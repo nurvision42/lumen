@@ -2,7 +2,7 @@ import type { ModelBinding } from "../config.js";
 import type { MediaRef, VideoRequest } from "../catalog.js";
 import { CliError } from "../errors.js";
 import type { RunMode } from "../flags.js";
-import { fetchOf, joinUrl, perform, publicResult, TransportError, type HttpCall } from "../http.js";
+import { fetchOf, joinUrl, perform, publicResult, TransportError, type HttpCall, type HttpResult, type SendOptions } from "../http.js";
 import type { IO } from "../io.js";
 import { redactValue } from "../redact.js";
 import type { OutputFile } from "../runs.js";
@@ -169,7 +169,21 @@ export async function runVideo(
   const first = planned[0];
   if (first === undefined) throw new CliError("video request has no call");
   const submitted = await perform(calls, first, opts);
-  const finished = await awaitHaomaoTask(calls, binding.baseUrl, {}, submitted, opts, io);
+  return finishHaomaoVideo(calls, binding.baseUrl, submitted, opts, io, mode, videoFile, receipt);
+}
+
+export async function finishHaomaoVideo(
+  calls: HttpCall[],
+  baseUrl: string,
+  initial: HttpResult,
+  opts: SendOptions,
+  io: IO,
+  mode: RunMode,
+  videoFile: string,
+  receipt: string,
+  knownId?: string,
+): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
+  const finished = await awaitHaomaoTask(calls, baseUrl, {}, initial, opts, io, knownId);
   const published = publicResult(finished.task);
   const response = redactValue(
     finished.videoUrl === undefined || published === null || typeof published !== "object" || Array.isArray(published)

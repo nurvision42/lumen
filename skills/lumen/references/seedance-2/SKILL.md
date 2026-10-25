@@ -59,4 +59,4 @@ lumen 对这三支模型只接受时长 4–15。官方允许的 `-1` 在这里�
 lumen gen video --model seedance-2 --shape text --prompt "…" --duration 5 --project <dir>
 ```
 
-默认 `--dry-run`。用户明确要成片时才加 `--execute`，命令会自己提交并等到成片。比例、时长、分辨率和声音用旗标，不要只写进提示词。不要加 `--web-search`。不要自己拼请求。
+默认 `--dry-run`。用户明确要成片时才加 `--execute`，命令会自己提交并等到成片（最多约 30 分钟）。如果输出 `running` 并提示 `lumen runs resume <id>`，说明任务还在服务端跑，执行那条命令接着等，不要重新生成。比例、时长、分辨率和声音用旗标，不要只写进提示词。不要加 `--web-search`。不要自己拼请求。
