@@ -53,7 +53,7 @@ lumen skill install --target agents
 lumen skill install --target /path/to/lumen --clean
 ```
 
-重复安装覆盖同一份，并把 CLI 版本写入该目录的 `.lumen-version`。另一个候选目录里已有 lumen 时会提示；`--clean` 只删那个 lumen 目录，其他 skill 不动。每次运行 lumen 都会做一次轻量检查：技能缺失或版本低于 CLI 时自动安装或更新到检测到的那一处，并打一行提示。`LUMEN_NO_SKILL_AUTOINSTALL=1` 关闭自动安装。没有 postinstall。
+重复安装覆盖同一份，并把 CLI 版本写入该目录的 `.lumen-version`。另一个候选目录里已有 lumen 时会提示；`--clean` 只删那个 lumen 目录，其他 skill 不动。`npm install` 和 `npm install -g` 的 postinstall 用同一套检测，装到这一处（覆盖并写 `.lumen-version`）。技能装不上时只在 stderr 打一行，npm 安装仍然成功。这一行在本仓库的 `npm install` 里能看到；`npm install -g` 默认不回显成功脚本的输出，加上 `--foreground-scripts` 才能看到。每次运行 lumen 还会做一次轻量检查：技能缺失或版本低于 CLI 时自动安装或更新到检测到的那一处，并打一行提示。`LUMEN_NO_SKILL_AUTOINSTALL=1` 同时关掉 postinstall 和这次运行时检查。
 
 ## 本地运行
 
@@ -282,7 +282,7 @@ npm install -g --prefix "$HOME/.local" --install-links .
 
 The script puts the program in `~/.local/share/lumen` and the command in `~/.local/bin/lumen`. The npm command copies the package to `~/.local/lib/node_modules/lumen` and the command to `~/.local/bin/lumen`. `--install-links` copies the checkout; without it, npm only links that directory. With nvm, `npm install -g --install-links .` is already under the user directory. `--path` writes the shell rc; a non-interactive run does not. Config is `~/.config/lumen` or `$XDG_CONFIG_HOME/lumen`. Downloaded ffmpeg, ffprobe, and sharp go to `~/.cache/lumen` or `$XDG_CACHE_HOME/lumen`. Uninstall removes the program and the command, and leaves config and cache.
 
-`lumen skill install` copies `SKILL.md` and `references` to one directory. `LUMEN_SKILL_DIR` wins over `--target`. Auto-detect uses `/home/box/agent-data/workflows/lumen` when that workflows directory exists and is writable, and otherwise `~/.agents/skills/lumen`. `LUMEN_WORKFLOWS_DIR` changes the workflows directory that auto-detect checks. A repeat install overwrites that same directory and writes `.lumen-version`. When the other candidate already has a lumen skill, the command says so; `--clean` removes that lumen directory and leaves other skills. Every lumen run updates the detected directory when the skill is missing or older than the CLI, and prints one line. `LUMEN_NO_SKILL_AUTOINSTALL=1` turns that off. There is no postinstall hook.
+`lumen skill install` copies `SKILL.md` and `references` to one directory. `LUMEN_SKILL_DIR` wins over `--target`. Auto-detect uses `/home/box/agent-data/workflows/lumen` when that workflows directory exists and is writable, and otherwise `~/.agents/skills/lumen`. `LUMEN_WORKFLOWS_DIR` changes the workflows directory that auto-detect checks. A repeat install overwrites that same directory and writes `.lumen-version`. When the other candidate already has a lumen skill, the command says so; `--clean` removes that lumen directory and leaves other skills. `npm install` and `npm install -g` run a postinstall hook that uses the same detection, overwrites that one directory, and writes `.lumen-version`. If the skill install fails, the hook prints one stderr line and the npm install still succeeds. `npm install` in this package shows that line. `npm install -g` hides successful script output unless `--foreground-scripts` is set. Every lumen run updates the detected directory when the skill is missing or older than the CLI, and prints one line. `LUMEN_NO_SKILL_AUTOINSTALL=1` turns both off.
 
 For a checkout: `npm install`, `npm test`, `npm run build`, then `node dist/cli.js --help`. `npx tsx src/cli.ts` works without a build.
 
