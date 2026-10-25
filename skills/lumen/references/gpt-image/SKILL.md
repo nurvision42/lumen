@@ -26,7 +26,7 @@ Sunburst 已经够用之后，再用同一条提示词、同一组参考、同�
 供应商只有 `yunqiao` 或 `grsai`。每支模型一条绑定，没有绑定就停，不换模型，不换密钥。
 
 ```bash
-lumen providers set gpt-image-2.5-flare --provider yunqiao --base-url <url> --api-key-env YUNQIAO_API_KEY
+lumen providers set gpt-image-2.5-flare --provider yunqiao --api-key-env YUNQIAO_API_KEY
 ```
 
 可加 `--group <id>`、`--model-alias <id>`、`--global`。`yunqiao` 的 group 会带上。`grsai` 不发送 group。`model-alias` 只替换上游模型字符串，不换 lumen 的模型 id。`haomao`、`kitta`、`mediakit` 不能绑这三支。

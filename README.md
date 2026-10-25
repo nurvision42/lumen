@@ -123,7 +123,17 @@ lumen doctor
 | `voice-design-1`、`voice-clone`、`voice-synthesis` | kitta |
 | `video-understand-router`、`enhance-video-generative` | mediakit |
 
-`baseUrl` 必须写进绑定，没有静默默认地址。yunqiao 含 `/v1`。grsai 是源站（路径 `/v1/images/generations`）。haomao 含版本前缀，lumen 再接 `/contents/generations/tasks`。kitta 是源站，例如 `https://fishaudio.org`。mediakit 是源站。
+每个内置供应商都自带官方默认 `baseUrl`，绑定里可以不写；写了（配置或 `--base-url`）就用你写的。密钥仍由你自己配。
+
+| 供应商 | 默认 `baseUrl` |
+|---|---|
+| yunqiao（云桥） | `https://api.yunqiao.me/v1`（含 `/v1`） |
+| grsai | `https://grsaiapi.com`（源站，路径 `/v1/images/generations`；国内节点 `https://grsai.dakka.com.cn`） |
+| haomao（好猫） | `https://haomaotoken.com/api/v3`（含版本前缀，lumen 再接 `/contents/generations/tasks`） |
+| kitta | `https://fishaudio.org`（源站） |
+| mediakit | `https://mediakit.cn-beijing.volces.com`（源站） |
+
+`lumen providers list` 和 `lumen doctor` 在用默认地址时标 `(default)`。
 
 分组：
 
@@ -237,11 +247,10 @@ dry-run 可以记下本地路径，并在计划里留下占位轮询：`GET /con
 ```bash
 lumen providers set seedance-2 \
   --provider haomao \
-  --base-url https://haomao.example/api/v3 \
   --api-key-env HAOMAO_SEEDANCE_KEY
 ```
 
-加 `--global` 写到用户目录。只保存环境变量名，不保存密钥值。示例（假主机）见 `lumen.config.example.json`。结构见 `schemas/config.schema.json`。
+不写 `--base-url` 就用默认地址；要换线路再加 `--base-url <url>`。加 `--global` 写到用户目录。只保存环境变量名，不保存密钥值。示例（假主机）见 `lumen.config.example.json`。结构见 `schemas/config.schema.json`。
 
 `lumen doctor` 先写出 lumen 自己的安装目录、PATH 上的 `lumen` 是不是这一份、`~/.local/bin` 在不在 PATH，以及配置目录和缓存目录。接着写出技能目录、版本、是否和 CLI 一致、有没有另一份 lumen。然后报告 ffmpeg、ffprobe、sharp 各自的路径、版本和来源（没有则是 missing）、每个模型未绑定 / 已绑定 / 供应商不对、对应环境变量是否有值、拆解提示词是 default（内置拉片表）还是 set、TikHub 密钥是 present 还是 missing。不下载二进制，不打印提示词正文，也不打印密钥。
 
@@ -290,9 +299,19 @@ The default is `--dry-run` (audit only, no network, no media). `--execute` calls
 
 ## Routing
 
-Each model id has its own binding: `provider`, `baseUrl`, `apiKeyEnv`, optional `group` and `modelAlias`. A project binding replaces the global one for that id. A missing mapping is `no provider binding for <id>` and never falls back to another model. Key values are not stored.
+Each model id has its own binding: `provider`, `apiKeyEnv`, optional `baseUrl`, `group` and `modelAlias`. A project binding replaces the global one for that id. A missing mapping is `no provider binding for <id>` and never falls back to another model. Key values are not stored.
 
-yunqiao base URLs include `/v1`. grsai, haomao, kitta, and mediakit base URLs are the origins or version roots their docs name. There is no silent default host.
+Every built-in provider ships an official default `baseUrl`; a `baseUrl` you set (config or `--base-url`) overrides it. Keys are always yours to configure.
+
+| Provider | Default `baseUrl` |
+|---|---|
+| yunqiao | `https://api.yunqiao.me/v1` (includes `/v1`) |
+| grsai | `https://grsaiapi.com` (origin; China node `https://grsai.dakka.com.cn`) |
+| haomao | `https://haomaotoken.com/api/v3` (version root; lumen appends `/contents/generations/tasks`) |
+| kitta | `https://fishaudio.org` (origin) |
+| mediakit | `https://mediakit.cn-beijing.volces.com` (origin) |
+
+`lumen providers list` and `lumen doctor` mark defaults with `(default)`.
 
 Groups: `X-Group` for yunqiao. On MediaKit, `group` is `queue_id`. grsai, haomao, and kitta do not send `group`.
 

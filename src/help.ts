@@ -72,7 +72,7 @@ Skill (one directory):
 
 Config:
   lumen.config.json in the project, merged over ~/.config/lumen/providers.json
-  models.<id>.{ provider, baseUrl, apiKeyEnv, group?, modelAlias? }
+  models.<id>.{ provider, apiKeyEnv, baseUrl?, group?, modelAlias? }  (baseUrl defaults to the provider's official API)
 
 Exit 0 on success, 1 on a bad project or request, 2 on usage.`;
 }

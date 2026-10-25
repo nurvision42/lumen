@@ -6,7 +6,8 @@ import {
   projectConfigPath,
   readConfigFile,
   writeConfigFile,
-  type ModelBinding,
+  resolveBinding,
+  type StoredBinding,
 } from "../config.js";
 import { CliError } from "../errors.js";
 import { flagString, parseFlags, requireRestEmpty } from "../flags.js";
@@ -35,7 +36,7 @@ async function listProviders(args: string[], project: string, io: IO): Promise<n
     if (binding === undefined) continue;
     const group = binding.group === undefined ? "" : ` group=${binding.group}`;
     const alias = binding.modelAlias === undefined ? "" : ` alias=${binding.modelAlias}`;
-    line(io, `${id}  ${binding.provider}  ${binding.baseUrl}  ${binding.apiKeyEnv}${group}${alias}  [${loaded.sources[id]}]`);
+    line(io, `${id}  ${binding.provider}  ${binding.baseUrl}${binding.baseUrlDefault ? " (default)" : ""}  ${binding.apiKeyEnv}${group}${alias}  [${loaded.sources[id]}]`);
   }
   line(io, `project: ${projectConfigPath(project)}`);
   const global = globalConfigPath(io.env);
@@ -60,8 +61,8 @@ async function setProvider(args: string[], project: string, io: IO): Promise<num
   const provider = flagString(values, "provider");
   const baseUrl = flagString(values, "base-url");
   const apiKeyEnv = flagString(values, "api-key-env");
-  if (provider === undefined || baseUrl === undefined || apiKeyEnv === undefined) {
-    throw new CliError("providers set needs --provider, --base-url, and --api-key-env", 2);
+  if (provider === undefined || apiKeyEnv === undefined) {
+    throw new CliError("providers set needs --provider and --api-key-env (--base-url is optional)", 2);
   }
   if (!(PROVIDERS as readonly string[]).includes(provider)) {
     throw new CliError(`unknown provider ${provider}. Known providers: ${PROVIDERS.join(", ")}`);
@@ -70,9 +71,9 @@ async function setProvider(args: string[], project: string, io: IO): Promise<num
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
     throw new CliError("apiKeyEnv must match /^[A-Za-z_][A-Za-z0-9_]*$/");
   }
-  const binding: ModelBinding = {
+  const stored: StoredBinding = {
     provider,
-    baseUrl: assertBaseUrl(baseUrl),
+    ...(baseUrl === undefined ? {} : { baseUrl: assertBaseUrl(baseUrl) }),
     apiKeyEnv,
     ...(flagString(values, "group") === undefined ? {} : { group: flagString(values, "group") }),
     ...(flagString(values, "model-alias") === undefined ? {} : { modelAlias: flagString(values, "model-alias") }),
@@ -82,8 +83,9 @@ async function setProvider(args: string[], project: string, io: IO): Promise<num
   if (file === undefined) throw new CliError("no global config path; set HOME or XDG_CONFIG_HOME");
   if (!global) await assertProject(project);
   const current = await readConfigFile(file);
-  current.models[modelId] = binding;
+  current.models[modelId] = stored;
+  const binding = resolveBinding(stored);
   await writeConfigFile(file, current);
-  line(io, `set ${modelId} ${provider} ${binding.baseUrl} ${apiKeyEnv} (${global ? "global" : "project"})`);
+  line(io, `set ${modelId} ${provider} ${binding.baseUrl}${binding.baseUrlDefault ? " (default)" : ""} ${apiKeyEnv} (${global ? "global" : "project"})`);
   return 0;
 }

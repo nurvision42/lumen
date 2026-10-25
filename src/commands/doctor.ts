@@ -51,7 +51,7 @@ export async function doctorCommand(args: string[], project: string, io: IO): Pr
     const alias = binding.modelAlias === undefined ? "" : ` alias=${binding.modelAlias}`;
     const source = loaded.sources[model.id] ?? "project";
     const name = accepted ? binding.provider : `${binding.provider} wrong-provider`;
-    line(io, `  ${model.id}: ${name} ${binding.baseUrl}${group}${alias} ${binding.apiKeyEnv} ${key} [${source}]`);
+    line(io, `  ${model.id}: ${name} ${binding.baseUrl}${binding.baseUrlDefault ? " (default)" : ""}${group}${alias} ${binding.apiKeyEnv} ${key} [${source}]`);
     if (!accepted) line(io, `    accepts: ${model.providers.join(", ")}`);
   }
   line(io, "");
