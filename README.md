@@ -42,7 +42,7 @@ bash scripts/install.sh --uninstall
 npm install -g --prefix "$HOME/.local" --install-links .
 ```
 
-这一步把包装进 `~/.local/lib/node_modules/lumen`，命令在 `~/.local/bin/lumen`。`--install-links` 复制一份，而不是链回源码目录。nvm 的全局目录已经在用户目录下，用 `npm install -g --install-links .`。
+这一步把包装进 `~/.local/lib/node_modules/@nurvision/lumen`，命令在 `~/.local/bin/lumen`。`--install-links` 复制一份，而不是链回源码目录。nvm 的全局目录已经在用户目录下，用 `npm install -g --install-links .`。
 
 技能说明随包发布，运行时再复制到一个目录。`LUMEN_SKILL_DIR` 优先于 `--target`，否则自动检测：`/home/box/agent-data/workflows` 存在且可写时用 `workflows/lumen/`（Grok Bot 读该目录下每个子目录的 `SKILL.md`），否则用 `~/.agents/skills/lumen/`。只写这一处。`LUMEN_WORKFLOWS_DIR` 可改检测用的 workflows 目录。
 
@@ -280,7 +280,7 @@ bash scripts/install.sh --uninstall
 npm install -g --prefix "$HOME/.local" --install-links .
 ```
 
-The script puts the program in `~/.local/share/lumen` and the command in `~/.local/bin/lumen`. The npm command copies the package to `~/.local/lib/node_modules/lumen` and the command to `~/.local/bin/lumen`. `--install-links` copies the checkout; without it, npm only links that directory. With nvm, `npm install -g --install-links .` is already under the user directory. `--path` writes the shell rc; a non-interactive run does not. Config is `~/.config/lumen` or `$XDG_CONFIG_HOME/lumen`. Downloaded ffmpeg, ffprobe, and sharp go to `~/.cache/lumen` or `$XDG_CACHE_HOME/lumen`. Uninstall removes the program and the command, and leaves config and cache.
+The script puts the program in `~/.local/share/lumen` and the command in `~/.local/bin/lumen`. The npm command copies the package to `~/.local/lib/node_modules/@nurvision/lumen` and the command to `~/.local/bin/lumen`. `--install-links` copies the checkout; without it, npm only links that directory. With nvm, `npm install -g --install-links .` is already under the user directory. `--path` writes the shell rc; a non-interactive run does not. Config is `~/.config/lumen` or `$XDG_CONFIG_HOME/lumen`. Downloaded ffmpeg, ffprobe, and sharp go to `~/.cache/lumen` or `$XDG_CACHE_HOME/lumen`. Uninstall removes the program and the command, and leaves config and cache.
 
 `lumen skill install` copies `SKILL.md` and `references` to one directory. `LUMEN_SKILL_DIR` wins over `--target`. Auto-detect uses `/home/box/agent-data/workflows/lumen` when that workflows directory exists and is writable, and otherwise `~/.agents/skills/lumen`. `LUMEN_WORKFLOWS_DIR` changes the workflows directory that auto-detect checks. A repeat install overwrites that same directory and writes `.lumen-version`. When the other candidate already has a lumen skill, the command says so; `--clean` removes that lumen directory and leaves other skills. Every lumen run updates the detected directory when the skill is missing or older than the CLI, and prints one line. `LUMEN_NO_SKILL_AUTOINSTALL=1` turns that off. There is no postinstall hook.
 

@@ -1,6 +1,9 @@
 {
-  "name": "lumen",
+  "name": "@nurvision/lumen",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Thin chat-oriented video assistant. A project is a local folder.",
   "license": "MIT",
   "type": "module",
