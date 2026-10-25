@@ -223,3 +223,66 @@ test("fish clone and synth plan the official routes", async () => {
     assert.equal(spoken?.calls[0]?.body.value?.text, "hello there");
   });
 });
+
+test("haomao seedance uploads local refs once each and keeps https refs", async () => {
+  await withDir(async (dir) => {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(path.join(dir, "face.png"), Buffer.from("png-bytes"));
+    await writeFile(path.join(dir, "move.mp4"), Buffer.from("mp4-bytes"));
+    await writeFile(path.join(dir, "line.mp3"), Buffer.from("mp3-bytes"));
+    await bind(dir, "seedance-2-fast", "haomao", "https://haomao.example/api/v3", "HAOMAO");
+    const uploads: Array<{ auth?: string; type: string; body: string }> = [];
+    let submitted: unknown;
+    const fetchImpl: IO["fetch"] = async (url, init) => {
+      if (url.endsWith("/files/uploads")) {
+        const headers = init?.headers as Record<string, string>;
+        const body = Buffer.from(init?.body as Uint8Array).toString("utf8");
+        uploads.push({ type: headers["Content-Type"] ?? "", body, ...(authOf(init) ? { auth: authOf(init) } : {}) });
+        const name = /filename="([^"]+)"/.exec(body)?.[1];
+        return jsonResponse({ url: `https://files.example/${name}` });
+      }
+      if (url.endsWith("/contents/generations/tasks")) {
+        submitted = JSON.parse(String(init?.body));
+        return jsonResponse({ id: "cgt-u", status: "queued" });
+      }
+      if (url.endsWith("/tasks/cgt-u")) return jsonResponse({ id: "cgt-u", status: "succeeded", content: { video_url: "https://cdn.example/out.mp4" } });
+      if (url === "https://cdn.example/out.mp4") return new Response(Buffer.from("video"), { headers: { "content-type": "video/mp4" } });
+      return jsonResponse({ error: "unexpected" }, 500);
+    };
+    const args = [
+      "gen", "video", "--model", "seedance-2-fast", "--shape", "reference", "--prompt", "go", "--duration", "4",
+      "--ref", "image|face.png|true", "--ref", "image|./face.png|false", "--ref", "image|https://cdn.example/b.png|false",
+      "--ref", "video|move.mp4|false", "--ref", "audio|line.mp3", "--out", path.join(dir, "out.mp4"), "--project", dir,
+    ];
+    const dry = capture({ HAOMAO: "haomao-secret-value" }, { cwd: dir });
+    assert.equal(await run(args, dry.io), 0, dry.err());
+    assert.equal(uploads.length, 0);
+    const cap = capture({ HAOMAO: "haomao-secret-value", SEEDANCE_POLL_MS: "0" }, { fetch: fetchImpl, cwd: dir });
+    assert.equal(await run([...args, "--execute"], cap.io), 0, cap.err());
+    assert.equal(uploads.length, 3);
+    for (const up of uploads) {
+      assert.equal(up.auth, "Bearer haomao-secret-value");
+      assert.match(up.type, /^multipart\/form-data/);
+      assert.match(up.body, /name="purpose"\r\n\r\nuser_data/);
+      assert.match(up.body, /name="model"\r\n\r\n/);
+    }
+    assert.match(uploads.map((u) => u.body).join(""), /Content-Type: image\/png[\s\S]*Content-Type: video\/mp4[\s\S]*Content-Type: audio\/mpeg/);
+    const content = (submitted as { content: Array<{ type: string; role?: string; [k: string]: unknown }> }).content;
+    const urls = content.filter((c) => c.type !== "text").map((c) => `${c.role}=${(c[c.type] as { url: string }).url}`);
+    assert.deepEqual(urls, [
+      "reference_image=https://files.example/face.png",
+      "reference_image=https://files.example/face.png",
+      "reference_image=https://cdn.example/b.png",
+      "reference_video=https://files.example/move.mp4",
+      "reference_audio=https://files.example/line.mp3",
+    ]);
+    const { readdir } = await import("node:fs/promises");
+    const records = await Promise.all((await readdir(path.join(dir, ".lumen", "runs"))).map(async (name) =>
+      await readFile(path.join(dir, ".lumen", "runs", name, "record.json"), "utf8")));
+    const dumped = records.join("");
+    assert.match(dumped, /plannedUploads/);
+    assert.match(dumped, /"sha256": "[0-9a-f]{64}"/);
+    assert.equal(dumped.includes("haomao-secret-value"), false);
+    assert.equal(dumped.includes("png-bytes"), false);
+  });
+});
