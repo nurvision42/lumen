@@ -16,7 +16,7 @@ Usage:
   lumen sprite --video <file> --to <image> [--every s|--frames n|--every-frame|--at t|--ranges json] [--columns n] [--rows n] [--cell px] [--transcript file] [--json]
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
   lumen enhance [--video file] [--shot N] [--out file]
-  lumen runs list|show <id>
+  lumen runs list|show <id>|resume <id>
   lumen concat [--project dir]
   lumen library status|list|find|add|connect feishu
   lumen skill install [--target grokbot|agents|<path>] [--clean]

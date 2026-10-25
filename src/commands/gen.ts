@@ -171,6 +171,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
       out: flagString(values, "out"),
     });
     const receipt = `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`;
+    ctx.resume = { videoFile, receipt };
     const outcome = await runVideo(request, binding, mode, io, ctx.secret, videoFile, receipt);
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;

@@ -2,6 +2,7 @@ import { CliError } from "../errors.js";
 import { flagString, parseFlags, requireRestEmpty } from "../flags.js";
 import { line, type IO } from "../io.js";
 import { assertProject } from "../project.js";
+import { resumeRun } from "./resume.js";
 import { listRunRecords, readRunMarkdown } from "../runs.js";
 
 export async function runsCommand(args: string[], project: string, io: IO): Promise<number> {
@@ -25,5 +26,14 @@ export async function runsCommand(args: string[], project: string, io: IO): Prom
     io.stdout(await readRunMarkdown(project, id));
     return 0;
   }
-  throw new CliError("runs needs list or show", 2);
+  if (sub === "resume") {
+    const parsed = parseFlags(rest, { task: "string", out: "string" });
+    const id = parsed.rest[0];
+    if (id === undefined) throw new CliError("runs resume needs a run id", 2);
+    requireRestEmpty(parsed.rest.slice(1));
+    const task = flagString(parsed.values, "task");
+    const out = flagString(parsed.values, "out");
+    return resumeRun(project, id, { ...(task === undefined ? {} : { task }), ...(out === undefined ? {} : { out }) }, io);
+  }
+  throw new CliError("runs needs list, show or resume", 2);
 }

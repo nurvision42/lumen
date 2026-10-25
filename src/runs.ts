@@ -6,6 +6,7 @@ import { CliError } from "./errors.js";
 import { fileExists } from "./fsutil.js";
 import type { HttpCall } from "./http.js";
 import { TransportError } from "./http.js";
+import { PendingTaskError } from "./clients/jobs.js";
 import type { IO } from "./io.js";
 import { line } from "./io.js";
 import { assertProject } from "./project.js";
@@ -28,13 +29,24 @@ export interface RunRecord {
   command: string[];
   modelId: string;
   mode: RunMode;
-  status: "dry-run" | "mock" | "ok" | "error";
+  status: "dry-run" | "mock" | "ok" | "error" | "running";
   binding: RunBinding | null;
   params: unknown;
   calls: unknown;
   response: unknown;
   outputs: string[];
   error?: string;
+  pending?: PendingTask;
+  resumedAt?: string[];
+}
+
+/** A remote task still running when the poll window ended; `lumen runs resume <id>` picks it up. */
+export interface PendingTask {
+  provider: string;
+  taskId: string;
+  lastStatus: string;
+  videoFile: string;
+  receipt: string;
 }
 
 export interface OutputFile {
@@ -52,6 +64,11 @@ export interface RunCtx {
   calls: HttpCall[];
   response: unknown;
   files: OutputFile[];
+  resume?: { videoFile: string; receipt: string };
+}
+
+export function resumeHint(id: string): string {
+  return `still running on the server; resume with: lumen runs resume ${id}`;
 }
 
 export function createRunId(date: Date): string {
@@ -137,21 +154,29 @@ export async function settle(
   let status: RunRecord["status"] = "error";
   let error: string | undefined;
   let thrown: unknown;
+  let pending: PendingTask | undefined;
   try {
     await work(id, ctx);
     status = mode === "dry-run" ? "dry-run" : mode === "mock" ? "mock" : "ok";
   } catch (err) {
     if (err instanceof CliError && err.exitCode === 2) throw err;
+    if (err instanceof PendingTaskError && ctx.resume !== undefined && mode === "execute") {
+      status = "running";
+      pending = { provider: err.provider, taskId: err.taskId, lastStatus: err.lastStatus, ...ctx.resume };
+      ctx.calls = err.calls;
+      ctx.response = err.response ?? ctx.response;
+    } else {
     thrown = err;
     error = err instanceof Error ? err.message : String(err);
     if (err instanceof TransportError) {
       ctx.calls = err.calls;
       ctx.response = err.response ?? ctx.response;
     }
+    }
   }
 
   const outputs: string[] = [];
-  if (thrown === undefined && mode === "execute") {
+  if (thrown === undefined && pending === undefined && mode === "execute") {
     for (const file of ctx.files) {
       await mkdir(path.dirname(file.path), { recursive: true });
       if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
@@ -173,6 +198,7 @@ export async function settle(
     response: ctx.response,
     outputs,
     ...(error === undefined ? {} : { error }),
+    ...(pending === undefined ? {} : { pending }),
   };
   await writeRun(project, record, ctx.secret === undefined ? [] : [ctx.secret]);
 
@@ -185,6 +211,10 @@ export async function settle(
 
   line(io, `${status} ${modelId}`);
   line(io, `run: ${id}`);
+  if (pending !== undefined) {
+    line(io, `task: ${pending.provider} ${pending.taskId} (${pending.lastStatus})`);
+    line(io, resumeHint(id));
+  }
   for (const call of ctx.calls) line(io, `${call.method} ${redactUrl(call.url)}`);
   for (const output of outputs) line(io, `wrote: ${output}`);
   line(io, `audit: ${path.join(runDir(project, id), "record.json")}`);
@@ -209,4 +239,10 @@ export async function readRunMarkdown(project: string, id: string): Promise<stri
   const file = path.join(runDir(project, id), "record.md");
   if (!(await fileExists(file))) throw new CliError(`no run ${id}`);
   return readFile(file, "utf8");
+}
+
+export async function readRunRecord(project: string, id: string): Promise<RunRecord> {
+  const file = path.join(runDir(project, id), "record.json");
+  if (!(await fileExists(file))) throw new CliError(`no run ${id}`);
+  return JSON.parse(await readFile(file, "utf8")) as RunRecord;
 }
