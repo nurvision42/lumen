@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, readFileSync } from "node:fs";
 import { access, chmod, lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -22,6 +22,7 @@ import { capture, withDir } from "./helpers.js";
 const exec = promisify(execFile);
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const script = path.join(root, "scripts", "install.sh");
+const pkgVersion = (JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as { version: string }).version;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -150,7 +151,7 @@ test("user install upgrades in place and uninstall leaves config and cache", { t
     await assert.rejects(access(path.join(share, "node_modules", "typescript", "package.json")));
     const versionEnv = installEnv(home, { PATH: `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ""}` });
     const version = await exec(bin, ["--version"], { env: versionEnv });
-    assert.equal(version.stdout.trim(), "0.1.0");
+    assert.equal(version.stdout.trim(), pkgVersion);
     const doctor = await exec(bin, ["doctor", "--project", home], { env: versionEnv });
     assert.match(doctor.stdout, new RegExp(`^lumen: ${escapeRegExp(share)}$`, "m"));
     assert.match(doctor.stdout, new RegExp(`^lumen on PATH: ${escapeRegExp(bin)} \\(this\\)$`, "m"));
@@ -163,7 +164,7 @@ test("user install upgrades in place and uninstall leaves config and cache", { t
     await runScript(home, ["--no-path"]);
     await assert.rejects(access(marker));
     const upgraded = await exec(bin, ["--version"], { env: versionEnv });
-    assert.equal(upgraded.stdout.trim(), "0.1.0");
+    assert.equal(upgraded.stdout.trim(), pkgVersion);
 
     const linked = await runScript(home, ["--path"], { SHELL: "/bin/zsh" });
     assert.match(linked.stdout, /added .+ to .+\/\.zshrc/);
@@ -205,7 +206,7 @@ test("npm --prefix install puts the command in the user directory", { timeout: 1
     const bin = path.join(prefix, "bin", "lumen");
     const runEnv = installEnv(home, { PATH: `${path.join(prefix, "bin")}${path.delimiter}${process.env.PATH ?? ""}` });
     const version = await exec(bin, ["--version"], { env: runEnv });
-    assert.equal(version.stdout.trim(), "0.1.0");
+    assert.equal(version.stdout.trim(), pkgVersion);
     const doctor = await exec(bin, ["doctor", "--project", home], { env: runEnv });
     const installed = path.join(prefix, "lib", "node_modules", "@nurvision", "lumen");
     assert.match(doctor.stdout, new RegExp(`^lumen: ${escapeRegExp(installed)}$`, "m"));

@@ -40,6 +40,7 @@ test("version relation treats missing and unparsable text as older", () => {
 test("postinstall is wired and documented next to runtime autoinstall", async () => {
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { scripts?: Record<string, string> };
   assert.equal(pkg.scripts?.postinstall, "node scripts/postinstall-skill.mjs");
+  assert.equal(pkg.scripts?.prepublishOnly, "npm run build");
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
   const readme = await readFile(path.join(root, "README.md"), "utf8");
@@ -406,7 +407,7 @@ test("npm pack postinstall installs one skill directory", { timeout: 180_000 }, 
     assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8"));
     assert.equal((await readFile(path.join(grokbot, SKILL_VERSION_FILE), "utf8")).trim(), version);
     await assert.rejects(access(agents));
-    await access(path.join(prefix, "lib", "node_modules", "lumen", "scripts", "postinstall-skill.mjs"));
+    await access(path.join(prefix, "lib", "node_modules", "@nurvision", "lumen", "scripts", "postinstall-skill.mjs"));
 
     const blocker = path.join(home, "not-a-directory");
     await writeFile(blocker, "x\n");
@@ -431,7 +432,7 @@ async function runPackedPostinstall(
   prefix: string,
   env: NodeJS.ProcessEnv,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const script = path.join(prefix, "lib", "node_modules", "lumen", "scripts", "postinstall-skill.mjs");
+  const script = path.join(prefix, "lib", "node_modules", "@nurvision", "lumen", "scripts", "postinstall-skill.mjs");
   return runNode([script], env, path.dirname(path.dirname(script)));
 }
 
