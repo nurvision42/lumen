@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumen.dev/schemas/run.schema.json",
+  "title": "lumen run record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "time", "command", "modelId", "mode", "status", "binding", "params", "calls", "response", "outputs"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{4}$" },
+    "time": { "type": "string" },
+    "command": { "type": "array", "items": { "type": "string" } },
+    "modelId": { "type": "string" },
+    "mode": { "enum": ["dry-run", "execute", "mock"] },
+    "status": { "enum": ["dry-run", "mock", "ok", "error"] },
+    "binding": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "baseUrl", "apiKeyEnv", "keyPresent"],
+          "properties": {
+            "provider": { "type": "string" },
+            "baseUrl": { "type": "string" },
+            "apiKeyEnv": { "type": "string" },
+            "keyPresent": { "type": "boolean" },
+            "group": { "type": "string" },
+            "modelAlias": { "type": "string" },
+            "source": { "enum": ["project", "global"] }
+          }
+        }
+      ]
+    },
+    "params": {},
+    "calls": {},
+    "response": {},
+    "outputs": { "type": "array", "items": { "type": "string" } },
+    "error": { "type": "string" }
+  }
+}

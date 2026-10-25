@@ -1,0 +1,73 @@
+{
+  "models": {
+    "gpt-image-2": {
+      "provider": "yunqiao",
+      "baseUrl": "https://yunqiao.example/v1",
+      "apiKeyEnv": "YUNQIAO_API_KEY",
+      "group": "image-a"
+    },
+    "gpt-image-2.5-flare": {
+      "provider": "grsai",
+      "baseUrl": "https://grsai.example",
+      "apiKeyEnv": "GRSAI_FLARE_KEY"
+    },
+    "gpt-image-2.5-sunburst": {
+      "provider": "grsai",
+      "baseUrl": "https://grsai.example",
+      "apiKeyEnv": "GRSAI_SUNBURST_KEY"
+    },
+    "seedance-2": {
+      "provider": "haomao",
+      "baseUrl": "https://haomao.example/api/v3",
+      "apiKeyEnv": "HAOMAO_SEEDANCE_KEY"
+    },
+    "seedance-2-fast": {
+      "provider": "haomao",
+      "baseUrl": "https://haomao.example/api/v3",
+      "apiKeyEnv": "HAOMAO_FAST_KEY"
+    },
+    "seedance-2-mini": {
+      "provider": "haomao",
+      "baseUrl": "https://haomao.example/api/v3",
+      "apiKeyEnv": "HAOMAO_MINI_KEY"
+    },
+    "seedance-2.5": {
+      "provider": "haomao",
+      "baseUrl": "https://haomao.example/api/v3",
+      "apiKeyEnv": "HAOMAO_25_KEY"
+    },
+    "voice-design-1": {
+      "provider": "kitta",
+      "baseUrl": "https://fishaudio.org",
+      "apiKeyEnv": "KITTA_API_KEY"
+    },
+    "voice-clone": {
+      "provider": "kitta",
+      "baseUrl": "https://fishaudio.org",
+      "apiKeyEnv": "KITTA_API_KEY"
+    },
+    "voice-synthesis": {
+      "provider": "kitta",
+      "baseUrl": "https://fishaudio.org",
+      "apiKeyEnv": "KITTA_API_KEY"
+    },
+    "video-understand-router": {
+      "provider": "mediakit",
+      "baseUrl": "https://mediakit.cn-beijing.volces.com",
+      "apiKeyEnv": "MEDIAKIT_UNDERSTAND_KEY",
+      "group": "queue-edit"
+    },
+    "enhance-video-generative": {
+      "provider": "mediakit",
+      "baseUrl": "https://mediakit.cn-beijing.volces.com",
+      "apiKeyEnv": "MEDIAKIT_ENHANCE_KEY",
+      "group": "queue-enhance"
+    }
+  },
+  "breakdown": {
+    "prompt": "",
+    "preferModels": ["doubao-seed-2-1-lite-260915"],
+    "level": "Quality",
+    "needAudio": true
+  }
+}

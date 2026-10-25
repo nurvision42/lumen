@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lumen/shotlist.schema.json",
+  "title": "lumen shotlist",
+  "description": "A lumen shot list. Four fields only: #, durationSec, frame, vo. An empty array is a valid document and an incomplete project; `lumen validate` requires at least one shot. Shot numbers are unique.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["#", "durationSec", "frame", "vo"],
+    "properties": {
+      "#": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Shot number."
+      },
+      "durationSec": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "description": "Duration in seconds."
+      },
+      "frame": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What the picture shows."
+      },
+      "vo": {
+        "type": "string",
+        "description": "Spoken line. Empty string when the shot has no voice."
+      }
+    }
+  }
+}

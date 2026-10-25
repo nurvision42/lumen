@@ -1,0 +1,50 @@
+{
+  "name": "lumen",
+  "version": "0.1.0",
+  "description": "Thin chat-oriented video assistant. A project is a local folder.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "lumen": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "skills",
+    "scripts",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsx --test test/*.test.ts",
+    "lumen": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "cli",
+    "lumen",
+    "shotlist",
+    "video"
+  ],
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/qrcode": "^1.5.6",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
