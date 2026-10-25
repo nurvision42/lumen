@@ -112,7 +112,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.equal(readme.includes(BREAKDOWN_DEFAULT_PROMPT), true);
   assert.equal(skill.trim().split("\n").length <= 80, true);
   assert.equal(/给代理用的|for agents/i.test(skill), false);
-  assert.equal(/nurvision|\.nurvision|\bnv\b/i.test(skill), false);
+  assert.equal(/nurvision|\.nurvision|\bnv\b/i.test(skill.replaceAll("@nurvision/lumen", "")), false);
   assert.equal(/cinematic|电影感|seedance-pe\/SKILL\.md/.test(skill), false);
   assert.equal(/https?:\/\/|contents\/generations|\/v1\/|SEEDANCE_POLL|MEDIAKIT_POLL|还没做的|X-Group|voice-designs|api\/open|shotlist\.md/.test(skill), false);
 

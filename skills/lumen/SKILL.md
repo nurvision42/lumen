@@ -4,7 +4,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 ## 安装
 
-默认进用户目录，不需要 sudo。`bash scripts/install.sh` 把程序放到 `~/.local/share/lumen`，命令放到 `~/.local/bin/lumen`；已装则覆盖升级。`~/.local/bin` 不在 PATH 时只提示，`--path` 或在终端里回答 yes 才写 shell rc，`--no-path` 不改。卸掉用 `bash scripts/install.sh --uninstall`，配置和缓存留下。npm 用 `npm install -g --prefix ~/.local --install-links .`，包装进 `~/.local/lib/node_modules/lumen`，命令仍是 `~/.local/bin/lumen`；nvm 里用 `npm install -g --install-links .`。不加 `--install-links` 时，从目录安装只会链到源码。配置在 `~/.config/lumen`（或 `$XDG_CONFIG_HOME/lumen`），ffmpeg、ffprobe、sharp 的缓存在 `~/.cache/lumen`（或 `$XDG_CACHE_HOME/lumen`）。`lumen doctor` 写出安装位置和 PATH。
+默认进用户目录，不需要 sudo。`bash scripts/install.sh` 把程序放到 `~/.local/share/lumen`，命令放到 `~/.local/bin/lumen`；已装则覆盖升级。`~/.local/bin` 不在 PATH 时只提示，`--path` 或在终端里回答 yes 才写 shell rc，`--no-path` 不改。卸掉用 `bash scripts/install.sh --uninstall`，配置和缓存留下。npm 用 `npm install -g --prefix ~/.local --install-links .`，包装进 `~/.local/lib/node_modules/@nurvision/lumen`，命令仍是 `~/.local/bin/lumen`；nvm 里用 `npm install -g --install-links .`。不加 `--install-links` 时，从目录安装只会链到源码。配置在 `~/.config/lumen`（或 `$XDG_CONFIG_HOME/lumen`），ffmpeg、ffprobe、sharp 的缓存在 `~/.cache/lumen`（或 `$XDG_CACHE_HOME/lumen`）。`lumen doctor` 写出安装位置和 PATH。
 
 ## 技能
 

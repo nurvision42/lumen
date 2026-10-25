@@ -13,7 +13,7 @@ export function packageRootFrom(startFile: string): string {
   while (true) {
     try {
       const parsed = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")) as { name?: string };
-      if (parsed.name === "lumen") return dir;
+      if (parsed.name === "@nurvision/lumen") return dir;
     } catch {
       // keep walking
     }

@@ -54,7 +54,7 @@ Install (user directory, no sudo):
   npm install -g --prefix ~/.local --install-links .
   With nvm: npm install -g --install-links .
   Script: program ~/.local/share/lumen, command ~/.local/bin/lumen.
-  npm prefix: package ~/.local/lib/node_modules/lumen, command ~/.local/bin/lumen.
+  npm prefix: package ~/.local/lib/node_modules/@nurvision/lumen, command ~/.local/bin/lumen.
   Without --install-links, installing a folder only links that checkout.
   Config ~/.config/lumen (or $XDG_CONFIG_HOME/lumen). Cache ~/.cache/lumen (or $XDG_CACHE_HOME/lumen).
   --path writes the shell rc. Otherwise a terminal asks first. A non-interactive run leaves the rc unchanged.

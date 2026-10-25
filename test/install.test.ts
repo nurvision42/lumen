@@ -67,6 +67,7 @@ test("install paths stay under the user directory", () => {
   assert.equal(userBinDir({}), undefined);
   assert.equal(dirOnPath("/home/lumen/.local/bin", { PATH: "/usr/bin:/home/lumen/.local/bin" }), true);
   assert.equal(dirOnPath("/home/lumen/.local/bin", { PATH: "/usr/bin" }), false);
+  assert.equal(packageRootFrom(path.join(root, "src", "run.ts")), root);
   assert.equal(packageRootFrom(path.join(root, "src", "install", "locate.ts")), root);
 });
 
@@ -206,7 +207,7 @@ test("npm --prefix install puts the command in the user directory", { timeout: 1
     const version = await exec(bin, ["--version"], { env: runEnv });
     assert.equal(version.stdout.trim(), "0.1.0");
     const doctor = await exec(bin, ["doctor", "--project", home], { env: runEnv });
-    const installed = path.join(prefix, "lib", "node_modules", "lumen");
+    const installed = path.join(prefix, "lib", "node_modules", "@nurvision", "lumen");
     assert.match(doctor.stdout, new RegExp(`^lumen: ${escapeRegExp(installed)}$`, "m"));
     assert.match(doctor.stdout, new RegExp(`^lumen on PATH: ${escapeRegExp(bin)} \\(this\\)$`, "m"));
     assert.match(doctor.stdout, new RegExp(`^user bin: ${escapeRegExp(path.join(home, ".local", "bin"))} on PATH$`, "m"));
