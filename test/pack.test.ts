@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readdir } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
@@ -21,6 +21,15 @@ async function filesUnder(dir: string): Promise<string[]> {
 }
 
 test("npm pack includes the lumen skill and every reference", async () => {
+  const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as {
+    bin?: { lumen?: string };
+    files?: string[];
+  };
+  assert.equal(pkg.bin?.lumen, "./dist/cli.js");
+  assert.equal(pkg.files?.includes("dist"), true);
+  const gitignore = await readFile(path.join(root, ".gitignore"), "utf8");
+  assert.match(gitignore, /^dist\/$/m);
+  await assert.rejects(access(path.join(root, ".npmignore")));
   const { stdout } = await exec("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: root });
   const packed = JSON.parse(stdout) as { files?: { path: string }[] }[];
   const names = new Set((packed[0]?.files ?? []).map((file) => file.path));
@@ -30,5 +39,7 @@ test("npm pack includes the lumen skill and every reference", async () => {
   assert.equal(names.has("skills/lumen/SKILL.md"), true);
   assert.equal(names.has("scripts/install.sh"), true);
   assert.equal(names.has("scripts/postinstall-skill.mjs"), true);
+  assert.equal(names.has("dist/cli.js"), true);
+  assert.equal(names.has("dist/skill/place.js"), true);
   assert.equal([...names].some((file) => file.startsWith("skills/lumen/references/") && file.endsWith("/SKILL.md")), true);
 });

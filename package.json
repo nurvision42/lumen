@@ -31,10 +31,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall-skill.mjs",
     "test": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsx --test test/*.test.ts",
-    "lumen": "tsx src/cli.ts",
-    "prepublishOnly": "npm run build"
+    "lumen": "tsx src/cli.ts"
   },
   "keywords": [
     "cli",

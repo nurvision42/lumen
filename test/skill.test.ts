@@ -40,6 +40,7 @@ test("version relation treats missing and unparsable text as older", () => {
 test("postinstall is wired and documented next to runtime autoinstall", async () => {
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { scripts?: Record<string, string> };
   assert.equal(pkg.scripts?.postinstall, "node scripts/postinstall-skill.mjs");
+  assert.equal(pkg.scripts?.prepublishOnly, "npm run build");
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
   const readme = await readFile(path.join(root, "README.md"), "utf8");
