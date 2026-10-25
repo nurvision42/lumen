@@ -29,5 +29,6 @@ test("npm pack includes the lumen skill and every reference", async () => {
   for (const file of skills) assert.equal(names.has(file), true, file);
   assert.equal(names.has("skills/lumen/SKILL.md"), true);
   assert.equal(names.has("scripts/install.sh"), true);
+  assert.equal(names.has("scripts/postinstall-skill.mjs"), true);
   assert.equal([...names].some((file) => file.startsWith("skills/lumen/references/") && file.endsWith("/SKILL.md")), true);
 });

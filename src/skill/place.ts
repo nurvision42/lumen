@@ -1,10 +1,13 @@
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { extractProject } from "../args.js";
 import { CliError, errorCode } from "../errors.js";
 import { fileExists } from "../fsutil.js";
-import type { IO } from "../io.js";
+import { packageRootFrom } from "../install/locate.js";
+import { defaultIO, type IO } from "../io.js";
+import { readVersion } from "../version.js";
 
 /** Version file written inside the installed lumen skill directory. */
 export const SKILL_VERSION_FILE = ".lumen-version";
@@ -101,7 +104,30 @@ export async function installSkill(options: {
   };
 }
 
+/** npm postinstall entry. Uses the packaged files and never throws. */
+export async function runSkillPostinstall(): Promise<void> {
+  await postinstallSkill(defaultIO(), packageRootFrom(fileURLToPath(import.meta.url)), readVersion());
+}
+
+/**
+ * Copy the packaged skill into the one detected directory.
+ * `LUMEN_NO_SKILL_AUTOINSTALL` skips. A failure is one stderr line and does not throw.
+ */
+export async function postinstallSkill(io: IO, root: string, cliVersion: string): Promise<void> {
+  await placeSkill(io, root, cliVersion, false, "skill postinstall failed");
+}
+
 export async function autoinstallSkill(io: IO, root: string, cliVersion: string): Promise<void> {
+  await placeSkill(io, root, cliVersion, true, "skill autoinstall failed");
+}
+
+async function placeSkill(
+  io: IO,
+  root: string,
+  cliVersion: string,
+  upgradeOnly: boolean,
+  failureLabel: string,
+): Promise<void> {
   if (autoinstallDisabled(io.env)) return;
   try {
     const result = await installSkill({
@@ -109,15 +135,21 @@ export async function autoinstallSkill(io: IO, root: string, cliVersion: string)
       cwd: io.cwd,
       root,
       cliVersion,
-      upgradeOnly: true,
+      upgradeOnly,
     });
     if (result === undefined || result.action === "unchanged") return;
     const verb = result.action === "updated" ? "updated" : "installed";
     const others = result.others.length === 0 ? "" : `; other copy: ${result.others.map((item) => item.dir).join(", ")}`;
     io.stderr(`skill ${verb}: ${result.dir} (${result.version})${others}\n`);
   } catch (err) {
-    io.stderr(`skill autoinstall failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    io.stderr(`${failureLabel}: ${failureDetail(err)}\n`);
   }
+}
+
+function failureDetail(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const line = message.split("\n")[0] ?? "";
+  return line.length > 0 ? line : "unknown error";
 }
 
 export function explicitSkillInstall(argv: string[]): boolean {
@@ -212,7 +244,9 @@ async function readInstalled(dir: string): Promise<{ present: boolean; skill: bo
     const text = (await readFile(path.join(dir, SKILL_VERSION_FILE), "utf8")).trim();
     if (text.length > 0) version = text;
   } catch (err) {
-    if (errorCode(err) !== "ENOENT") throw err;
+    const code = errorCode(err);
+    // A file sitting where the skill directory should be is not an installed skill.
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
   }
   return { present: skill || version !== undefined, skill, version };
 }

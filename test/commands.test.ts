@@ -89,6 +89,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(skill, /LUMEN_SKILL_DIR/);
   assert.match(skill, /--clean/);
   assert.match(skill, /LUMEN_NO_SKILL_AUTOINSTALL=1/);
+  assert.match(skill, /postinstall 也按这个规则/);
   assert.match(skill, /\.lumen-version/);
   const downloadSkill = await readFile(path.join(root, "skills", "lumen", "references", "视频下载", "SKILL.md"), "utf8");
   assert.match(downloadSkill, /不要在对话里向用户要密钥/);

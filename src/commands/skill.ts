@@ -15,8 +15,10 @@ Copies this package's SKILL.md and references into one directory.
 LUMEN_SKILL_DIR wins over --target. Otherwise --target, otherwise auto-detect.
 Auto-detect uses /home/box/agent-data/workflows/lumen when that workflows directory exists and is writable.
 Otherwise it uses ~/.agents/skills/lumen. It never writes both.
+npm postinstall uses the same detection after npm install, overwrites that directory, and does not fail npm.
 --clean removes the other lumen directory and leaves every other skill in place.
-A version file .lumen-version is written in the lumen directory.`;
+A version file .lumen-version is written in the lumen directory.
+LUMEN_NO_SKILL_AUTOINSTALL=1 skips the postinstall and the check on later lumen runs.`;
 }
 
 export async function skillCommand(args: string[], io: IO): Promise<number> {

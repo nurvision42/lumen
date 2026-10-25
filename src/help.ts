@@ -64,8 +64,10 @@ Skill (one directory):
   LUMEN_SKILL_DIR, then --target, then auto-detect.
   Auto-detect writes /home/box/agent-data/workflows/lumen when that workflows directory exists and is writable.
   Otherwise it writes ~/.agents/skills/lumen. One directory receives the skill.
+  npm postinstall installs that directory after npm install or npm install -g, and writes .lumen-version.
+  A failed skill install prints one stderr line and does not fail npm.
   Each run installs or updates when the skill is missing or older than this CLI, and prints one line.
-  LUMEN_NO_SKILL_AUTOINSTALL=1 skips that check. --clean removes only the other lumen directory.
+  LUMEN_NO_SKILL_AUTOINSTALL=1 skips the postinstall and that check. --clean removes only the other lumen directory.
   .lumen-version in that directory records the CLI version.
 
 Config:

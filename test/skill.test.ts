@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { skillHelp } from "../src/commands/skill.js";
+import { helpText } from "../src/help.js";
 import { run } from "../src/run.js";
-import { SKILL_VERSION_FILE, versionRelation } from "../src/skill/place.js";
+import { postinstallSkill, SKILL_VERSION_FILE, versionRelation } from "../src/skill/place.js";
 import { readVersion } from "../src/version.js";
 import { capture, withDir } from "./helpers.js";
+
+const exec = promisify(execFile);
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const version = readVersion();
@@ -30,11 +37,24 @@ test("version relation treats missing and unparsable text as older", () => {
   assert.equal(versionRelation("9.0.0", "0.1.0"), "newer");
 });
 
-test("package scripts do not install the skill", async () => {
+test("postinstall is wired and documented next to runtime autoinstall", async () => {
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { scripts?: Record<string, string> };
-  assert.equal(pkg.scripts?.postinstall, undefined);
+  assert.equal(pkg.scripts?.postinstall, "node scripts/postinstall-skill.mjs");
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
+  const readme = await readFile(path.join(root, "README.md"), "utf8");
+  assert.equal(readme.includes("没有 postinstall"), false);
+  assert.equal(/there is no postinstall/i.test(readme), false);
+  assert.match(readme, /npm install` 和 `npm install -g` 的 postinstall/);
+  assert.match(readme, /Every lumen run updates the detected directory/);
+  assert.match(readme, /LUMEN_NO_SKILL_AUTOINSTALL=1/);
+  const skill = await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8");
+  assert.match(skill, /postinstall 也按这个规则/);
+  assert.match(skill, /LUMEN_NO_SKILL_AUTOINSTALL=1/);
+  assert.match(helpText(version), /npm postinstall installs that directory/);
+  assert.match(helpText(version), /LUMEN_NO_SKILL_AUTOINSTALL=1 skips the postinstall and that check/);
+  assert.match(skillHelp(), /npm postinstall uses the same detection/);
+  assert.match(skillHelp(), /LUMEN_NO_SKILL_AUTOINSTALL=1/);
 });
 
 test("without a workflows directory the skill lands in ~/.agents/skills/lumen", async () => {
@@ -219,6 +239,242 @@ test("skill usage and a missing grokbot directory fail cleanly", async () => {
   });
 });
 
+test("postinstall installs into workflows when that directory is writable", async () => {
+  await withDir(async (home) => {
+    const workflows = path.join(home, "workflows");
+    const grokbot = path.join(workflows, "lumen");
+    const agents = path.join(home, ".agents", "skills", "lumen");
+    await mkdir(path.join(workflows, "other-skill"), { recursive: true });
+    await writeFile(path.join(workflows, "other-skill", "SKILL.md"), "keep-workflow\n");
+    const env = skillEnv(home, { LUMEN_WORKFLOWS_DIR: workflows });
+    const cap = capture(env, { cwd: home });
+    await postinstallSkill(cap.io, root, version);
+    assert.equal(cap.err(), `skill installed: ${grokbot} (${version})\n`);
+    assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8"));
+    assert.equal((await readFile(path.join(grokbot, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    assert.equal(await readFile(path.join(grokbot, "references", "雪碧图", "SKILL.md"), "utf8"), await readFile(path.join(root, "skills", "lumen", "references", "雪碧图", "SKILL.md"), "utf8"));
+    assert.equal(await readFile(path.join(workflows, "other-skill", "SKILL.md"), "utf8"), "keep-workflow\n");
+    await assert.rejects(access(agents));
+
+    await writeFile(path.join(grokbot, "SKILL.md"), "canary\n");
+    await writeFile(path.join(grokbot, SKILL_VERSION_FILE), "9.0.0\n");
+    await writeFile(path.join(grokbot, "notes.txt"), "keep\n");
+    const again = capture(env, { cwd: home });
+    await postinstallSkill(again.io, root, version);
+    assert.equal(again.err(), `skill updated: ${grokbot} (${version})\n`);
+    assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8"));
+    assert.equal((await readFile(path.join(grokbot, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    assert.equal(await readFile(path.join(grokbot, "notes.txt"), "utf8"), "keep\n");
+    await assert.rejects(access(agents));
+  });
+});
+
+test("postinstall uses ~/.agents/skills/lumen when workflows is missing or unwritable", async () => {
+  await withDir(async (home) => {
+    const agents = path.join(home, ".agents", "skills", "lumen");
+    const missing = path.join(home, "no-such-workflows");
+    const env = skillEnv(home);
+    const cap = capture(env, { cwd: home });
+    await postinstallSkill(cap.io, root, version);
+    assert.equal(cap.err(), `skill installed: ${agents} (${version})\n`);
+    assert.equal((await readFile(path.join(agents, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    await assert.rejects(access(missing));
+    await assert.rejects(access(path.join(home, "workflows")));
+  });
+
+  await withDir(async (home) => {
+    const workflows = path.join(home, "workflows");
+    const agents = path.join(home, ".agents", "skills", "lumen");
+    await mkdir(workflows);
+    await writeFile(path.join(workflows, "keep.txt"), "keep\n");
+    await chmod(workflows, 0o555);
+    try {
+      const env = skillEnv(home, { LUMEN_WORKFLOWS_DIR: workflows });
+      const cap = capture(env, { cwd: home });
+      await postinstallSkill(cap.io, root, version);
+      assert.equal(cap.err(), `skill installed: ${agents} (${version})\n`);
+      await assert.rejects(access(path.join(workflows, "lumen")));
+      assert.equal(await readFile(path.join(workflows, "keep.txt"), "utf8"), "keep\n");
+      assert.equal((await readFile(path.join(agents, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    } finally {
+      await chmod(workflows, 0o755);
+    }
+  });
+});
+
+test("postinstall honors LUMEN_SKILL_DIR and LUMEN_NO_SKILL_AUTOINSTALL", async () => {
+  await withDir(async (home) => {
+    const workflows = path.join(home, "workflows");
+    const custom = path.join(home, "custom", "lumen");
+    await mkdir(workflows);
+    const env = skillEnv(home, { LUMEN_WORKFLOWS_DIR: workflows, LUMEN_SKILL_DIR: custom });
+    const cap = capture(env, { cwd: home });
+    await postinstallSkill(cap.io, root, version);
+    assert.equal(cap.err(), `skill installed: ${custom} (${version})\n`);
+    await access(path.join(custom, "SKILL.md"));
+    assert.equal((await readFile(path.join(custom, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    await assert.rejects(access(path.join(workflows, "lumen")));
+    await assert.rejects(access(path.join(home, ".agents")));
+
+    const skipped = capture({ ...env, LUMEN_NO_SKILL_AUTOINSTALL: "1" }, { cwd: home });
+    await writeFile(path.join(custom, "SKILL.md"), "leave\n");
+    await postinstallSkill(skipped.io, root, version);
+    assert.equal(skipped.err(), "");
+    assert.equal(await readFile(path.join(custom, "SKILL.md"), "utf8"), "leave\n");
+  });
+});
+
+test("postinstall failure is one stderr line and does not throw", async () => {
+  await withDir(async (home) => {
+    const env = skillEnv(home);
+    const missing = capture(env, { cwd: home });
+    await postinstallSkill(missing.io, path.join(home, "missing-package"), version);
+    assert.match(missing.err(), /^skill postinstall failed: lumen skill is missing from the package: /);
+    assert.equal(missing.err().trim().split("\n").length, 1);
+    await assert.rejects(access(path.join(home, ".agents")));
+    await assert.rejects(access(path.join(home, "workflows")));
+
+    const blocker = path.join(home, "not-a-directory");
+    await writeFile(blocker, "x\n");
+    const denied = capture(skillEnv(home, { LUMEN_SKILL_DIR: blocker }), { cwd: home });
+    await postinstallSkill(denied.io, root, version);
+    assert.match(denied.err(), /^skill postinstall failed: skill directory is not a directory: /);
+    assert.equal(denied.err().trim().split("\n").length, 1);
+    await assert.rejects(access(path.join(home, ".agents")));
+  });
+});
+
+test("the postinstall script installs one directory and exits 0 on failure", async () => {
+  await withDir(async (home) => {
+    const workflows = path.join(home, "workflows");
+    const grokbot = path.join(workflows, "lumen");
+    const agents = path.join(home, ".agents", "skills", "lumen");
+    await mkdir(workflows);
+    const installed = await runPostinstall(skillEnv(home, { LUMEN_WORKFLOWS_DIR: workflows }));
+    assert.equal(installed.code, 0);
+    assert.equal(installed.stderr, `skill installed: ${grokbot} (${version})\n`);
+    assert.equal((await readFile(path.join(grokbot, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    await assert.rejects(access(agents));
+
+    const fallback = await runPostinstall(skillEnv(home));
+    assert.equal(fallback.code, 0);
+    assert.equal(fallback.stderr, `skill installed: ${agents} (${version})\n`);
+    assert.equal((await readFile(path.join(agents, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    await assert.rejects(access(path.join(home, "no-such-workflows", "lumen")));
+
+    const skipped = await runPostinstall(skillEnv(home, { LUMEN_NO_SKILL_AUTOINSTALL: "1", LUMEN_WORKFLOWS_DIR: workflows }));
+    assert.equal(skipped.code, 0);
+    assert.equal(skipped.stderr, "");
+    await writeFile(path.join(grokbot, "SKILL.md"), "leave\n");
+    const still = await runPostinstall(skillEnv(home, { LUMEN_NO_SKILL_AUTOINSTALL: "true", LUMEN_WORKFLOWS_DIR: workflows }));
+    assert.equal(still.code, 0);
+    assert.equal(still.stderr, "");
+    assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), "leave\n");
+
+    const blocker = path.join(home, "not-a-directory");
+    await writeFile(blocker, "x\n");
+    const failed = await runPostinstall(skillEnv(home, { LUMEN_SKILL_DIR: blocker, LUMEN_WORKFLOWS_DIR: workflows }));
+    assert.equal(failed.code, 0);
+    assert.match(failed.stderr, /^skill postinstall failed: skill directory is not a directory: /);
+    assert.equal(failed.stderr.trim().split("\n").length, 1);
+    assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), "leave\n");
+  });
+});
+
+test("npm pack postinstall installs one skill directory", { timeout: 180_000 }, async () => {
+  await withDir(async (home) => {
+    const workflows = path.join(home, "workflows");
+    const grokbot = path.join(workflows, "lumen");
+    const agents = path.join(home, ".agents", "skills", "lumen");
+    const prefix = path.join(home, "prefix");
+    await mkdir(workflows);
+    const packed = await exec("npm", ["pack", "--pack-destination", home, "--json", "--ignore-scripts"], {
+      cwd: root,
+      env: npmEnv(home),
+      timeout: 60_000,
+    });
+    const listed = JSON.parse(packed.stdout) as { filename?: string }[];
+    const filename = listed[0]?.filename;
+    assert.equal(typeof filename, "string");
+    const tarball = path.isAbsolute(filename ?? "") ? filename ?? "" : path.join(home, filename ?? "");
+    const installed = await exec(
+      "npm",
+      ["install", "-g", "--prefix", prefix, "--foreground-scripts", "--omit=dev", "--no-audit", "--no-fund", tarball],
+      { cwd: home, env: npmEnv(home, { LUMEN_WORKFLOWS_DIR: workflows }), timeout: 180_000 },
+    );
+    assert.match(`${installed.stdout}\n${installed.stderr}`, new RegExp(`skill installed: ${escapeRegExp(grokbot)} \\(${escapeRegExp(version)}\\)`));
+    assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8"));
+    assert.equal((await readFile(path.join(grokbot, SKILL_VERSION_FILE), "utf8")).trim(), version);
+    await assert.rejects(access(agents));
+    await access(path.join(prefix, "lib", "node_modules", "lumen", "scripts", "postinstall-skill.mjs"));
+
+    const blocker = path.join(home, "not-a-directory");
+    await writeFile(blocker, "x\n");
+    const failed = await runPackedPostinstall(prefix, npmEnv(home, { LUMEN_SKILL_DIR: blocker, LUMEN_WORKFLOWS_DIR: workflows }));
+    assert.equal(failed.code, 0);
+    assert.match(failed.stderr, /^skill postinstall failed: /);
+    assert.equal(failed.stderr.trim().split("\n").length, 1);
+    assert.equal(await readFile(path.join(grokbot, "SKILL.md"), "utf8"), await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8"));
+    await assert.rejects(access(agents));
+  });
+});
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function runPostinstall(env: NodeJS.ProcessEnv): Promise<{ code: number; stdout: string; stderr: string }> {
+  return runNode([path.join(root, "scripts", "postinstall-skill.mjs")], env, root);
+}
+
+async function runPackedPostinstall(
+  prefix: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const script = path.join(prefix, "lib", "node_modules", "lumen", "scripts", "postinstall-skill.mjs");
+  return runNode([script], env, path.dirname(path.dirname(script)));
+}
+
+function runNode(args: string[], env: NodeJS.ProcessEnv, cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(process.execPath, args, { cwd, env, timeout: 30_000 }, (err, stdout, stderr) => {
+      if (err) {
+        const failed = err as NodeJS.ErrnoException & { stdout?: string; stderr?: string };
+        if (typeof failed.code === "number") {
+          resolve({ code: failed.code, stdout: failed.stdout ?? stdout, stderr: failed.stderr ?? stderr });
+          return;
+        }
+        reject(err);
+        return;
+      }
+      resolve({ code: 0, stdout, stderr });
+    });
+  });
+}
+
+function npmEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: home,
+    npm_config_cache: process.env.npm_config_cache ?? path.join(homedir(), ".npm"),
+    npm_config_update_notifier: "false",
+    LUMEN_NO_SKILL_AUTOINSTALL: "0",
+    ...extra,
+  };
+  for (const key of [
+    "npm_config_prefix",
+    "NPM_CONFIG_PREFIX",
+    "npm_config_global",
+    "NPM_CONFIG_GLOBAL",
+    "npm_config_ignore_scripts",
+    "NPM_CONFIG_IGNORE_SCRIPTS",
+  ]) {
+    if (extra[key] === undefined) delete env[key];
+  }
+  if (extra.LUMEN_SKILL_DIR === undefined) delete env.LUMEN_SKILL_DIR;
+  if (extra.LUMEN_WORKFLOWS_DIR === undefined) delete env.LUMEN_WORKFLOWS_DIR;
+  if (extra.XDG_DATA_HOME === undefined) delete env.XDG_DATA_HOME;
+  if (extra.XDG_CONFIG_HOME === undefined) delete env.XDG_CONFIG_HOME;
+  if (extra.XDG_CACHE_HOME === undefined) delete env.XDG_CACHE_HOME;
+  return env;
 }

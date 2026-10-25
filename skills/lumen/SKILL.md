@@ -8,7 +8,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 ## 技能
 
-`lumen skill install` 把本包的 SKILL.md 和 references 复制到一个目录。`LUMEN_SKILL_DIR` 优先于 `--target`，再自动检测：`/home/box/agent-data/workflows` 存在且可写就装到 `workflows/lumen/`，否则装到 `~/.agents/skills/lumen/`。只装一处。重复安装覆盖同一份，版本记在 `.lumen-version`。另一处已有 lumen 时会提示；`--clean` 只删除那一处的 lumen 目录。每次运行 lumen，技能缺失或版本低于 CLI 时自动更新，只打一行。`LUMEN_NO_SKILL_AUTOINSTALL=1` 关闭自动安装。`lumen doctor` 显示技能位置、版本、是否和 CLI 一致、有没有重复。
+`lumen skill install` 把本包的 SKILL.md 和 references 复制到一个目录。`LUMEN_SKILL_DIR` 优先于 `--target`，再自动检测：`/home/box/agent-data/workflows` 存在且可写就装到 `workflows/lumen/`，否则装到 `~/.agents/skills/lumen/`。只装一处。重复安装覆盖同一份，版本记在 `.lumen-version`。另一处已有 lumen 时会提示；`--clean` 只删除那一处的 lumen 目录。`npm install` 和 `npm install -g` 的 postinstall 也按这个规则装到这一处；失败只打一行，不让 npm 失败。每次运行 lumen，技能缺失或版本低于 CLI 时自动更新，只打一行。`LUMEN_NO_SKILL_AUTOINSTALL=1` 关闭 postinstall 和运行时自动安装。`lumen doctor` 显示技能位置、版本、是否和 CLI 一致、有没有重复。
 
 ## 硬规则
 
