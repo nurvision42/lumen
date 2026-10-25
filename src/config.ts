@@ -1,14 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { assertProviderServes, BREAKDOWN_LEVEL, BREAKDOWN_NEED_AUDIO, BREAKDOWN_PREFER_MODELS } from "./catalog.js";
+import { assertProviderServes, PROVIDER_DEFAULT_BASE_URLS, BREAKDOWN_LEVEL, BREAKDOWN_NEED_AUDIO, BREAKDOWN_PREFER_MODELS } from "./catalog.js";
 import { CliError } from "./errors.js";
 import { fileExists } from "./fsutil.js";
 
 export const bindingSchema = z
   .object({
     provider: z.string().min(1),
-    baseUrl: z.string().min(1),
+    baseUrl: z.string().min(1).optional(),
     apiKeyEnv: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
     group: z.string().min(1).optional(),
     modelAlias: z.string().min(1).optional(),
@@ -38,7 +38,24 @@ export const configSchema = z
   })
   .strict();
 
-export type ModelBinding = z.infer<typeof bindingSchema>;
+/** A binding as written in a config file; baseUrl may be omitted to use the provider default. */
+export type StoredBinding = z.infer<typeof bindingSchema>;
+/** A binding with baseUrl resolved (user value, else the provider's built-in default). */
+export type ModelBinding = StoredBinding & { baseUrl: string; baseUrlDefault?: boolean };
+
+export interface StoredConfig extends Omit<LumenConfig, "models"> {
+  models: Record<string, StoredBinding>;
+}
+
+/** Fill in the provider's default baseUrl when the binding does not set one. */
+export function resolveBinding(binding: StoredBinding): ModelBinding {
+  if (binding.baseUrl !== undefined) return { ...binding, baseUrl: binding.baseUrl };
+  const fallback = (PROVIDER_DEFAULT_BASE_URLS as Record<string, string | undefined>)[binding.provider];
+  if (fallback === undefined) {
+    throw new CliError(`provider ${binding.provider} has no default baseUrl; set one with --base-url`);
+  }
+  return { ...binding, baseUrl: fallback, baseUrlDefault: true };
+}
 
 export interface ToolPaths {
   ffmpeg?: string;
@@ -69,7 +86,7 @@ export function globalConfigPath(env: NodeJS.ProcessEnv): string | undefined {
   return path.join(base, "lumen", "providers.json");
 }
 
-export function parseConfig(raw: unknown, label: string): LumenConfig {
+export function parseConfig(raw: unknown, label: string): StoredConfig {
   const parsed = configSchema.safeParse(raw);
   if (!parsed.success) {
     const detail = parsed.error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`).join("; ");
@@ -82,7 +99,7 @@ export function parseConfig(raw: unknown, label: string): LumenConfig {
   };
 }
 
-export async function readConfigFile(file: string): Promise<LumenConfig> {
+export async function readConfigFile(file: string): Promise<StoredConfig> {
   if (!(await fileExists(file))) return { models: {}, breakdown: {}, tools: {} };
   let raw: unknown;
   try {
@@ -93,7 +110,7 @@ export async function readConfigFile(file: string): Promise<LumenConfig> {
   return parseConfig(raw, file);
 }
 
-export async function writeConfigFile(file: string, config: LumenConfig): Promise<void> {
+export async function writeConfigFile(file: string, config: StoredConfig): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
   const tools = {
     ...(config.tools.ffmpeg === undefined ? {} : { ffmpeg: config.tools.ffmpeg }),
@@ -115,9 +132,11 @@ export interface LoadedConfig {
 
 export async function loadConfig(project: string, env: NodeJS.ProcessEnv): Promise<LoadedConfig> {
   const globalPath = globalConfigPath(env);
-  const global = globalPath === undefined ? EMPTY_CONFIG : await readConfigFile(globalPath);
+  const global: StoredConfig = globalPath === undefined ? EMPTY_CONFIG : await readConfigFile(globalPath);
   const local = await readConfigFile(projectConfigPath(project));
-  const models: Record<string, ModelBinding> = { ...global.models, ...local.models };
+  const stored: Record<string, StoredBinding> = { ...global.models, ...local.models };
+  const models: Record<string, ModelBinding> = {};
+  for (const [id, binding] of Object.entries(stored)) models[id] = resolveBinding(binding);
   const sources: Record<string, "project" | "global"> = {};
   for (const id of Object.keys(models)) {
     sources[id] = id in local.models ? "project" : "global";
@@ -186,7 +205,7 @@ export function bindingFor(config: LumenConfig, modelId: string): ModelBinding {
   const binding = config.models[modelId];
   if (binding === undefined) {
     throw new CliError(
-      `no provider binding for ${modelId}\nset one with: lumen providers set ${modelId} --provider <id> --base-url <url> --api-key-env <NAME>`,
+      `no provider binding for ${modelId}\nset one with: lumen providers set ${modelId} --provider <id> --api-key-env <NAME> [--base-url <url>]`,
     );
   }
   return binding;

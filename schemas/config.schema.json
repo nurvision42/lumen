@@ -37,7 +37,7 @@
     "binding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "baseUrl", "apiKeyEnv"],
+      "required": ["provider", "apiKeyEnv"],
       "properties": {
         "provider": { "enum": ["yunqiao", "grsai", "haomao", "kitta", "mediakit"] },
         "baseUrl": { "type": "string", "minLength": 1 },

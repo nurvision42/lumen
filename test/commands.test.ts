@@ -311,6 +311,24 @@ test("gen without --model is usage and writes no run", async () => {
   });
 });
 
+test("providers set without --base-url uses the provider default, and --base-url overrides it", async () => {
+  await withDir(async (dir) => {
+    const set = capture();
+    assert.equal(await run(["providers", "set", "seedance-2", "--provider", "haomao", "--api-key-env", "HAOMAO_KEY", "--project", dir], set.io), 0);
+    assert.match(set.out(), /https:\/\/haomaotoken\.com\/api\/v3 \(default\)/);
+    const stored = JSON.parse(await readFile(path.join(dir, "lumen.config.json"), "utf8")) as { models: Record<string, { baseUrl?: string }> };
+    assert.equal(stored.models["seedance-2"]?.baseUrl, undefined);
+    const list = capture();
+    assert.equal(await run(["providers", "list", "--project", dir], list.io), 0);
+    assert.match(list.out(), /seedance-2  haomao  https:\/\/haomaotoken\.com\/api\/v3 \(default\)/);
+    const custom = capture();
+    assert.equal(await run(["providers", "set", "seedance-2", "--provider", "haomao", "--base-url", "https://mirror.example/api/v3", "--api-key-env", "HAOMAO_KEY", "--project", dir], custom.io), 0);
+    const again = capture();
+    assert.equal(await run(["providers", "list", "--project", dir], again.io), 0);
+    assert.match(again.out(), /seedance-2  haomao  https:\/\/mirror\.example\/api\/v3  HAOMAO_KEY/);
+  });
+});
+
 test("doctor lists unbound models and does not print secret values", async () => {
   await withDir(async (dir) => {
     const set = capture();

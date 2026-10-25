@@ -24,6 +24,18 @@ export const PROVIDERS = ["yunqiao", "grsai", "haomao", "kitta", "mediakit"] as 
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /**
+ * Official API base each built-in provider uses when a binding sets no baseUrl.
+ * A user-set baseUrl (config or `providers set --base-url`) always wins.
+ */
+export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
+  yunqiao: "https://api.yunqiao.me/v1",
+  grsai: "https://grsaiapi.com",
+  haomao: "https://haomaotoken.com/api/v3",
+  kitta: "https://fishaudio.org",
+  mediakit: "https://mediakit.cn-beijing.volces.com",
+};
+
+/**
  * Pixel tiers a provider will accept. The model map still computes every tier;
  * a provider that cannot take one fails here, not by changing the model id.
  */
