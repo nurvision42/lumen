@@ -7,11 +7,23 @@ import type { IO } from "../io.js";
 import { redactValue } from "../redact.js";
 import type { OutputFile } from "../runs.js";
 import { awaitHaomaoTask } from "./jobs.js";
-import { jsonCall, wireModel } from "./wire.js";
+import { jsonCall } from "./wire.js";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { contentTypeFor } from "../media.js";
+
+/** haomao lists seedance 2.0 models with the ".0" suffix (GET /v1/models). */
+export const HAOMAO_SEEDANCE_MODELS: Record<string, string> = {
+  "seedance-2": "seedance-2.0",
+  "seedance-2-fast": "seedance-2.0-fast",
+  "seedance-2-mini": "seedance-2.0-mini",
+  "seedance-2.5": "seedance-2.5",
+};
+
+export function haomaoWireModel(modelId: string, alias: string | undefined): string {
+  return alias ?? HAOMAO_SEEDANCE_MODELS[modelId] ?? modelId;
+}
 
 export const HAOMAO_UPLOAD_TIMEOUT_MS = 300_000;
 
@@ -85,7 +97,7 @@ export function planVideo(request: VideoRequest, binding: ModelBinding): HttpCal
     throw new CliError(`provider ${binding.provider} has no seedance client`);
   }
   if (request.webSearch) throw new CliError("haomao seedance does not accept web-search");
-  const model = wireModel(request.modelId, binding.modelAlias);
+  const model = haomaoWireModel(request.modelId, binding.modelAlias);
   const content = [
     { type: "text", text: request.prompt },
     ...(request.firstFrame ? [contentItem("image_url", request.firstFrame.source, "first_frame")] : []),
@@ -130,7 +142,7 @@ export async function runVideo(
   const locals = localSources(request);
   const described = await Promise.all(locals.map((source) => describe(source, io.cwd)));
   const uploads = described.filter((item, index) => described.findIndex((other) => other.path === item.path) === index);
-  const model = wireModel(request.modelId, binding.modelAlias);
+  const model = haomaoWireModel(request.modelId, binding.modelAlias);
   const uploadCalls = uploads.map((item) => uploadCall(binding.baseUrl, model, item.path));
   if (mode === "dry-run") {
     const placeholders = new Map(described.map((item) => [item.source, `{{upload:${item.path}}}`]));

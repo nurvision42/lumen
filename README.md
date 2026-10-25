@@ -141,7 +141,7 @@ lumen doctor
 - mediakit：`group` 是请求体里的 `queue_id`。
 - grsai、haomao、kitta：不发送 `group`。
 
-`modelAlias` 替换上游模型字符串。缺省就是 lumen 的模型 id。kitta 的语音合成把 `modelAlias` 放进 JSON 的 `modelId`；不设就不传。
+`modelAlias` 替换上游模型字符串。缺省就是 lumen 的模型 id；haomao 的 seedance 例外，缺省按好猫 `/v1/models` 的名字发送：`seedance-2`→`seedance-2.0`、`seedance-2-fast`→`seedance-2.0-fast`、`seedance-2-mini`→`seedance-2.0-mini`、`seedance-2.5`→`seedance-2.5`。设置了 `modelAlias` 就以它为准，提交任务的 `model` 和上传表单的 `model` 都用它（例：`lumen providers set seedance-2-mini --provider haomao --model-alias seedance-2.0-mini`）。kitta 的语音合成把 `modelAlias` 放进 JSON 的 `modelId`；不设就不传。
 
 ### 图像
 

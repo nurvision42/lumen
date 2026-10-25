@@ -45,3 +45,8 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 **素材库。** 按名字复用人物、音色、场景和供应商编号，存在用户的飞书多维表格里。查：`lumen library find "<名称>"` · `lumen library list`。状态：`lumen library status`。未连接时 `lumen library connect feishu` 写出二维码图片并打印 `qr:` 路径，把图片发到对话里，用户用飞书手机扫。手机上可选新建应用或绑定已有应用，不必填写 App ID 或 App Secret。新素材用 `lumen library add`。细则读 `skills/lumen/references/素材库/SKILL.md`。
 
 **拼接。** `lumen concat` 把镜头接成一条成片。它仍是占位，不调用外部程序。
+
+
+## haomao 模型名
+
+haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fast`、`seedance-2.0-mini`（2.5 仍是 `seedance-2.5`），lumen 自动换。若好猫报 `model_not_found`，用 `GET <base>/v1/models` 查实际 id，再 `lumen providers set <模型> --provider haomao --model-alias <id>` 覆盖；它同时作用于提交和上传。
