@@ -85,6 +85,8 @@ export interface SendOptions {
   apiKey?: string;
   /** When false, the bearer token is not attached. Downloads use this. */
   auth?: boolean;
+  /** Abort the request after this many milliseconds. */
+  timeoutMs?: number;
 }
 
 function mockJson(call: HttpCall): unknown {
@@ -101,6 +103,7 @@ function mockJson(call: HttpCall): unknown {
     };
   }
   if (call.method === "PUT") return { success: true };
+  if (url.endsWith("/files/uploads")) return { url: "https://cdn.example/mock-upload.bin" };
   if (url.includes("video-understand-router") || url.includes("enhance-video-generative")) {
     return { success: true, task_id: "mock-task" };
   }
@@ -178,7 +181,9 @@ export async function sendCall(call: HttpCall, opts: SendOptions): Promise<HttpR
   const auth = opts.auth === false ? undefined : opts.apiKey;
   let response: Response;
   try {
-    response = await opts.fetchImpl(call.url, await toInit(call, auth));
+    const init = await toInit(call, auth);
+    if (opts.timeoutMs !== undefined) init.signal = AbortSignal.timeout(opts.timeoutMs);
+    response = await opts.fetchImpl(call.url, init);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new CliError(redactText(message, opts.apiKey ? [opts.apiKey] : []));

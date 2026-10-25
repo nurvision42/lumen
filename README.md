@@ -198,6 +198,8 @@ dry-run 可以记下本地路径，并在计划里留下占位轮询：`GET /con
 
 间隔默认 10000 毫秒（`SEEDANCE_POLL_MS`），次数默认 180（`SEEDANCE_MAX_POLLS`）。只在两次轮询之间等待。
 
+本地素材（首帧、尾帧、参考图、参考视频、参考音频）在 `--execute` 时先 `POST {baseUrl}/files/uploads` 上传到好猫（multipart：`model`、`purpose=user_data`、`file`，Bearer 鉴权，超时 300 秒），用返回的 `url` 填进 content；同一文件一次 run 只传一次。`https://` 和 `asset://` 原样透传。`--dry-run` 不上传，只在审计里记下计划上传的路径、大小和 sha256。
+
 ### Kitta
 
 官方站点 `https://fishaudio.org`。

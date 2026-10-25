@@ -7,19 +7,73 @@ import type { IO } from "../io.js";
 import { redactValue } from "../redact.js";
 import type { OutputFile } from "../runs.js";
 import { awaitHaomaoTask } from "./jobs.js";
-import { assertHttps, jsonCall, wireModel } from "./wire.js";
+import { jsonCall, wireModel } from "./wire.js";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { contentTypeFor } from "../media.js";
+
+export const HAOMAO_UPLOAD_TIMEOUT_MS = 300_000;
+
+export interface PlannedUpload {
+  source: string;
+  path: string;
+  size: number;
+  sha256: string;
+}
+
+function isLocal(source: string): boolean {
+  return !/^[a-z][a-z0-9+.-]*:/i.test(source) || /^[a-z]:[\\/]/i.test(source);
+}
+
+function localSources(request: VideoRequest): string[] {
+  const all = [request.firstFrame?.source, request.lastFrame?.source, ...request.references.map((ref) => ref.source)]
+    .filter((item): item is string => item !== undefined);
+  for (const source of all) {
+    if (!isLocal(source) && !/^(https|asset):\/\//i.test(source)) {
+      throw new CliError(`seedance media must be https://, asset:// or a local file: ${source}`);
+    }
+  }
+  return [...new Set(all.filter(isLocal))];
+}
+
+export function uploadCall(baseUrl: string, model: string, file: string): HttpCall {
+  return {
+    method: "POST",
+    url: joinUrl(baseUrl, "/files/uploads"),
+    headers: {},
+    body: {
+      kind: "multipart",
+      parts: [
+        { name: "model", text: model },
+        { name: "purpose", text: "user_data" },
+        { name: "file", filePath: file, filename: path.basename(file), contentType: contentTypeFor(file) },
+      ],
+    },
+  };
+}
+
+async function describe(source: string, cwd: string): Promise<PlannedUpload> {
+  const file = path.resolve(cwd, source);
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(file);
+  } catch {
+    throw new CliError(`local media not found: ${file}`);
+  }
+  return { source, path: file, size: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+function withSources(request: VideoRequest, map: Map<string, string>): VideoRequest {
+  const swap = (ref: MediaRef): MediaRef => ({ ...ref, source: map.get(ref.source) ?? ref.source });
+  const out: VideoRequest = { ...request, references: request.references.map(swap) };
+  if (request.firstFrame) out.firstFrame = swap(request.firstFrame);
+  if (request.lastFrame) out.lastFrame = swap(request.lastFrame);
+  return out;
+}
 
 function sources(refs: MediaRef[], kind: MediaRef["kind"]): string[] {
   return refs.filter((ref) => ref.kind === kind).map((ref) => ref.source);
-}
-
-function checkRemote(request: VideoRequest, provider: string): void {
-  const urls = [
-    request.firstFrame?.source,
-    request.lastFrame?.source,
-    ...request.references.map((ref) => ref.source),
-  ].filter((item): item is string => item !== undefined);
-  for (const url of urls) assertHttps(url, provider, "seedance");
 }
 
 function contentItem(type: "image_url" | "video_url" | "audio_url", url: string, role: string): Record<string, unknown> {
@@ -73,11 +127,33 @@ export async function runVideo(
   videoFile: string,
   receipt: string,
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
-  if (mode === "execute") checkRemote(request, binding.provider);
-  const planned = planVideo(request, binding);
-  if (mode === "dry-run") return { calls: planned, response: null, files: [] };
+  const locals = localSources(request);
+  const described = await Promise.all(locals.map((source) => describe(source, io.cwd)));
+  const uploads = described.filter((item, index) => described.findIndex((other) => other.path === item.path) === index);
+  const model = wireModel(request.modelId, binding.modelAlias);
+  const uploadCalls = uploads.map((item) => uploadCall(binding.baseUrl, model, item.path));
+  if (mode === "dry-run") {
+    const placeholders = new Map(described.map((item) => [item.source, `{{upload:${item.path}}}`]));
+    return {
+      calls: [...uploadCalls, ...planVideo(withSources(request, placeholders), binding)],
+      response: { plannedUploads: uploads },
+      files: [],
+    };
+  }
   const opts = { mode, fetchImpl: fetchOf(io), ...(apiKey === undefined ? {} : { apiKey }) };
   const calls: HttpCall[] = [];
+  const urls = new Map<string, string>();
+  for (const [index, item] of uploads.entries()) {
+    const call = uploadCalls[index];
+    if (call === undefined) continue;
+    const result = await perform(calls, call, { ...opts, timeoutMs: HAOMAO_UPLOAD_TIMEOUT_MS });
+    const json = result.json as { url?: unknown } | undefined;
+    if (typeof json?.url !== "string" || !/^https?:\/\//i.test(json.url)) {
+      throw new TransportError(`haomao upload of ${item.path} returned no url`, calls, publicResult(result));
+    }
+    for (const same of described) if (same.path === item.path) urls.set(same.source, json.url);
+  }
+  const planned = planVideo(withSources(request, urls), binding);
   const first = planned[0];
   if (first === undefined) throw new CliError("video request has no call");
   const submitted = await perform(calls, first, opts);
