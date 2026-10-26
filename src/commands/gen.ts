@@ -20,6 +20,7 @@ import { loadShotlist } from "../shotlist.js";
 import { runFish } from "../clients/fish.js";
 import { runImage } from "../clients/image.js";
 import { runVideo } from "../clients/seedance.js";
+import { runBeeftvVideo } from "../clients/beeftv.js";
 import { adoptBinding } from "./session.js";
 
 const MODES: Record<string, FlagKind> = { "dry-run": "boolean", execute: "boolean", mock: "boolean" };
@@ -172,7 +173,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
     });
     const receipt = `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`;
     ctx.resume = { videoFile, receipt };
-    const outcome = await runVideo(request, binding, mode, io, ctx.secret, videoFile, receipt);
+    const outcome = await (binding.provider === "beeftv" ? runBeeftvVideo : runVideo)(request, binding, mode, io, ctx.secret, videoFile, receipt);
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     ctx.files = outcome.files;

@@ -114,12 +114,13 @@ lumen doctor
 
 ## 模型与供应商
 
-内置供应商：图像 `yunqiao`（云桥）和 `grsai`，Seedance `haomao`（好猫），语音 `kitta`（fishaudio.org），拆解和增强 `mediakit`。同一个供应商可以给不同模型配不同的密钥。没有绑定就是错误 `no provider binding for <id>`，不会改用另一个模型。
+内置供应商：图像 `yunqiao`（云桥）和 `grsai`，Seedance `haomao`（好猫）和 `beeftv`（仅 `seedance-2-fast`），语音 `kitta`（fishaudio.org），拆解和增强 `mediakit`。同一个供应商可以给不同模型配不同的密钥。没有绑定就是错误 `no provider binding for <id>`，不会改用另一个模型。
 
 | 模型 | 可用供应商 |
 | --- | --- |
 | `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` | yunqiao、grsai |
-| `seedance-2`、`seedance-2-fast`、`seedance-2-mini`、`seedance-2.5` | haomao |
+| `seedance-2`、`seedance-2-mini`、`seedance-2.5` | haomao |
+| `seedance-2-fast` | haomao、beeftv |
 | `voice-design-1`、`voice-clone`、`voice-synthesis` | kitta |
 | `video-understand-router`、`enhance-video-generative` | mediakit |
 
@@ -130,6 +131,7 @@ lumen doctor
 | yunqiao（云桥） | `https://api.yunqiao.me/v1`（含 `/v1`） |
 | grsai | `https://grsaiapi.com`（源站，路径 `/v1/images/generations`；国内节点 `https://grsai.dakka.com.cn`） |
 | haomao（好猫） | `https://haomaotoken.com/api/v3`（含版本前缀，lumen 再接 `/contents/generations/tasks`） |
+| beeftv | `https://enterprise.beefapi.com`（不含版本前缀，lumen 再接 `/v1/videos`） |
 | kitta | `https://fishaudio.org`（源站） |
 | mediakit | `https://mediakit.cn-beijing.volces.com`（源站） |
 
@@ -139,7 +141,7 @@ lumen doctor
 
 - yunqiao：`group` 只放在 `X-Group` 头，不写进 JSON。
 - mediakit：`group` 是请求体里的 `queue_id`。
-- grsai、haomao、kitta：不发送 `group`。
+- grsai、haomao、kitta、beeftv：不发送 `group`。
 
 `modelAlias` 替换上游模型字符串。缺省就是 lumen 的模型 id；haomao 的 seedance 例外，缺省按好猫 `/v1/models` 的名字发送：`seedance-2`→`seedance-2.0`、`seedance-2-fast`→`seedance-2.0-fast`、`seedance-2-mini`→`seedance-2.0-mini`、`seedance-2.5`→`seedance-2.5`。设置了 `modelAlias` 就以它为准，提交任务的 `model` 和上传表单的 `model` 都用它（例：`lumen providers set seedance-2-mini --provider haomao --model-alias seedance-2.0-mini`）。kitta 的语音合成把 `modelAlias` 放进 JSON 的 `modelId`；不设就不传。
 
@@ -160,6 +162,8 @@ lumen doctor
 参考上限：图像 9/30、视频 3/10、音频 3/10（斜线后是 2.5）。每张图和每段视频都要 `person-reference`（`image|url|true`），音频不写。拒绝 `.m4a` 和音频 `.mp4`。非 2.5 的音频必须同时有图像或视频，并且参考总数不超过 12。不能混用首尾帧和参考。尾帧必须有首帧。`web-search` 只在 `text`，而且 haomao 不接受它。时长 4–15；2.5 是 `-1` 或 4–30。分辨率：`seedance-2` 为 480p/720p/1080p/4k，2.5 为 480p/720p/1080p，fast/mini 为 480p/720p。比例 `1:1`、`4:3`、`3:4`、`16:9`、`9:16`、`21:9`、`adaptive`。默认 720p、`9:16`、`generateAudio false`。haomao 上的 `seedance-2.5` 帧模式只能用 `adaptive`。
 
 haomao：`POST {base}/contents/generations/tasks`。`content` 是 text、image_url（first_frame / last_frame / reference_image）、video_url、audio_url，再加上 `resolution`、`ratio`、`duration`、`generate_audio`。`seedance-2.5` 的参考形态再带官方字段 `omni_reference_task_type`。person-reference 只留在审计参数里，不进正文。执行时不上传本地素材，请传 `https://` URL。
+
+beeftv（[企业文档](https://docs.enterprise.beefapi.com/docs/seedance)）：`Authorization: Bearer <key>`，`POST {base}/v1/videos`，正文 `model`（缺省 `seedance-2.0-fast`，`modelAlias` 覆盖）、`prompt`、`duration`、`resolution`、`content`（image_url / video_url / audio_url，角色 first_frame、last_frame、reference_image、reference_video、reference_audio）和 `metadata`（`ratio`、`generate_audio`，文本形态的 `web-search` 写成 `tools: [{"type":"web_search"}]`）。轮询 `GET {base}/v1/videos/{id}`：`completed` 下载，`failed`、`expired` 失败，其余状态（`queued`、`in_progress`、`unknown`）继续轮询；规则和 haomao 相同，超时记为 `running`，用 `lumen runs resume` 续上。下载走 `GET {base}/v1/videos/{id}/content`（跟随跳转，遇 503 `video_delivery_pending` 重试）。beeftv 没有上传接口：素材要传 `https://` URL；只有单独一张首帧可以是本地图片（小于 30 MB），以 data URL 放进顶层 `image`，运行记录里只留占位符。
 
 #### Seedance 2.5 全模态子任务
 
@@ -311,18 +315,19 @@ Every built-in provider ships an official default `baseUrl`; a `baseUrl` you set
 | yunqiao | `https://api.yunqiao.me/v1` (includes `/v1`) |
 | grsai | `https://grsaiapi.com` (origin; China node `https://grsai.dakka.com.cn`) |
 | haomao | `https://haomaotoken.com/api/v3` (version root; lumen appends `/contents/generations/tasks`) |
+| beeftv | `https://enterprise.beefapi.com` (lumen appends `/v1/videos`; `seedance-2-fast` only, wire id `seedance-2.0-fast`) |
 | kitta | `https://fishaudio.org` (origin) |
 | mediakit | `https://mediakit.cn-beijing.volces.com` (origin) |
 
 `lumen providers list` and `lumen doctor` mark defaults with `(default)`.
 
-Groups: `X-Group` for yunqiao. On MediaKit, `group` is `queue_id`. grsai, haomao, and kitta do not send `group`.
+Groups: `X-Group` for yunqiao. On MediaKit, `group` is `queue_id`. grsai, haomao, kitta, and beeftv do not send `group`.
 
 `lumen providers set <model> --provider --base-url --api-key-env [--group] [--model-alias] [--global]` checks that the provider can serve that model. See `lumen.config.example.json`.
 
 ## Generation
 
-Image models `gpt-image-2`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` generate, and edit when references are attached. Before `gen image`, read `skills/lumen/references/gpt-image/SKILL.md` for the command, then `skills/lumen/references/gpt-image-提示词写法/SKILL.md` for the prompt. Size, quality, background, and provider stay on the command. All three image models map 1K, 2K, and 4K; yunqiao rejects 4K. Omitted quality sends high for gpt-image-2 and max for the 2.5 models. lumen does not send `output_format`. Yunqiao uses synchronous OpenAI `images/generations` and `images/edits`. grsai uses synchronous JSON `POST /v1/images/generations` with an `image` array. Seedance models `seedance-2`, `seedance-2-fast`, `seedance-2-mini`, `seedance-2.5` are haomao only. They accept `text` / `TextVideo`, `frame` / `FrameVideo`, and `reference` / `ReferenceVideo`, plus the aliases `standard`, `fast`, `mini`, and `2.5`. Before `gen video`, read `skills/lumen/references/seedance-2/SKILL.md` for the 2.0 models and `skills/lumen/references/seedance-2.5/SKILL.md` for `seedance-2.5`. Then read `skills/lumen/references/seedance-提示词写法/SKILL.md` for the prompt. For camera, lens, light, grade, or camera movement on an image or a video, read `skills/lumen/references/拍摄设定/SKILL.md`. Pass only materials the prompt names. On `seedance-2.5` reference, `--task-type auto|reference|edit|extend` is `omni_reference_task_type` on the haomao content task. Omitting it records `auto` and still sends `auto`. `edit` fails locally without a reference video, `aspect-ratio adaptive`, and `duration -1`. `extend` fails locally without a reference video and adaptive ratio. Duration `-1` plus adaptive ratio does not select the subtask. `--execute` polls `GET /contents/generations/tasks/{id}` and writes the mp4 beside a redacted `.seedance.json`. `SEEDANCE_POLL_MS` defaults to 10000 and `SEEDANCE_MAX_POLLS` to 180 (30 min; never under 10 min). Every non-terminal status keeps polling and transient poll errors retry. If the window ends first, the run is `running` (exit 0) with the task id recorded; `lumen runs resume <runId>` re-polls and downloads the mp4. Kitta at fishaudio.org supports design, clone, and synthesis. MediaKit `video-understand-router` (breakdown, `scene=editing` fixed) and `enhance-video-generative` share the upload, submit, and poll flow, with separate keys.
+Image models `gpt-image-2`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` generate, and edit when references are attached. Before `gen image`, read `skills/lumen/references/gpt-image/SKILL.md` for the command, then `skills/lumen/references/gpt-image-提示词写法/SKILL.md` for the prompt. Size, quality, background, and provider stay on the command. All three image models map 1K, 2K, and 4K; yunqiao rejects 4K. Omitted quality sends high for gpt-image-2 and max for the 2.5 models. lumen does not send `output_format`. Yunqiao uses synchronous OpenAI `images/generations` and `images/edits`. grsai uses synchronous JSON `POST /v1/images/generations` with an `image` array. Seedance models `seedance-2`, `seedance-2-fast`, `seedance-2-mini`, `seedance-2.5` run on haomao; `seedance-2-fast` also runs on beeftv (`POST /v1/videos`, poll `GET /v1/videos/{id}`, download `/v1/videos/{id}/content`; https media only, except a lone local first frame sent inline). They accept `text` / `TextVideo`, `frame` / `FrameVideo`, and `reference` / `ReferenceVideo`, plus the aliases `standard`, `fast`, `mini`, and `2.5`. Before `gen video`, read `skills/lumen/references/seedance-2/SKILL.md` for the 2.0 models and `skills/lumen/references/seedance-2.5/SKILL.md` for `seedance-2.5`. Then read `skills/lumen/references/seedance-提示词写法/SKILL.md` for the prompt. For camera, lens, light, grade, or camera movement on an image or a video, read `skills/lumen/references/拍摄设定/SKILL.md`. Pass only materials the prompt names. On `seedance-2.5` reference, `--task-type auto|reference|edit|extend` is `omni_reference_task_type` on the haomao content task. Omitting it records `auto` and still sends `auto`. `edit` fails locally without a reference video, `aspect-ratio adaptive`, and `duration -1`. `extend` fails locally without a reference video and adaptive ratio. Duration `-1` plus adaptive ratio does not select the subtask. `--execute` polls `GET /contents/generations/tasks/{id}` and writes the mp4 beside a redacted `.seedance.json`. `SEEDANCE_POLL_MS` defaults to 10000 and `SEEDANCE_MAX_POLLS` to 180 (30 min; never under 10 min). Every non-terminal status keeps polling and transient poll errors retry. If the window ends first, the run is `running` (exit 0) with the task id recorded; `lumen runs resume <runId>` re-polls and downloads the mp4. Kitta at fishaudio.org supports design, clone, and synthesis. MediaKit `video-understand-router` (breakdown, `scene=editing` fixed) and `enhance-video-generative` share the upload, submit, and poll flow, with separate keys.
 
 Omitting `--prompt` sends the built-in 拉片 prompt printed in the Chinese section. Do not pass that text again. An explicit `--prompt`, `--prompt-file`, or non-empty `breakdown.prompt` / `breakdown.promptFile` replaces it. Breakdown sends `level` `"Quality"`, `prefer_models` `["doubao-seed-2-1-lite-260915"]`, and `manual_option.need_audio` `true`. It does not send `prefer_endpoints`. `scene` stays `editing`. A non-empty `breakdown.preferModels` list, `breakdown.level`, or `breakdown.needAudio` in the project config or `~/.config/lumen/providers.json` replaces that default; the project value replaces the global value. `needAudio: false` turns audio off.
 

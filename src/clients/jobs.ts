@@ -72,7 +72,7 @@ export function haomaoTaskState(value: unknown): "pending" | "ok" | "fail" {
   return "pending";
 }
 
-async function until(
+export async function awaitTask(
   calls: HttpCall[],
   initial: HttpResult,
   nextUrl: string,
@@ -132,7 +132,7 @@ export async function awaitHaomaoTask(
   const id = haomaoTaskId(initial.json) ?? knownId;
   if (id === undefined) throw new TransportError("haomao response has no task id", calls, publicResult(initial));
   const root = baseUrl.replace(/\/$/, "");
-  const task = await until(
+  const task = await awaitTask(
     calls,
     initial,
     `${root}/contents/generations/tasks/${encodeURIComponent(id)}`,

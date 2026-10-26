@@ -20,7 +20,7 @@ export const VIDEO_SHAPES = ["text", "frame", "reference"] as const;
 /** Official Seedance 2.5 omni-reference subtasks. `auto` is the default when `--task-type` is omitted. */
 export const OMNI_TASK_TYPES = ["auto", "reference", "edit", "extend"] as const;
 
-export const PROVIDERS = ["yunqiao", "grsai", "haomao", "kitta", "mediakit"] as const;
+export const PROVIDERS = ["yunqiao", "grsai", "haomao", "kitta", "mediakit", "beeftv"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /**
@@ -33,6 +33,7 @@ export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
   haomao: "https://haomaotoken.com/api/v3",
   kitta: "https://fishaudio.org",
   mediakit: "https://mediakit.cn-beijing.volces.com",
+  beeftv: "https://enterprise.beefapi.com",
 };
 
 /**
@@ -93,7 +94,7 @@ export const MODELS: readonly ModelInfo[] = [
     id,
     kind: "video" as const,
     summary: "Seedance TextVideo, FrameVideo, and ReferenceVideo",
-    providers: ["haomao"] as const,
+    providers: (id === "seedance-2-fast" ? ["haomao", "beeftv"] : ["haomao"]) as readonly ProviderId[],
   })),
   {
     id: "voice-design-1",

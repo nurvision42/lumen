@@ -27,7 +27,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **出图。** 按提示词生成一张图，或按参考图改图。单张即可。`lumen gen image --model <id>`。模型 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`，供应商 `yunqiao` 或 `grsai`。出图先读 `skills/lumen/references/gpt-image/SKILL.md`，再读 `skills/lumen/references/gpt-image-提示词写法/SKILL.md`。提示词写法只写正文，不提交。要写设备、镜头、视场、光圈、光、色或运镜时，图像和视频都读 `skills/lumen/references/拍摄设定/SKILL.md`。
 
-**出视频。** 用 Seedance 出一条视频。单条即可。`lumen gen video --model <id>`。供应商只有 `haomao`。出视频先读对应的使用说明（形态、时长、比例、素材、提交），再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。提示词写法只优化提示词，不代替 lumen 提交任务。
+**出视频。** 用 Seedance 出一条视频。单条即可。`lumen gen video --model <id>`。供应商是 `haomao`；`seedance-2-fast` 还可以绑 `beeftv`。出视频先读对应的使用说明（形态、时长、比例、素材、提交），再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。提示词写法只优化提示词，不代替 lumen 提交任务。
 
 - `seedance-2`、`seedance-2-fast`、`seedance-2-mini`（别名 `standard`、`fast`、`mini`）先读 `skills/lumen/references/seedance-2/SKILL.md`，然后读上面的提示词写法。
 - `seedance-2.5`（别名 `2.5`）先读 `skills/lumen/references/seedance-2.5/SKILL.md`，然后读同一份提示词写法。`--task-type` 只在这份使用说明里。
@@ -50,3 +50,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 ## haomao 模型名
 
 haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fast`、`seedance-2.0-mini`（2.5 仍是 `seedance-2.5`），lumen 自动换。若好猫报 `model_not_found`，用好猫的模型列表接口查实际 id，再 `lumen providers set <模型> --provider haomao --model-alias <id>` 覆盖；它同时作用于提交和上传。
+
+## beeftv
+
+`beeftv` 只提供 `seedance-2-fast`，上游模型名 `seedance-2.0-fast`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2-fast --provider beeftv --api-key-env <你的变量名>`。它没有上传接口：参考图、视频、音频和尾帧都要传网络链接；只有单独一张首帧可以用本地图片。模型名不对时用 `--model-alias` 覆盖。
