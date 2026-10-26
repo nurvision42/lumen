@@ -27,7 +27,7 @@ Default mode is --dry-run: the audit records the request and nothing is sent.
 
 Backends, one binding per model (no family fallback):
   image    yunqiao (OpenAI-compatible) or grsai
-  video    haomao — Seedance. Polls the task, then saves the mp4. Not MediaKit.
+  video    haomao, beeftv (seedance-2-fast) — Seedance. Polls the task, then saves the mp4. Not MediaKit.
            seedance-2.5 reference: --task-type auto|reference|edit|extend (omni_reference_task_type).
   voice    kitta at fishaudio.org
   download    douyin.com only. Saves a file for breakdown. No key on the command line.

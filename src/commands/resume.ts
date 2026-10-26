@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { finishHaomaoVideo } from "../clients/seedance.js";
+import { finishBeeftvVideo } from "../clients/beeftv.js";
 import { PendingTaskError } from "../clients/jobs.js";
 import { CliError } from "../errors.js";
 import { fetchOf, joinUrl, perform, TransportError, type HttpCall } from "../http.js";
@@ -15,7 +16,7 @@ function flagAfter(command: string[], flag: string): string | undefined {
 
 /** Older runs (<=0.1.4) recorded a still-processing task as an error; recover what we can. */
 function derivePending(record: RunRecord, project: string, overrides: { task?: string; out?: string }): PendingTask | undefined {
-  const taskId = overrides.task ?? record.pending?.taskId ?? /haomao task (\S+)/.exec(record.error ?? "")?.[1];
+  const taskId = overrides.task ?? record.pending?.taskId ?? /(?:haomao|beeftv) task (\S+)/.exec(record.error ?? "")?.[1];
   if (taskId === undefined) return undefined;
   const out = overrides.out ?? flagAfter(record.command, "--out");
   const videoFile =
@@ -45,7 +46,7 @@ export async function resumeRun(
   }
   const pending = derivePending(record, project, overrides);
   if (pending === undefined) throw new CliError(`run ${id} has no remote task to resume (pass --task <id>)`, 2);
-  if (pending.provider !== "haomao") throw new CliError(`resume supports haomao seedance tasks, not ${pending.provider}`, 2);
+  if (pending.provider !== "haomao" && pending.provider !== "beeftv") throw new CliError(`resume supports haomao and beeftv seedance tasks, not ${pending.provider}`, 2);
   const binding = record.binding;
   if (binding === null) throw new CliError(`run ${id} has no provider binding`, 2);
   const apiKey = io.env[binding.apiKeyEnv]?.trim();
@@ -60,13 +61,18 @@ export async function resumeRun(
       calls,
       {
         method: "GET",
-        url: joinUrl(binding.baseUrl, `/contents/generations/tasks/${encodeURIComponent(pending.taskId)}`),
+        url: joinUrl(
+          binding.baseUrl,
+          pending.provider === "beeftv"
+            ? `/v1/videos/${encodeURIComponent(pending.taskId)}`
+            : `/contents/generations/tasks/${encodeURIComponent(pending.taskId)}`,
+        ),
         headers: {},
         body: { kind: "empty" },
       },
       opts,
     );
-    const outcome = await finishHaomaoVideo(calls, binding.baseUrl, first, opts, io, "execute", pending.videoFile, pending.receipt, pending.taskId);
+    const outcome = await (pending.provider === "beeftv" ? finishBeeftvVideo : finishHaomaoVideo)(calls, binding.baseUrl, first, opts, io, "execute", pending.videoFile, pending.receipt, pending.taskId);
     const outputs: string[] = [];
     for (const file of outcome.files) {
       await mkdir(path.dirname(file.path), { recursive: true });
@@ -90,7 +96,7 @@ export async function resumeRun(
       await writeRun(project, next, [apiKey]);
       line(io, `running ${record.modelId}`);
       line(io, `run: ${id}`);
-      line(io, `task: haomao ${pending.taskId} (${err.lastStatus})`);
+      line(io, `task: ${pending.provider} ${pending.taskId} (${err.lastStatus})`);
       line(io, resumeHint(id));
       return 0;
     }
