@@ -26,11 +26,6 @@
       "baseUrl": "https://haomao.example/api/v3",
       "apiKeyEnv": "HAOMAO_FAST_KEY"
     },
-    "seedance-2-mini": {
-      "provider": "haomao",
-      "baseUrl": "https://haomao.example/api/v3",
-      "apiKeyEnv": "HAOMAO_MINI_KEY"
-    },
     "seedance-2.5": {
       "provider": "haomao",
       "baseUrl": "https://haomao.example/api/v3",

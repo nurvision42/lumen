@@ -57,12 +57,12 @@ test("two seedance models keep separate bindings and do not fall back", async ()
     const missing = capture(env);
     assert.equal(
       await run(
-        ["gen", "video", "--model", "seedance-2-mini", "--shape", "text", "--prompt", "no binding", "--duration", "5", "--project", dir],
+        ["gen", "video", "--model", "seedance-2.5", "--shape", "text", "--prompt", "no binding", "--duration", "5", "--project", dir],
         missing.io,
       ),
       1,
     );
-    assert.match(missing.err(), /no provider binding for seedance-2-mini/);
+    assert.match(missing.err(), /no provider binding for seedance-2.5/);
 
     const wrong = capture();
     assert.equal(

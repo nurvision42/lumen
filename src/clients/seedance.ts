@@ -17,7 +17,6 @@ import { contentTypeFor } from "../media.js";
 export const HAOMAO_SEEDANCE_MODELS: Record<string, string> = {
   "seedance-2": "seedance-2.0",
   "seedance-2-fast": "seedance-2.0-fast",
-  "seedance-2-mini": "seedance-2.0-mini",
   "seedance-2.5": "seedance-2.5",
 };
 

@@ -163,7 +163,7 @@ test("execute polls a haomao task and saves the mp4", async () => {
 
 test("a failed seedance job keeps the poll calls in the audit", async () => {
   await withDir(async (dir) => {
-    await bind(dir, "seedance-2-mini", "haomao", "https://haomao.example/api/v3", "HAOMAO");
+    await bind(dir, "seedance-2-fast", "haomao", "https://haomao.example/api/v3", "HAOMAO");
     const fetchImpl: IO["fetch"] = async (url) => {
       if (url.endsWith("/contents/generations/tasks")) return jsonResponse({ id: "cgt-x", status: "queued" });
       if (url.endsWith("/contents/generations/tasks/cgt-x")) return jsonResponse({ id: "cgt-x", status: "failed" });
@@ -172,7 +172,7 @@ test("a failed seedance job keeps the poll calls in the audit", async () => {
     const cap = capture({ HAOMAO: "haomao-secret-value", SEEDANCE_POLL_MS: "0" }, { fetch: fetchImpl });
     assert.equal(
       await run(
-        ["gen", "video", "--model", "mini", "--shape", "text", "--prompt", "nope", "--duration", "4", "--execute", "--project", dir],
+        ["gen", "video", "--model", "fast", "--shape", "text", "--prompt", "nope", "--duration", "4", "--execute", "--project", dir],
         cap.io,
       ),
       1,
