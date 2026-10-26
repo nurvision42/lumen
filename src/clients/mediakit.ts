@@ -1,4 +1,17 @@
-import { BREAKDOWN_LEVEL, BREAKDOWN_NEED_AUDIO, BREAKDOWN_PREFER_MODELS } from "../catalog.js";
+import {
+  BREAKDOWN_LEVEL,
+  BREAKDOWN_NEED_AUDIO,
+  BREAKDOWN_PREFER_MODELS,
+  ENHANCE_BITRATE_LEVEL,
+  ENHANCE_FPS,
+  ENHANCE_GENERATIVE_RESOLUTION,
+  ENHANCE_GENERATIVE_RESOLUTIONS,
+  ENHANCE_RESOLUTION,
+  ENHANCE_SCENE,
+  ENHANCE_STYLE,
+  ENHANCE_TOOL_VERSION,
+  ENHANCE_VIDEO_RESOLUTIONS,
+} from "../catalog.js";
 import type { ModelBinding } from "../config.js";
 import { CliError } from "../errors.js";
 import type { RunMode } from "../flags.js";
@@ -18,11 +31,74 @@ import { contentTypeFor, isRemoteMedia } from "../media.js";
 import { findString } from "../walk.js";
 import { jsonCall } from "./wire.js";
 
+export type MediakitTool = "video-understand-router" | "enhance-video" | "enhance-video-generative";
+export type EnhanceTool = "enhance-video" | "enhance-video-generative";
+
 export interface EnhanceOptions {
   toolVersion?: string;
   scene?: string;
   resolution?: string;
   enhanceStyle?: string;
+  fps?: number;
+  bitrateLevel?: string;
+}
+
+export interface ResolvedEnhance {
+  toolVersion?: string;
+  scene?: string;
+  resolution: string;
+  enhanceStyle?: string;
+  fps?: number;
+  bitrateLevel?: string;
+}
+
+function filled(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (trimmed === undefined || trimmed.length === 0) return undefined;
+  return trimmed;
+}
+
+export function enhanceResolutionChoices(tool: EnhanceTool): readonly string[] {
+  return tool === "enhance-video-generative" ? ENHANCE_GENERATIVE_RESOLUTIONS : ENHANCE_VIDEO_RESOLUTIONS;
+}
+
+/** Rejects a tier the chosen product does not offer. Returns the lowercase wire value. */
+export function assertEnhanceResolution(tool: EnhanceTool, toolVersion: string | undefined, resolution: string): string {
+  const normalized = resolution.trim().toLowerCase();
+  const allowed = enhanceResolutionChoices(tool);
+  if (!(allowed as readonly string[]).includes(normalized)) {
+    const who = tool === "enhance-video-generative" ? tool : `${tool} ${toolVersion ?? ENHANCE_TOOL_VERSION}`;
+    throw new CliError(`${who} does not accept resolution ${resolution}. It accepts: ${allowed.join(", ")}`, 2);
+  }
+  return normalized;
+}
+
+/** Defaults are 标准版 on enhance-video. `scene` is only applied for tool_version standard unless the caller set one. */
+export function resolveEnhance(input: EnhanceOptions | undefined, tool: EnhanceTool = "enhance-video"): ResolvedEnhance {
+  if (tool === "enhance-video-generative") {
+    if (filled(input?.toolVersion) !== undefined || filled(input?.scene) !== undefined || filled(input?.enhanceStyle) !== undefined) {
+      throw new CliError("enhance-video-generative does not take --tool-version, --scene, or --enhance-style", 2);
+    }
+    const resolution = assertEnhanceResolution(tool, undefined, filled(input?.resolution) ?? ENHANCE_GENERATIVE_RESOLUTION);
+    const bitrateLevel = filled(input?.bitrateLevel);
+    return {
+      resolution,
+      ...(input?.fps === undefined ? {} : { fps: input.fps }),
+      ...(bitrateLevel === undefined ? {} : { bitrateLevel }),
+    };
+  }
+  const toolVersion = filled(input?.toolVersion) ?? ENHANCE_TOOL_VERSION;
+  const explicitScene = filled(input?.scene);
+  const scene = explicitScene ?? (toolVersion === ENHANCE_TOOL_VERSION ? ENHANCE_SCENE : undefined);
+  const resolution = assertEnhanceResolution(tool, toolVersion, filled(input?.resolution) ?? ENHANCE_RESOLUTION);
+  return {
+    toolVersion,
+    ...(scene === undefined ? {} : { scene }),
+    resolution,
+    enhanceStyle: filled(input?.enhanceStyle) ?? ENHANCE_STYLE,
+    fps: input?.fps ?? ENHANCE_FPS,
+    bitrateLevel: filled(input?.bitrateLevel) ?? ENHANCE_BITRATE_LEVEL,
+  };
 }
 
 export interface UnderstandOptions {
@@ -75,7 +151,7 @@ function uploadHeaders(value: unknown): Record<string, string> {
 }
 
 function toolBody(
-  tool: "video-understand-router" | "enhance-video-generative",
+  tool: MediakitTool,
   video: string,
   runId: string,
   group: string | undefined,
@@ -100,19 +176,32 @@ function toolBody(
       ...queue,
     };
   }
+  const resolved = resolveEnhance(enhance, tool);
+  if (tool === "enhance-video-generative") {
+    return {
+      video_url: video,
+      client_token: runId,
+      resolution: resolved.resolution,
+      ...(resolved.fps === undefined ? {} : { fps: resolved.fps }),
+      ...(resolved.bitrateLevel === undefined ? {} : { bitrate_level: resolved.bitrateLevel }),
+      ...queue,
+    };
+  }
   return {
     video_url: video,
     client_token: runId,
+    tool_version: resolved.toolVersion,
+    ...(resolved.scene === undefined ? {} : { scene: resolved.scene }),
+    resolution: resolved.resolution,
+    fps: resolved.fps,
+    bitrate_level: resolved.bitrateLevel,
+    enhance_style: resolved.enhanceStyle,
     ...queue,
-    ...(enhance?.toolVersion === undefined ? {} : { tool_version: enhance.toolVersion }),
-    ...(enhance?.scene === undefined ? {} : { scene: enhance.scene }),
-    ...(enhance?.resolution === undefined ? {} : { resolution: enhance.resolution }),
-    ...(enhance?.enhanceStyle === undefined ? {} : { enhance_style: enhance.enhanceStyle }),
   };
 }
 
 export function planMediakit(
-  tool: "video-understand-router" | "enhance-video-generative",
+  tool: MediakitTool,
   binding: ModelBinding,
   video: string,
   runId: string,
@@ -135,12 +224,9 @@ export function planMediakit(
     body: { kind: "empty" },
   };
   if (remote) return [submit, poll];
-  const upload: HttpCall = {
-    method: "POST",
-    url: joinUrl(binding.baseUrl, "/api/v1/tools-sync/request-media-upload-url"),
-    headers: {},
-    body: { kind: "empty" },
-  };
+  // Docs list no body fields, but the example is `-d '{}'` with Content-Type application/json.
+  // An omitted body is rejected: 400 invalid empty request body.
+  const upload = jsonCall("POST", joinUrl(binding.baseUrl, "/api/v1/tools-sync/request-media-upload-url"), {}, {});
   const put: HttpCall = {
     method: "PUT",
     url: "https://upload.invalid/{{upload_url}}",
@@ -176,7 +262,7 @@ async function pollTask(
 }
 
 export async function runMediakit(
-  tool: "video-understand-router" | "enhance-video-generative",
+  tool: MediakitTool,
   binding: ModelBinding,
   video: string,
   runId: string,

@@ -52,10 +52,16 @@
       "apiKeyEnv": "MEDIAKIT_UNDERSTAND_KEY",
       "group": "queue-edit"
     },
-    "enhance-video-generative": {
+    "enhance-video": {
       "provider": "mediakit",
       "baseUrl": "https://mediakit.cn-beijing.volces.com",
       "apiKeyEnv": "MEDIAKIT_ENHANCE_KEY",
+      "group": "queue-enhance"
+    },
+    "enhance-video-generative": {
+      "provider": "mediakit",
+      "baseUrl": "https://mediakit.cn-beijing.volces.com",
+      "apiKeyEnv": "MEDIAKIT_ENHANCE_GENERATIVE_KEY",
       "group": "queue-enhance"
     }
   },

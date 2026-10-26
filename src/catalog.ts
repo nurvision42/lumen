@@ -3,7 +3,7 @@ import { CliError } from "./errors.js";
 export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
 export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2.5"] as const;
 export const FISH_MODELS = ["voice-clone", "voice-design-1", "voice-synthesis"] as const;
-export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video-generative"] as const;
+export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video", "enhance-video-generative"] as const;
 
 export const IMAGE_ASPECTS = [
   "auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16",
@@ -68,6 +68,21 @@ export const BREAKDOWN_LEVEL = "Quality";
 /** Sent as manual_option.need_audio when breakdown.needAudio is unset. */
 export const BREAKDOWN_NEED_AUDIO = true;
 
+/** MediaKit enhance-video 标准版. Sent when `lumen enhance` does not override the flag. */
+export const ENHANCE_TOOL_VERSION = "standard";
+/** Scene preset. Valid only for tool_version standard; omitted for other versions unless --scene is set. */
+export const ENHANCE_SCENE = "aigc";
+/** Default when `--resolution` is omitted on enhance-video standard and professional. */
+export const ENHANCE_RESOLUTION = "4k";
+/** Selectable tiers for enhance-video standard and professional. */
+export const ENHANCE_VIDEO_RESOLUTIONS = ["1080p", "2k", "4k"] as const;
+/** 大模型版. 4k is not accepted. Unset `--resolution` sends 1080p. */
+export const ENHANCE_GENERATIVE_RESOLUTIONS = ["1080p", "2k"] as const;
+export const ENHANCE_GENERATIVE_RESOLUTION = "1080p";
+export const ENHANCE_FPS = 30;
+export const ENHANCE_BITRATE_LEVEL = "medium";
+export const ENHANCE_STYLE = "natural";
+
 export type ImageModel = (typeof IMAGE_MODELS)[number];
 export type SeedanceModel = (typeof SEEDANCE_MODELS)[number];
 export type FishModel = (typeof FISH_MODELS)[number];
@@ -121,9 +136,15 @@ export const MODELS: readonly ModelInfo[] = [
     providers: ["mediakit"],
   },
   {
+    id: "enhance-video",
+    kind: "mediakit",
+    summary: "MediaKit enhance-video 标准版/专业版: resolutions 1080p, 2k, 4k (default 4k); standard defaults scene aigc, fps 30, bitrate_level medium, enhance_style natural",
+    providers: ["mediakit"],
+  },
+  {
     id: "enhance-video-generative",
     kind: "mediakit",
-    summary: "MediaKit enhance-video-generative",
+    summary: "MediaKit enhance-video-generative 大模型版: resolutions 1080p, 2k (default 1080p); not 4k",
     providers: ["mediakit"],
   },
 ];
@@ -141,10 +162,11 @@ const REMOVED_MODELS = new Set(["seedance-2-mini", "mini"]);
 
 /** Aliases `standard`, `fast`, and `2.5` map to lumen model ids. */
 export function canonicalModel(id: string): string {
-  if (REMOVED_MODELS.has(id.trim().toLowerCase())) {
+  const key = id.trim().toLowerCase();
+  if (REMOVED_MODELS.has(key)) {
     throw new CliError(`model removed: ${id} is no longer available in lumen; use seedance-2-fast or seedance-2 and delete its binding (lumen providers unset ${id} or edit providers.json)`);
   }
-  return MODEL_ALIASES[id] ?? MODEL_ALIASES[id.toLowerCase()] ?? id;
+  return MODEL_ALIASES[id] ?? MODEL_ALIASES[key] ?? id;
 }
 
 export function normalizeShape(value: string | undefined): string | undefined {

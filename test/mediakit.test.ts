@@ -67,8 +67,10 @@ test("breakdown dry-run plans scene=editing and the built-in 拉片 prompt", asy
     assert.match(body, /"prefer_models":\["doubao-seed-2-1-lite-260915"\]/);
     assert.match(body, /"manual_option":\{"need_audio":true\}/);
     assert.equal(body.includes("prefer_endpoints"), false);
-    const calls = record.calls as Array<{ body: { value?: { prompt?: string } } }>;
+    const calls = record.calls as Array<{ url: string; body: { kind: string; value?: { prompt?: string } } }>;
     assert.equal(calls.find((call) => call.body.value?.prompt !== undefined)?.body.value?.prompt, BREAKDOWN_DEFAULT_PROMPT);
+    const upload = calls.find((call) => call.url.includes("request-media-upload-url"));
+    assert.deepEqual(upload?.body, { kind: "json", value: {} });
   });
 });
 
@@ -108,6 +110,8 @@ test("breakdown execute uploads, posts, polls, and writes a shot list", async ()
         if (url.includes("mediakit.example")) assert.equal(header.get("authorization"), `Bearer ${KEY}`);
         else assert.equal(header.get("authorization"), null);
         if (url.includes("request-media-upload-url")) {
+          assert.equal(String(init?.body), "{}");
+          assert.match(header.get("content-type") ?? "", /application\/json/);
           return Response.json({
             success: true,
             result: { file_id: "abc123", upload_url: `https://upload.example/put?auth_key=${SECRET}`, method: "PUT", upload_headers: [] },
@@ -164,7 +168,7 @@ test("breakdown execute uploads, posts, polls, and writes a shot list", async ()
 
 test("enhance execute downloads the mp4 and redacts the presigned query", async () => {
   await withDir(async (dir) => {
-    await bind(dir, "enhance-video-generative", "MEDIAKIT_ENHANCE_KEY");
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
     await mkdir(path.join(dir, "refs"), { recursive: true });
     await writeFile(path.join(dir, "refs", "clip.mp4"), "fake");
     const auths: string[] = [];
@@ -175,22 +179,34 @@ test("enhance execute downloads the mp4 and redacts the presigned query", async 
         const auth = header.get("authorization");
         if (auth) auths.push(auth);
         if (url.includes("request-media-upload-url")) {
+          assert.equal(String(init?.body), "{}");
+          assert.match(header.get("content-type") ?? "", /application\/json/);
           return Response.json({
             result: { file_id: "mediakit://file-9", upload_url: `https://upload.example/put?auth_key=${SECRET}` },
           });
         }
         if (init?.method === "PUT") return new Response("", { status: 200 });
-        if (url.includes("enhance-video-generative")) {
+        if (url.includes("/api/v1/tools/enhance-video")) {
           const body = JSON.parse(String(init?.body)) as {
             video_url?: string;
+            tool_version?: string;
             scene?: string;
+            resolution?: string;
+            fps?: number;
+            bitrate_level?: string;
+            enhance_style?: string;
             level?: string;
             queue_id?: string;
             prefer_models?: string[];
             manual_option?: unknown;
           };
           assert.equal(body.video_url, "mediakit://file-9");
-          assert.equal(body.scene, undefined);
+          assert.equal(body.tool_version, "standard");
+          assert.equal(body.scene, "aigc");
+          assert.equal(body.resolution, "4k");
+          assert.equal(body.fps, 30);
+          assert.equal(body.bitrate_level, "medium");
+          assert.equal(body.enhance_style, "natural");
           assert.equal(body.level, undefined);
           assert.equal(body.queue_id, "queue-1");
           assert.equal(body.prefer_models, undefined);
@@ -218,12 +234,252 @@ test("enhance execute downloads the mp4 and redacts the presigned query", async 
     assert.ok(mp4);
     assert.equal(await readFile(path.join(outDir, mp4), "utf8"), "mp4-bytes");
     const audit = await readFile(path.join(dir, ".lumen", "runs", (await readdir(path.join(dir, ".lumen", "runs")))[0] ?? "", "record.json"), "utf8");
-    assert.match(audit, /enhance-video-generative/);
+    assert.match(audit, /\/api\/v1\/tools\/enhance-video/);
+    assert.equal(audit.includes("enhance-video-generative"), false);
     assert.equal(audit.includes(SECRET), false);
     assert.equal(audit.includes(KEY), false);
     assert.equal(audit.includes("auth_key"), false);
     assert.ok(auths.some((value) => value === `Bearer ${KEY}`));
     await access(path.join(outDir, mp4));
+  });
+});
+
+interface PlannedCall {
+  url: string;
+  body: { kind: string; value?: Record<string, unknown> };
+}
+
+async function plannedCalls(dir: string, runId: string): Promise<PlannedCall[]> {
+  const record = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", runId, "record.json"), "utf8")) as {
+    calls: PlannedCall[];
+  };
+  return record.calls;
+}
+
+test("enhance dry-run plans standard defaults and a json upload body", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    const cap = capture({ MEDIAKIT_ENHANCE_KEY: KEY }, {
+      fetch: async () => {
+        throw new Error("dry-run must not fetch");
+      },
+    });
+    assert.equal(await run(["enhance", "--video", "refs/in.mp4", "--project", dir], cap.io), 0, cap.err());
+    const runId = /run: (\S+)/.exec(cap.out())?.[1] ?? "";
+    const calls = await plannedCalls(dir, runId);
+    const upload = calls.find((call) => call.url.includes("request-media-upload-url"));
+    assert.equal(upload?.url, "https://mediakit.example/api/v1/tools-sync/request-media-upload-url");
+    assert.deepEqual(upload?.body, { kind: "json", value: {} });
+    const submit = calls.find((call) => call.url.includes("/api/v1/tools/enhance-video"));
+    assert.equal(submit?.url, "https://mediakit.example/api/v1/tools/enhance-video");
+    assert.deepEqual(submit?.body.value, {
+      video_url: "mediakit://{{file_id}}",
+      client_token: runId,
+      tool_version: "standard",
+      scene: "aigc",
+      resolution: "4k",
+      fps: 30,
+      bitrate_level: "medium",
+      enhance_style: "natural",
+      queue_id: "queue-1",
+    });
+  });
+});
+
+test("enhance flags override the standard defaults", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    const cap = capture({ MEDIAKIT_ENHANCE_KEY: KEY }, {
+      fetch: async () => {
+        throw new Error("dry-run must not fetch");
+      },
+    });
+    assert.equal(
+      await run(
+        [
+          "enhance", "--video", "https://cdn.example/in.mp4",
+          "--tool-version", "standard",
+          "--scene", "ugc",
+          "--resolution", "1080p",
+          "--fps", "60",
+          "--bitrate-level", "high",
+          "--enhance-style", "hd",
+          "--project", dir,
+        ],
+        cap.io,
+      ),
+      0,
+      cap.err(),
+    );
+    const runId = /run: (\S+)/.exec(cap.out())?.[1] ?? "";
+    const calls = await plannedCalls(dir, runId);
+    assert.equal(calls.some((call) => call.url.includes("request-media-upload-url")), false);
+    const submit = calls.find((call) => call.url.includes("/api/v1/tools/enhance-video"));
+    assert.deepEqual(submit?.body.value, {
+      video_url: "https://cdn.example/in.mp4",
+      client_token: runId,
+      tool_version: "standard",
+      scene: "ugc",
+      resolution: "1080p",
+      fps: 60,
+      bitrate_level: "high",
+      enhance_style: "hd",
+      queue_id: "queue-1",
+    });
+  });
+});
+
+test("enhance omits scene when tool_version is not standard unless --scene is set", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    const plain = capture({ MEDIAKIT_ENHANCE_KEY: KEY }, {
+      fetch: async () => {
+        throw new Error("dry-run must not fetch");
+      },
+    });
+    assert.equal(
+      await run(["enhance", "--video", "https://cdn.example/in.mp4", "--tool-version", "professional", "--project", dir], plain.io),
+      0,
+      plain.err(),
+    );
+    const plainId = /run: (\S+)/.exec(plain.out())?.[1] ?? "";
+    const plainSubmit = (await plannedCalls(dir, plainId)).find((call) => call.url.includes("/api/v1/tools/enhance-video"));
+    assert.equal(plainSubmit?.body.value?.tool_version, "professional");
+    assert.equal(plainSubmit?.body.value?.scene, undefined);
+    assert.equal(plainSubmit?.body.value?.resolution, "4k");
+    assert.equal(plainSubmit?.body.value?.fps, 30);
+    assert.equal(plainSubmit?.body.value?.bitrate_level, "medium");
+    assert.equal(plainSubmit?.body.value?.enhance_style, "natural");
+
+    const explicit = capture({ MEDIAKIT_ENHANCE_KEY: KEY }, {
+      fetch: async () => {
+        throw new Error("dry-run must not fetch");
+      },
+    });
+    assert.equal(
+      await run(
+        ["enhance", "--video", "https://cdn.example/in.mp4", "--tool-version", "professional", "--scene", "aigc", "--project", dir],
+        explicit.io,
+      ),
+      0,
+      explicit.err(),
+    );
+    const explicitId = /run: (\S+)/.exec(explicit.out())?.[1] ?? "";
+    const explicitSubmit = (await plannedCalls(dir, explicitId)).find((call) => call.url.includes("/api/v1/tools/enhance-video"));
+    assert.equal(explicitSubmit?.body.value?.scene, "aigc");
+  });
+});
+
+test("enhance standard and professional accept 1080p, 2k, and 4k", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    for (const [version, resolution] of [["standard", "2k"], ["professional", "1080p"], ["professional", "4k"], ["standard", "4K"]] as const) {
+      const cap = capture({ MEDIAKIT_ENHANCE_KEY: KEY }, {
+        fetch: async () => {
+          throw new Error("dry-run must not fetch");
+        },
+      });
+      assert.equal(
+        await run(
+          ["enhance", "--video", "https://cdn.example/in.mp4", "--tool-version", version, "--resolution", resolution, "--project", dir],
+          cap.io,
+        ),
+        0,
+        cap.err(),
+      );
+      const runId = /run: (\S+)/.exec(cap.out())?.[1] ?? "";
+      const submit = (await plannedCalls(dir, runId)).find((call) => call.url.endsWith("/api/v1/tools/enhance-video"));
+      assert.equal(submit?.body.value?.tool_version, version);
+      assert.equal(submit?.body.value?.resolution, resolution.toLowerCase());
+    }
+  });
+});
+
+test("enhance rejects a resolution outside the product allowlist", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    await bind(dir, "enhance-video-generative", "MEDIAKIT_GENERATIVE_KEY");
+    const standard = capture({ MEDIAKIT_ENHANCE_KEY: KEY });
+    assert.equal(
+      await run(["enhance", "--video", "refs/in.mp4", "--resolution", "720p", "--project", dir], standard.io),
+      2,
+    );
+    assert.match(standard.err(), /enhance-video standard does not accept resolution 720p/);
+    assert.match(standard.err(), /1080p, 2k, 4k/);
+    const professional = capture({ MEDIAKIT_ENHANCE_KEY: KEY });
+    assert.equal(
+      await run(
+        ["enhance", "--video", "refs/in.mp4", "--tool-version", "professional", "--resolution", "8k", "--project", dir],
+        professional.io,
+      ),
+      2,
+    );
+    assert.match(professional.err(), /enhance-video professional does not accept resolution 8k/);
+    assert.match(professional.err(), /1080p, 2k, 4k/);
+    const generative = capture({ MEDIAKIT_GENERATIVE_KEY: KEY });
+    assert.equal(
+      await run(
+        ["enhance", "--model", "enhance-video-generative", "--video", "refs/in.mp4", "--resolution", "4k", "--project", dir],
+        generative.io,
+      ),
+      2,
+    );
+    assert.match(generative.err(), /enhance-video-generative does not accept resolution 4k/);
+    assert.match(generative.err(), /1080p, 2k/);
+    assert.equal(generative.err().includes("4k,"), false);
+    await assert.rejects(access(path.join(dir, ".lumen", "runs")));
+  });
+});
+
+test("enhance-video-generative defaults to 1080p and accepts 2k", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video-generative", "MEDIAKIT_GENERATIVE_KEY");
+    const plain = capture({ MEDIAKIT_GENERATIVE_KEY: KEY }, {
+      fetch: async () => {
+        throw new Error("dry-run must not fetch");
+      },
+    });
+    assert.equal(
+      await run(["enhance", "--model", "enhance-video-generative", "--video", "https://cdn.example/in.mp4", "--project", dir], plain.io),
+      0,
+      plain.err(),
+    );
+    const plainId = /run: (\S+)/.exec(plain.out())?.[1] ?? "";
+    const plainSubmit = (await plannedCalls(dir, plainId)).find((call) => call.url.endsWith("/enhance-video-generative"));
+    assert.deepEqual(plainSubmit?.body.value, {
+      video_url: "https://cdn.example/in.mp4",
+      client_token: plainId,
+      resolution: "1080p",
+      queue_id: "queue-1",
+    });
+    const twoK = capture({ MEDIAKIT_GENERATIVE_KEY: KEY }, {
+      fetch: async () => {
+        throw new Error("dry-run must not fetch");
+      },
+    });
+    assert.equal(
+      await run(
+        ["enhance", "--model", "enhance-video-generative", "--video", "https://cdn.example/in.mp4", "--resolution", "2k", "--project", dir],
+        twoK.io,
+      ),
+      0,
+      twoK.err(),
+    );
+    const twoKId = /run: (\S+)/.exec(twoK.out())?.[1] ?? "";
+    const twoKSubmit = (await plannedCalls(dir, twoKId)).find((call) => call.url.endsWith("/enhance-video-generative"));
+    assert.equal(twoKSubmit?.body.value?.resolution, "2k");
+    assert.equal(twoKSubmit?.body.value?.tool_version, undefined);
+    assert.equal(twoKSubmit?.body.value?.scene, undefined);
+    assert.equal(twoKSubmit?.body.value?.enhance_style, undefined);
+  });
+});
+
+test("enhance rejects an fps outside 15 to 120", async () => {
+  await withDir(async (dir) => {
+    const cap = capture();
+    assert.equal(await run(["enhance", "--video", "refs/in.mp4", "--fps", "12", "--project", dir], cap.io), 2);
+    assert.match(cap.err(), /--fps/);
+    await assert.rejects(access(path.join(dir, ".lumen")));
   });
 });
 

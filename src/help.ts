@@ -15,7 +15,7 @@ Usage:
   lumen setup ffmpeg
   lumen sprite --video <file> --to <image> [--every s|--frames n|--every-frame|--at t|--ranges json] [--columns n] [--rows n] [--cell px] [--transcript file] [--json]
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
-  lumen enhance [--video file] [--shot N] [--out file]
+  lumen enhance [--model enhance-video|enhance-video-generative] [--video file] [--shot N] [--out file] [--tool-version standard] [--scene aigc] [--resolution 1080p|2k|4k] [--fps 30] [--bitrate-level medium] [--enhance-style natural]
   lumen runs list|show <id>|resume <id>
   lumen concat [--project dir]
   lumen library status|list|find|add|connect feishu
@@ -33,10 +33,15 @@ Backends, one binding per model (no family fallback):
   download    douyin.com only. Saves a file for breakdown. No key on the command line.
               lumen setup --key tikhub stores it in the machine credential store, or set TIKHUB_API_KEY.
               Do not ask for the key in conversation. A missing key names the setup command.
-  breakdown / enhance    MediaKit video-understand-router and enhance-video-generative
+  breakdown / enhance    MediaKit video-understand-router and enhance-video
                          breakdown sends prefer_models doubao-seed-2-1-lite-260915, level Quality, need_audio true
                          omitted --prompt sends the built-in 拉片 prompt; do not pass one
                          override with breakdown.preferModels, breakdown.level, or breakdown.needAudio
+                         enhance defaults: tool_version standard, scene aigc, resolution 4k, fps 30, bitrate_level medium, enhance_style natural
+                         enhance-video standard and professional accept resolution 1080p, 2k, 4k (default 4k)
+                         enhance-video-generative accepts resolution 1080p, 2k (default 1080p), not 4k
+                         scene is sent for standard only, unless --scene is set
+                         local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}
   sprite    Contact sheet. ffmpeg extracts real frame times; sharp lays them out.
             Resolution is config (LUMEN_FFMPEG / LUMEN_FFPROBE or tools.ffmpeg / tools.ffprobe), then PATH, then the cache, then a hashed download.
             sharp loads a local install, then the cache, then an on-demand install. Neither is an npm dependency of lumen.

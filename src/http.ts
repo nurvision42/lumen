@@ -104,7 +104,7 @@ function mockJson(call: HttpCall): unknown {
   }
   if (call.method === "PUT") return { success: true };
   if (url.endsWith("/files/uploads")) return { url: "https://cdn.example/mock-upload.bin" };
-  if (url.includes("video-understand-router") || url.includes("enhance-video-generative")) {
+  if (url.includes("video-understand-router") || url.includes("/enhance-video")) {
     return { success: true, task_id: "mock-task" };
   }
   if (url.includes("/api/v1/tasks/")) {
