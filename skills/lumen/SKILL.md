@@ -29,7 +29,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **出视频。** 用 Seedance 出一条视频。单条即可。`lumen gen video --model <id>`。供应商是 `haomao`；`seedance-2-fast` 还可以绑 `beeftv`。出视频先读对应的使用说明（形态、时长、比例、素材、提交），再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。提示词写法只优化提示词，不代替 lumen 提交任务。
 
-- `seedance-2`、`seedance-2-fast`、`seedance-2-mini`（别名 `standard`、`fast`、`mini`）先读 `skills/lumen/references/seedance-2/SKILL.md`，然后读上面的提示词写法。
+- `seedance-2`、`seedance-2-fast`（别名 `standard`、`fast`）先读 `skills/lumen/references/seedance-2/SKILL.md`，然后读上面的提示词写法。
 - `seedance-2.5`（别名 `2.5`）先读 `skills/lumen/references/seedance-2.5/SKILL.md`，然后读同一份提示词写法。`--task-type` 只在这份使用说明里。
 
 **语音。** 设计音色、用参考录音克隆，或用已有音色念稿。单句即可。先按上面的规则查库。`lumen fish design` · `lumen fish clone` · `lumen fish synth`。模型 `voice-design-1`、`voice-clone`、`voice-synthesis`，供应商只有 `kitta`。接口不写在这里。
@@ -49,7 +49,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 ## haomao 模型名
 
-haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fast`、`seedance-2.0-mini`（2.5 仍是 `seedance-2.5`），lumen 自动换。若好猫报 `model_not_found`，用好猫的模型列表接口查实际 id，再 `lumen providers set <模型> --provider haomao --model-alias <id>` 覆盖；它同时作用于提交和上传。
+haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fast`（2.5 仍是 `seedance-2.5`），lumen 自动换。若好猫报 `model_not_found`，用好猫的模型列表接口查实际 id，再 `lumen providers set <模型> --provider haomao --model-alias <id>` 覆盖；它同时作用于提交和上传。
 
 ## beeftv
 

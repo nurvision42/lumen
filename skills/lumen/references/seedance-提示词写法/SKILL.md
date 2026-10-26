@@ -7,7 +7,7 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 本文件的说明用中文。交给模型的提示词正文只用英文：模板、样例、默认约束都是英文。不要把中文写进模型收到的正文。
 
-本文件只写提示词，不提交任务。`seedance-2`、`seedance-2-fast`、`seedance-2-mini` 的形态、时长、比例、素材和提交见 `seedance-2/SKILL.md`。`seedance-2.5` 见 `seedance-2.5/SKILL.md`。那些数字不写进提示词，也不在这里再列一张表。
+本文件只写提示词，不提交任务。`seedance-2`、`seedance-2-fast` 的形态、时长、比例、素材和提交见 `seedance-2/SKILL.md`。`seedance-2.5` 见 `seedance-2.5/SKILL.md`。那些数字不写进提示词，也不在这里再列一张表。
 
 机身、镜头、视场、光圈或景深、光、色、类型、调色、运镜、运镜风格和可选变速，都从 `skills/lumen/references/拍摄设定/SKILL.md` 的「写入」列取英文句子。图像也用那一份。这里不列预设，也不把中文名称或编号写进正文。
 
@@ -135,7 +135,7 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 ## 时间轴
 
-- **Seedance 2 / fast / mini**：用 `Shot 1`、`Shot 2`、`Shot 3`。不要写 `0–3s`，也不要把顺序写成中文镜头编号。路径 B 的每一镜写景别、视场角和一种运镜。机身是 iPhone 原相机时不写视场角，只写景别和一种运镜。
+- **Seedance 2 / fast**：用 `Shot 1`、`Shot 2`、`Shot 3`。不要写 `0–3s`，也不要把顺序写成中文镜头编号。路径 B 的每一镜写景别、视场角和一种运镜。机身是 iPhone 原相机时不写视场角，只写景别和一种运镜。
 - **Seedance 2.5**：秒数或镜头顺序都可以。秒数必须连续、不重叠，并且来自用户已经给出的事件时间。不要为了凑总时长新造 `0–3s`。用户没给数字时用 `Phase 1`，每个阶段一件主要的状态变化，并写结束时看得见什么。
 
 `Shot 1:` 这种编号是顺序，不是秒。Seedance 2.5 上如果用户已经给了时间段，保留他的数字，写成 `0-5s` 这种英文，不要改成别的编号，也不要加密。
@@ -176,7 +176,7 @@ Extend @Video1 forward in time. The new picture continues from the last frame: t
 
 **第一段，设定和主体。** 用英文一句定场所。一次性绑完主体。脸和服装分开时写 `Face from @Image1. Costume from @Image2.` 机身/色调若要写，只在这一段或第三段写一次。运镜参考、环境声参考也在这里声明。首帧尾帧不写在这一段的同一句里，改到「可选：关键帧」。
 
-**第二段，时间。** Seedance 2 / fast / mini 用 `Shot 1`、`Shot 2`。Seedance 2.5 用 `Phase 1`，或用用户给过的秒数。每一镜必须有景别、视场角或焦段、一种运镜，英文句子从拍摄设定的「写入」列取，镜与镜可以不同。机身是 iPhone 原相机时，每一镜只写景别和一种运镜，不写视场角、焦段、光圈或景深。另外写主体动作与表情、位置变化、这一镜的声音。不要把机身、色板、类型或调色抄进每一镜。动作写肢体和幅度，优先低而连续，写过渡，情绪写成身体，不要只写 `sad`。
+**第二段，时间。** Seedance 2 / fast 用 `Shot 1`、`Shot 2`。Seedance 2.5 用 `Phase 1`，或用用户给过的秒数。每一镜必须有景别、视场角或焦段、一种运镜，英文句子从拍摄设定的「写入」列取，镜与镜可以不同。机身是 iPhone 原相机时，每一镜只写景别和一种运镜，不写视场角、焦段、光圈或景深。另外写主体动作与表情、位置变化、这一镜的声音。不要把机身、色板、类型或调色抄进每一镜。动作写肢体和幅度，优先低而连续，写过渡，情绪写成身体，不要只写 `sad`。
 
 **第三段，全程保持。** 身份、服装、道具归属、空间方向、声音关系。机身/色调若没写在第一段，可以写在这里，仍然只一次。用户没指定字幕和音乐时写 `no subtitles, no music`。多人写清谁穿什么、相对哪个稳定物体站在哪一侧，用 `only these people are in the frame` 代替一长串分身禁令。
 
@@ -419,7 +419,7 @@ Shot 9: <ending action and what is visible at the end>.
 no subtitles, no music.
 ```
 
-Seedance 2 / fast / mini 保持 `Shot 1` 这种顺序。Seedance 2.5 在用户没给秒数时也可以用同样的镜头顺序；不要把格子编号改成 `0–3s`。
+Seedance 2 / fast 保持 `Shot 1` 这种顺序。Seedance 2.5 在用户没给秒数时也可以用同样的镜头顺序；不要把格子编号改成 `0–3s`。
 
 ## 情绪、镜头、声音、产品
 
@@ -510,7 +510,7 @@ Shot 2: a close-up, the face or one object filling most of the frame. locked-off
 no subtitles, no music.
 ```
 
-Seedance 2 / fast / mini 的分镜。机身/色调在分镜外一次。每一镜的视场和运镜不同：
+Seedance 2 / fast 的分镜。机身/色调在分镜外一次。每一镜的视场和运镜不同：
 
 ```text
 film texture without heavy grain, gentle highlight roll-off, natural skin rendering. neutral realistic colour from the scene materials, white balance matched to the intended light.
@@ -564,7 +564,7 @@ Keep the barista's apron, who stands inside or outside the bar, and the cup coun
 - 延长方向和边界帧正确，同一个人没有变成两个，原片里的内容没有被改写。
 - 首帧、尾帧各自单独成句。
 - 宫格写了读取顺序，线、标注和占位不当成画面。
-- Seedance 2 / fast / mini 用 `Shot 1`，没有 `0–3s`。Seedance 2.5 的秒数都是用户给的，连续且不重叠。
+- Seedance 2 / fast 用 `Shot 1`，没有 `0–3s`。Seedance 2.5 的秒数都是用户给的，连续且不重叠。
 - 路径 A 的景别、视场角、运镜如果写了，整段只有一套。机身/色调如果写了，全片只有一次。
 - 路径 B 的每一镜都有景别、视场角和一种运镜，句子来自拍摄设定，镜与镜可以不同。机身/色调不在每一镜重复。机身是 iPhone 原相机时，不写视场角、光圈、景深、镜头、色板、类型或调色；每一镜仍可写景别和一种运镜。
 - 拍摄设定只放了选中的英文句子；没选的维度没有写成 `Auto`。

@@ -1,11 +1,11 @@
 ---
 name: seedance-2
-description: 用 seedance-2、seedance-2-fast 或 seedance-2-mini 调用 lumen 之前先读。只管形态、时长、比例、素材上限和提交。
+description: 用 seedance-2 或 seedance-2-fast 调用 lumen 之前先读。只管形态、时长、比例、素材上限和提交。
 ---
 
 # Seedance 2.0 使用说明
 
-本文件只管怎么用 `lumen` 调用 `seedance-2`、`seedance-2-fast`、`seedance-2-mini`（别名 `standard`、`fast`、`mini`）。三支都绑 `haomao`，不是 MediaKit；`seedance-2-fast` 也可以绑 `beeftv`（本地素材自动上传）。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。
+本文件只管怎么用 `lumen` 调用 `seedance-2`、`seedance-2-fast`（别名 `standard`、`fast`）。两支都绑 `haomao`，不是 MediaKit；`seedance-2-fast` 也可以绑 `beeftv`（本地素材自动上传）。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。
 
 ## 三种形态
 
@@ -25,7 +25,7 @@ description: 用 seedance-2、seedance-2-fast 或 seedance-2-mini 调用 lumen �
 
 来自方舟「创建视频生成任务」：
 
-| 项 | Seedance 2.0 | fast / mini |
+| 项 | Seedance 2.0 | fast |
 | --- | --- | --- |
 | `duration` | 整数秒，`[4, 15]`，或 `-1` 让模型在这个范围内自选 | 同左 |
 | `ratio` | `16:9`、`4:3`、`1:1`、`3:4`、`9:16`、`21:9`、`adaptive`。系列默认 `adaptive` | 同左 |

@@ -1,7 +1,7 @@
 import { CliError } from "./errors.js";
 
 export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
-export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2-mini", "seedance-2.5"] as const;
+export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2.5"] as const;
 export const FISH_MODELS = ["voice-clone", "voice-design-1", "voice-synthesis"] as const;
 export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video-generative"] as const;
 
@@ -133,12 +133,17 @@ const byId = new Map(MODELS.map((model) => [model.id, model]));
 const MODEL_ALIASES: Record<string, ModelId> = {
   standard: "seedance-2",
   fast: "seedance-2-fast",
-  mini: "seedance-2-mini",
   "2.5": "seedance-2.5",
 };
 
-/** Aliases `standard`, `fast`, `mini`, and `2.5` map to lumen model ids. */
+/** Model ids and aliases that lumen no longer ships. Using one is an explicit error. */
+const REMOVED_MODELS = new Set(["seedance-2-mini", "mini"]);
+
+/** Aliases `standard`, `fast`, and `2.5` map to lumen model ids. */
 export function canonicalModel(id: string): string {
+  if (REMOVED_MODELS.has(id.trim().toLowerCase())) {
+    throw new CliError(`model removed: ${id} is no longer available in lumen; use seedance-2-fast or seedance-2 and delete its binding (lumen providers unset ${id} or edit providers.json)`);
+  }
   return MODEL_ALIASES[id] ?? MODEL_ALIASES[id.toLowerCase()] ?? id;
 }
 
