@@ -42,6 +42,7 @@ Backends, one binding per model (no family fallback):
                          enhance-video-generative accepts resolution 1080p, 2k (default 1080p), not 4k
                          scene is sent for standard only, unless --scene is set
                          local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}
+                         still running when polling ends stays running (exit 0); lumen runs resume <id> continues and saves the result
   sprite    Contact sheet. ffmpeg extracts real frame times; sharp lays them out.
             Resolution is config (LUMEN_FFMPEG / LUMEN_FFPROBE or tools.ffmpeg / tools.ffprobe), then PATH, then the cache, then a hashed download.
             sharp loads a local install, then the cache, then an on-demand install. Neither is an npm dependency of lumen.

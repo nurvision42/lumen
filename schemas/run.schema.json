@@ -11,7 +11,7 @@
     "command": { "type": "array", "items": { "type": "string" } },
     "modelId": { "type": "string" },
     "mode": { "enum": ["dry-run", "execute", "mock"] },
-    "status": { "enum": ["dry-run", "mock", "ok", "error"] },
+    "status": { "enum": ["dry-run", "mock", "ok", "error", "running"] },
     "binding": {
       "oneOf": [
         { "type": "null" },
@@ -35,6 +35,20 @@
     "calls": {},
     "response": {},
     "outputs": { "type": "array", "items": { "type": "string" } },
-    "error": { "type": "string" }
+    "error": { "type": "string" },
+    "pending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "taskId", "lastStatus", "videoFile", "receipt"],
+      "properties": {
+        "provider": { "type": "string" },
+        "taskId": { "type": "string" },
+        "lastStatus": { "type": "string" },
+        "videoFile": { "type": "string" },
+        "receipt": { "type": "string" },
+        "pollUrl": { "type": "string" }
+      }
+    },
+    "resumedAt": { "type": "array", "items": { "type": "string" } }
   }
 }

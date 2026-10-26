@@ -40,7 +40,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **拆解、增强。** 把一条成片拆成镜头，或增强一条已有视频。可以对单个文件做。用户要拆镜头时才跑，不要因为出现了视频就自动拆解。`lumen breakdown` · `lumen enhance`。模型 `video-understand-router`、`enhance-video`、`enhance-video-generative`，供应商只有 `mediakit`。拆解先读 `skills/lumen/references/视频拆解/SKILL.md`。只传视频，不要传 prompt。拆解默认用 `doubao-seed-2-1-lite-260915`，`level` 为 `Quality`，需要音频，不要问用户选模型。要换时改项目 `lumen.config.json` 或 `~/.config/lumen/providers.json` 里的 `breakdown.preferModels`、`breakdown.level`、`breakdown.needAudio`。`lumen enhance` 不传旗标就是标准版：`tool_version` `standard`、`scene` `aigc`、`resolution` `4k`、`fps` `30`、`bitrate_level` `medium`、`enhance_style` `natural`。标准版和专业版的 `--resolution` 可以是 `1080p`、`2k`、`4k`，不传仍是 `4k`。大模型版用 `--model enhance-video-generative`，分辨率只有 `1080p` 和 `2k`（默认 `1080p`，不要传 `4k`）。要换标准版参数时用 `--tool-version`、`--scene`、`--resolution`、`--fps`、`--bitrate-level`、`--enhance-style`。两支增强模型分开绑定。
 
-**记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs show <id>`。视频生成等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id>` 接着等并下载，不要重新提交。
+**记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs show <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id>` 接着等并取回结果，不要重新提交。
 
 **素材库。** 按名字复用人物、音色、场景和供应商编号，存在用户的飞书多维表格里。查：`lumen library find "<名称>"` · `lumen library list`。状态：`lumen library status`。未连接时 `lumen library connect feishu` 写出二维码图片并打印 `qr:` 路径，把图片发到对话里，用户用飞书手机扫。手机上可选新建应用或绑定已有应用，不必填写 App ID 或 App Secret。新素材用 `lumen library add`。细则读 `skills/lumen/references/素材库/SKILL.md`。
 
