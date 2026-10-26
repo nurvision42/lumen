@@ -10,6 +10,7 @@ import { asRecord } from "../walk.js";
 import { awaitTask } from "./jobs.js";
 import { jsonCall } from "./wire.js";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { contentTypeFor } from "../media.js";
 
@@ -53,24 +54,32 @@ function refs(list: MediaRef[], kind: MediaRef["kind"]): string[] {
   return list.filter((ref) => ref.kind === kind).map((ref) => ref.source);
 }
 
-/**
- * BeefTV has no upload endpoint. Its docs allow a data URL only for the top-level
- * single first-frame `image`; every `content` item must be a reachable https URL.
- */
-export function checkBeeftvMedia(request: VideoRequest): void {
-  const all = [request.firstFrame?.source, request.lastFrame?.source, ...request.references.map((ref) => ref.source)]
-    .filter((s): s is string => s !== undefined);
-  const soloFirst = request.firstFrame !== undefined && request.lastFrame === undefined && request.references.length === 0;
-  for (const source of all) {
-    if (/^https:\/\//i.test(source)) continue;
-    if (soloFirst && source === request.firstFrame?.source && isLocal(source)) continue;
-    throw new CliError(
-      `beeftv has no upload endpoint; pass an https URL (a local file is only accepted as a lone --first-frame): ${source}`,
-    );
-  }
+export type UploadKind = "image" | "video" | "audio";
+
+export interface PlannedBeeftvUpload {
+  source: string;
+  path: string;
+  kind: UploadKind;
+  mime: string;
+  bytes: number;
+  sha256: string;
 }
 
-export function planBeeftvVideo(request: VideoRequest, binding: ModelBinding, firstFrameDataUrl?: string): HttpCall[] {
+/** Every media source with its kind; https passes through, local files are uploaded. */
+function mediaSources(request: VideoRequest): Array<{ source: string; kind: UploadKind }> {
+  const out: Array<{ source: string; kind: UploadKind }> = [];
+  if (request.firstFrame) out.push({ source: request.firstFrame.source, kind: "image" });
+  if (request.lastFrame) out.push({ source: request.lastFrame.source, kind: "image" });
+  for (const ref of request.references) out.push({ source: ref.source, kind: ref.kind as UploadKind });
+  for (const item of out) {
+    if (!isLocal(item.source) && !/^https:\/\//i.test(item.source)) {
+      throw new CliError(`beeftv media must be https:// or a local file: ${item.source}`);
+    }
+  }
+  return out.filter((item) => isLocal(item.source));
+}
+
+export function planBeeftvVideo(request: VideoRequest, binding: ModelBinding): HttpCall[] {
   const model = beeftvWireModel(request.modelId, binding.modelAlias);
   const body: Record<string, unknown> = {
     model,
@@ -83,9 +92,7 @@ export function planBeeftvVideo(request: VideoRequest, binding: ModelBinding, fi
       ...(request.webSearch ? { tools: [{ type: "web_search" }] } : {}),
     },
   };
-  if (firstFrameDataUrl !== undefined) {
-    body.image = firstFrameDataUrl;
-  } else {
+  {
     const content = [
       ...(request.firstFrame ? [item("image_url", request.firstFrame.source, "first_frame")] : []),
       ...(request.lastFrame ? [item("image_url", request.lastFrame.source, "last_frame")] : []),
@@ -102,9 +109,10 @@ export function planBeeftvVideo(request: VideoRequest, binding: ModelBinding, fi
   ];
 }
 
-const MAX_INLINE_BYTES = 30 * 1024 * 1024;
+export const BEEFTV_UPLOAD_TIMEOUT_MS = 300_000;
+const UPLOAD_RETRIES = 4;
 
-async function dataUrl(source: string, cwd: string): Promise<string> {
+async function describe(source: string, kind: UploadKind, cwd: string): Promise<PlannedBeeftvUpload> {
   const file = path.resolve(cwd, source);
   let bytes: Buffer;
   try {
@@ -112,8 +120,85 @@ async function dataUrl(source: string, cwd: string): Promise<string> {
   } catch {
     throw new CliError(`local media not found: ${file}`);
   }
-  if (bytes.byteLength >= MAX_INLINE_BYTES) throw new CliError(`beeftv first-frame image must be under 30 MB: ${file}`);
-  return `data:${contentTypeFor(file)};base64,${bytes.toString("base64")}`;
+  return { source, path: file, kind, mime: contentTypeFor(file), bytes: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+function startCall(baseUrl: string, up: PlannedBeeftvUpload): HttpCall {
+  return jsonCall("POST", joinUrl(baseUrl, "/v1/video-references/uploads"), {}, {
+    bytes: up.bytes, kind: up.kind, mime: up.mime, sha256: up.sha256, resumable: true,
+  });
+}
+
+function completeCall(baseUrl: string, ticket: string): HttpCall {
+  return jsonCall("POST", joinUrl(baseUrl, "/v1/video-references/uploads/complete"), {}, { ticket });
+}
+
+function retriable(err: unknown): boolean {
+  if (!(err instanceof TransportError)) return true;
+  const status = asRecord(err.response)?.status;
+  return typeof status !== "number" || status === 408 || status === 429 || status >= 500;
+}
+
+async function withRetry<T>(io: IO, fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!retriable(err) || attempt >= UPLOAD_RETRIES) throw err;
+      const ms = Number(io.env.SEEDANCE_POLL_MS ?? 2_000);
+      await pause(io, Number.isFinite(ms) && ms >= 0 ? Math.min(ms, 2_000) * (attempt + 1) : 2_000);
+    }
+  }
+}
+
+function stripQuery(url: string): string {
+  const i = url.indexOf("?");
+  return i < 0 ? url : `${url.slice(0, i)}?<signed>`;
+}
+
+/** start -> PUT presigned (no Authorization) -> complete; returns the https url. */
+async function uploadOne(calls: HttpCall[], baseUrl: string, up: PlannedBeeftvUpload, opts: SendOptions, io: IO): Promise<string> {
+  const timed = { ...opts, timeoutMs: BEEFTV_UPLOAD_TIMEOUT_MS };
+  const started = await withRetry(io, () => perform(calls, startCall(baseUrl, up), opts));
+  const s = asRecord(started.json);
+  const ticket = s?.ticket;
+  const uploadUrl = s?.upload_url;
+  if (typeof ticket !== "string" || typeof uploadUrl !== "string" || !/^https?:\/\//i.test(uploadUrl)) {
+    throw new TransportError(`beeftv upload start for ${up.path} returned no ticket/upload_url`, calls, publicResult(started));
+  }
+  const method = String(s?.upload_method ?? "PUT").toUpperCase();
+  if (method !== "PUT") throw new TransportError(`beeftv upload_method ${method} is not supported`, calls, publicResult(started));
+  const required = asRecord(s?.required_headers) ?? {};
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(required)) {
+    // fetch computes Content-Length from the body itself
+    if (k.toLowerCase() !== "content-length" && typeof v === "string") headers[k] = v;
+  }
+  if (!Object.keys(headers).some((k) => k.toLowerCase() === "content-type")) headers["Content-Type"] = up.mime;
+  const put: HttpCall = { method: "PUT", url: uploadUrl, headers, body: { kind: "file", path: up.path, contentType: up.mime } };
+  await withRetry(io, async () => {
+    const at = calls.length;
+    try {
+      return await perform(calls, put, { ...timed, auth: false });
+    } finally {
+      const c = calls[at];
+      if (c !== undefined) calls[at] = { ...c, url: stripQuery(c.url) }; // keep the signature out of the record
+    }
+  });
+  const done = await withRetry(io, () => perform(calls, completeCall(baseUrl, ticket), opts));
+  const url = asRecord(done.json)?.url;
+  if (typeof url !== "string" || !/^https:\/\//i.test(url)) {
+    throw new TransportError(`beeftv upload complete for ${up.path} returned no url`, calls, publicResult(done));
+  }
+  return url;
+}
+
+function withSources(request: VideoRequest, map: Map<string, string>): VideoRequest {
+  const swap = (ref: MediaRef): MediaRef => ({ ...ref, source: map.get(ref.source) ?? ref.source });
+  const out: VideoRequest = { ...request, references: request.references.map(swap) };
+  if (request.firstFrame) out.firstFrame = swap(request.firstFrame);
+  if (request.lastFrame) out.lastFrame = swap(request.lastFrame);
+  return out;
 }
 
 export async function runBeeftvVideo(
@@ -125,28 +210,26 @@ export async function runBeeftvVideo(
   videoFile: string,
   receipt: string,
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
-  checkBeeftvMedia(request);
-  const local = request.firstFrame !== undefined && isLocal(request.firstFrame.source) ? request.firstFrame.source : undefined;
+  const locals = mediaSources(request);
+  const described = await Promise.all(locals.map((item) => describe(item.source, item.kind, io.cwd)));
+  // one upload per distinct sha256 within the run
+  const uploads = described.filter((item, index) => described.findIndex((other) => other.sha256 === item.sha256) === index);
   if (mode === "dry-run") {
-    const placeholder = local === undefined ? undefined : `{{data-url:${path.resolve(io.cwd, local)}}}`;
+    const placeholders = new Map(described.map((item) => [item.source, `{{upload:${item.sha256}}}`]));
     return {
-      calls: planBeeftvVideo(request, binding, placeholder),
-      response: local === undefined ? {} : { inlineFirstFrame: path.resolve(io.cwd, local) },
+      calls: [...uploads.map((up) => startCall(binding.baseUrl, up)), ...planBeeftvVideo(withSources(request, placeholders), binding)],
+      response: { plannedUploads: uploads },
       files: [],
     };
   }
-  const inline = local === undefined ? undefined : await dataUrl(local, io.cwd);
   const opts = { mode, fetchImpl: fetchOf(io), ...(apiKey === undefined ? {} : { apiKey }) };
   const calls: HttpCall[] = [];
-  const first = planBeeftvVideo(request, binding, inline)[0];
+  const bySha = new Map<string, string>();
+  for (const up of uploads) bySha.set(up.sha256, await uploadOne(calls, binding.baseUrl, up, opts, io));
+  const urls = new Map(described.map((item) => [item.source, bySha.get(item.sha256)!]));
+  const first = planBeeftvVideo(withSources(request, urls), binding)[0];
   if (first === undefined) throw new CliError("video request has no call");
-  const audit = inline === undefined ? first : planBeeftvVideo(request, binding, `{{data-url:${path.resolve(io.cwd, local ?? "")}}}`)[0]!;
-  let submitted: HttpResult;
-  try {
-    submitted = await perform(calls, first, opts);
-  } finally {
-    calls[0] = audit; // keep the inline image bytes out of the run record
-  }
+  const submitted = await perform(calls, first, opts);
   return finishBeeftvVideo(calls, binding.baseUrl, submitted, opts, io, mode, videoFile, receipt);
 }
 

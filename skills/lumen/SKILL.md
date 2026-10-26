@@ -53,4 +53,4 @@ haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fas
 
 ## beeftv
 
-`beeftv` 只提供 `seedance-2-fast`，上游模型名 `seedance-2.0-fast`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2-fast --provider beeftv --api-key-env <你的变量名>`。它没有上传接口：参考图、视频、音频和尾帧都要传网络链接；只有单独一张首帧可以用本地图片。模型名不对时用 `--model-alias` 覆盖。
+`beeftv` 只提供 `seedance-2-fast`，上游模型名 `seedance-2.0-fast`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2-fast --provider beeftv --api-key-env <你的变量名>`。本地的首帧、尾帧、参考图、视频、音频都会自动上传，直接传文件路径即可。模型名不对时用 `--model-alias` 覆盖。
