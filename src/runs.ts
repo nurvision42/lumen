@@ -47,6 +47,8 @@ export interface PendingTask {
   lastStatus: string;
   videoFile: string;
   receipt: string;
+  /** GET URL for this task. MediaKit resume polls it; the audit keeps it so the id is not only in an error string. */
+  pollUrl?: string;
 }
 
 export interface OutputFile {
@@ -109,6 +111,11 @@ function render(record: RunRecord): string {
     if (binding.group !== undefined) lines.push(`- group: ${binding.group}`);
     if (binding.modelAlias !== undefined) lines.push(`- modelAlias: ${binding.modelAlias}`);
   }
+  if (record.pending !== undefined) {
+    lines.push(`- task: ${record.pending.provider} ${record.pending.taskId} (${record.pending.lastStatus})`);
+    if (record.pending.pollUrl !== undefined) lines.push(`- poll: ${record.pending.pollUrl}`);
+    lines.push(`- resume: lumen runs resume ${record.id}`);
+  }
   lines.push("", "## params", "", "```json", JSON.stringify(record.params, null, 2), "```");
   lines.push("", "## calls", "", "```json", JSON.stringify(record.calls, null, 2), "```");
   lines.push("", "## response", "", "```json", JSON.stringify(record.response, null, 2), "```");
@@ -162,7 +169,13 @@ export async function settle(
     if (err instanceof CliError && err.exitCode === 2) throw err;
     if (err instanceof PendingTaskError && ctx.resume !== undefined && mode === "execute") {
       status = "running";
-      pending = { provider: err.provider, taskId: err.taskId, lastStatus: err.lastStatus, ...ctx.resume };
+      pending = {
+        provider: err.provider,
+        taskId: err.taskId,
+        lastStatus: err.lastStatus,
+        ...ctx.resume,
+        ...(err.pollUrl === undefined ? {} : { pollUrl: err.pollUrl }),
+      };
       ctx.calls = err.calls;
       ctx.response = err.response ?? ctx.response;
     } else {
@@ -213,6 +226,7 @@ export async function settle(
   line(io, `run: ${id}`);
   if (pending !== undefined) {
     line(io, `task: ${pending.provider} ${pending.taskId} (${pending.lastStatus})`);
+    if (pending.pollUrl !== undefined) line(io, `poll: ${redactUrl(pending.pollUrl)}`);
     line(io, resumeHint(id));
   }
   for (const call of ctx.calls) line(io, `${call.method} ${redactUrl(call.url)}`);

@@ -3,6 +3,7 @@ import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { BREAKDOWN_DEFAULT_PROMPT } from "../src/catalog.js";
+import { mediakitPollLimits } from "../src/clients/mediakit.js";
 import { run } from "../src/run.js";
 import { capture, withDir } from "./helpers.js";
 
@@ -576,6 +577,280 @@ test("breakdown level and needAudio follow project config over the global file",
     const projectSubmit = projectRecord.calls.find((call) => call.body.value?.level !== undefined);
     assert.equal(projectSubmit?.body.value?.level, "Quality");
     assert.equal(projectSubmit?.body.value?.manual_option?.need_audio, true);
+  });
+});
+
+test("mediakit poll budget defaults to 30 minutes and floors shorter windows", () => {
+  assert.deepEqual(mediakitPollLimits({}), { max: 180, ms: 10_000 });
+  assert.deepEqual(mediakitPollLimits({ MEDIAKIT_MAX_POLLS: "90", MEDIAKIT_POLL_MS: "2000" }), { max: 900, ms: 2000 });
+  assert.deepEqual(mediakitPollLimits({ MEDIAKIT_MAX_POLLS: "2", MEDIAKIT_POLL_MS: "0" }), { max: 2, ms: 0 });
+  assert.equal(mediakitPollLimits({ MEDIAKIT_MAX_POLLS: "400", MEDIAKIT_POLL_MS: "10000" }).max, 400);
+});
+
+function assertNoSecrets(audit: string): void {
+  assert.equal(audit.includes(SECRET), false, audit);
+  assert.equal(audit.includes(KEY), false, audit);
+  assert.equal(audit.includes("auth_key"), false, audit);
+}
+
+function mediakitFetch(opts: {
+  tool: string;
+  taskId: string;
+  polls: Array<string | number>;
+  videoUrl?: string;
+  shots?: boolean;
+}) {
+  let polls = 0;
+  const auths: Array<string | null> = [];
+  const fetch = async (input: string, init?: RequestInit): Promise<Response> => {
+    const url = String(input);
+    const header = new Headers(init?.headers);
+    const auth = header.get("authorization");
+    if (url.includes("mediakit.example")) auths.push(auth);
+    if (url.includes("request-media-upload-url")) {
+      return Response.json({
+        result: { file_id: "file-9", upload_url: `https://upload.example/put?auth_key=${SECRET}` },
+      });
+    }
+    if (init?.method === "PUT") {
+      assert.equal(auth, null);
+      return new Response("", { status: 200 });
+    }
+    if (url.includes(`/api/v1/tools/${opts.tool}`)) return Response.json({ success: true, task_id: opts.taskId });
+    if (url.includes("/api/v1/tasks/")) {
+      const step = opts.polls[Math.min(polls, opts.polls.length - 1)]!;
+      polls += 1;
+      if (typeof step === "number") return new Response("busy", { status: step });
+      if (step === "completed" && opts.shots) {
+        return Response.json({
+          success: true,
+          status: "completed",
+          result: { shots: [{ "#": 1, durationSec: 1.5, frame: "door", vo: "" }] },
+        });
+      }
+      if (step === "completed") {
+        return Response.json({
+          success: true,
+          status: "completed",
+          result: { video_url: opts.videoUrl ?? `https://cdn.example/out.mp4?auth_key=${SECRET}` },
+        });
+      }
+      if (step === "failed") return Response.json({ success: false, status: "failed" });
+      return Response.json({ success: true, status: step, task_id: opts.taskId });
+    }
+    if (url.includes("cdn.example")) {
+      assert.equal(auth, null);
+      return new Response("mp4-bytes", { status: 200, headers: { "content-type": "video/mp4" } });
+    }
+    throw new Error(`unexpected ${init?.method ?? "GET"} ${url}`);
+  };
+  return { fetch: fetch as never, polls: () => polls, auths };
+}
+
+async function seedClip(dir: string): Promise<void> {
+  await mkdir(path.join(dir, "refs"), { recursive: true });
+  await writeFile(path.join(dir, "refs", "clip.mp4"), "fake");
+}
+
+test("enhance poll exhaustion stays running and resume downloads the mp4", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    await seedClip(dir);
+    const first = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: ["running"] });
+    const cap = capture(
+      { MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "2" },
+      { fetch: first.fetch },
+    );
+    assert.equal(await run(["enhance", "--execute", "--project", dir], cap.io), 0, cap.err());
+    assert.equal(cap.err(), "");
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    assert.match(cap.out(), /^running enhance-video/m);
+    assert.match(cap.out(), /poll: https:\/\/mediakit\.example\/api\/v1\/tasks\/task-e/);
+    assert.match(cap.out(), new RegExp(`lumen runs resume ${id}`));
+    assert.equal(first.polls(), 2);
+    const file = path.join(dir, ".lumen", "runs", id, "record.json");
+    const rec = JSON.parse(await readFile(file, "utf8")) as {
+      status: string;
+      error?: string;
+      pending: { provider: string; taskId: string; lastStatus: string; pollUrl: string; videoFile: string; receipt: string };
+    };
+    assert.equal(rec.status, "running");
+    assert.equal(rec.error, undefined);
+    assert.equal(rec.pending.provider, "mediakit");
+    assert.equal(rec.pending.taskId, "task-e");
+    assert.equal(rec.pending.lastStatus, "running");
+    assert.equal(rec.pending.pollUrl, "https://mediakit.example/api/v1/tasks/task-e");
+    assert.match(rec.pending.videoFile, /enhance-.*\.mp4$/);
+    assert.match(rec.pending.receipt, /\.enhance\.json$/);
+    assertNoSecrets(await readFile(file, "utf8"));
+    const md = await readFile(path.join(dir, ".lumen", "runs", id, "record.md"), "utf8");
+    assert.match(md, new RegExp(`lumen runs resume ${id}`));
+    assert.match(md, /\/api\/v1\/tasks\/task-e/);
+    assertNoSecrets(md);
+    const show = capture();
+    assert.equal(await run(["runs", "show", id, "--project", dir], show.io), 0, show.err());
+    assert.match(show.out(), new RegExp(`lumen runs resume ${id}`));
+
+    const mid = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: ["processing"] });
+    const again = capture(
+      { MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "1" },
+      { fetch: mid.fetch },
+    );
+    assert.equal(await run(["runs", "resume", id, "--project", dir], again.io), 0, again.err());
+    assert.match(again.out(), /still running on the server/);
+    const midRec = JSON.parse(await readFile(file, "utf8")) as { status: string; pending: { lastStatus: string }; resumedAt: string[] };
+    assert.equal(midRec.status, "running");
+    assert.equal(midRec.pending.lastStatus, "processing");
+    assert.equal(midRec.resumedAt.length, 1);
+    assertNoSecrets(await readFile(file, "utf8"));
+
+    const done = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: ["completed"] });
+    const res = capture({ MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: done.fetch });
+    assert.equal(await run(["runs", "resume", id, "--project", dir], res.io), 0, res.err());
+    assert.match(res.out(), /wrote: .*enhance-.*\.mp4/);
+    assert.equal(await readFile(rec.pending.videoFile, "utf8"), "mp4-bytes");
+    const finished = JSON.parse(await readFile(file, "utf8")) as { status: string; pending?: unknown };
+    assert.equal(finished.status, "ok");
+    assert.equal(finished.pending, undefined);
+    assertNoSecrets(await readFile(file, "utf8"));
+    assert.ok(done.auths.some((value) => value === `Bearer ${KEY}`));
+  });
+});
+
+test("generative enhance resumes the same task and can retarget --out", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video-generative", "MEDIAKIT_GENERATIVE_KEY");
+    await seedClip(dir);
+    const first = mediakitFetch({ tool: "enhance-video-generative", taskId: "task-g", polls: ["running"] });
+    const cap = capture(
+      { MEDIAKIT_GENERATIVE_KEY: KEY, MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "1" },
+      { fetch: first.fetch },
+    );
+    assert.equal(
+      await run(["enhance", "--model", "enhance-video-generative", "--execute", "--project", dir], cap.io),
+      0,
+      cap.err(),
+    );
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    assert.match(cap.out(), /^running enhance-video-generative/m);
+    const done = mediakitFetch({ tool: "enhance-video-generative", taskId: "task-g", polls: ["completed"] });
+    const res = capture({ MEDIAKIT_GENERATIVE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: done.fetch });
+    assert.equal(await run(["runs", "resume", id, "--out", "out/final.mp4", "--project", dir], res.io), 0, res.err());
+    assert.equal(await readFile(path.join(dir, "out", "final.mp4"), "utf8"), "mp4-bytes");
+    assertNoSecrets(await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8"));
+    assert.ok(done.auths.some((value) => value === `Bearer ${KEY}`));
+  });
+});
+
+test("resume writes enhance.json when the result is not https and redacts the audit", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    await seedClip(dir);
+    const videoUrl = `mediakit://out-file?auth_key=${SECRET}`;
+    const first = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: ["running"] });
+    const cap = capture(
+      { MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "1" },
+      { fetch: first.fetch },
+    );
+    assert.equal(await run(["enhance", "--execute", "--project", dir], cap.io), 0, cap.err());
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    const done = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: ["completed"], videoUrl });
+    const res = capture({ MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: done.fetch });
+    assert.equal(await run(["runs", "resume", id, "--project", dir], res.io), 0, res.err());
+    const note = JSON.parse(await readFile(path.join(dir, "refs", `${id}.enhance.json`), "utf8")) as { video_url: string };
+    assert.equal(note.video_url, videoUrl);
+    assert.equal(await access(path.join(dir, "out")).then(() => true, () => false), false);
+    assertNoSecrets(await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8"));
+  });
+});
+
+test("a failed mediakit task is still an error", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    await seedClip(dir);
+    const fetch = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: ["failed"] });
+    const cap = capture({ MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: fetch.fetch });
+    assert.equal(await run(["enhance", "--execute", "--project", dir], cap.io), 1);
+    assert.match(cap.err(), /MediaKit task task-e failed/);
+    const id = /run: (\S+)/.exec(cap.err())?.[1];
+    assert.ok(id);
+    const rec = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8")) as { status: string };
+    assert.equal(rec.status, "error");
+  });
+});
+
+test("transient 503 during a mediakit poll is retried", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    await seedClip(dir);
+    const fetch = mediakitFetch({ tool: "enhance-video", taskId: "task-e", polls: [503, "completed"] });
+    const cap = capture({ MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: fetch.fetch });
+    assert.equal(await run(["enhance", "--execute", "--project", dir], cap.io), 0, cap.err());
+    assert.equal(fetch.polls(), 2);
+    const files = await readdir(path.join(dir, "out"));
+    const mp4 = files.find((name) => name.startsWith("enhance-") && name.endsWith(".mp4"));
+    assert.ok(mp4);
+    assert.equal(await readFile(path.join(dir, "out", mp4), "utf8"), "mp4-bytes");
+  });
+});
+
+test("breakdown poll exhaustion stays running and resume writes the shot list", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "video-understand-router", "MEDIAKIT_UNDERSTAND_KEY");
+    await seedClip(dir);
+    const first = mediakitFetch({ tool: "video-understand-router", taskId: "task-b", polls: ["running"], shots: true });
+    const cap = capture(
+      { MEDIAKIT_UNDERSTAND_KEY: KEY, MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "1" },
+      { fetch: first.fetch },
+    );
+    assert.equal(await run(["breakdown", "--prompt", "find the cuts", "--execute", "--project", dir], cap.io), 0, cap.err());
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    assert.match(cap.out(), /^running video-understand-router/m);
+    assert.match(cap.out(), /poll: https:\/\/mediakit\.example\/api\/v1\/tasks\/task-b/);
+    assert.equal(await access(path.join(dir, "shotlist.json")).then(() => true, () => false), false);
+    const raw = await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8");
+    assertNoSecrets(raw);
+    assert.match(raw, /\/api\/v1\/tasks\/task-b/);
+
+    const done = mediakitFetch({ tool: "video-understand-router", taskId: "task-b", polls: ["completed"], shots: true });
+    const res = capture({ MEDIAKIT_UNDERSTAND_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: done.fetch });
+    assert.equal(await run(["runs", "resume", id, "--project", dir], res.io), 0, res.err());
+    const shotlist = JSON.parse(await readFile(path.join(dir, "shotlist.json"), "utf8")) as Array<{ frame: string }>;
+    assert.equal(shotlist[0]?.frame, "door");
+    const refs = await readdir(path.join(dir, "refs"));
+    assert.ok(refs.some((name) => name === `${id}.video-understand.json`));
+    const finished = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8")) as { status: string };
+    assert.equal(finished.status, "ok");
+    assertNoSecrets(await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8"));
+  });
+});
+
+test("resume recovers a pre-0.1.9 mediakit run recorded as error", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "enhance-video", "MEDIAKIT_ENHANCE_KEY");
+    await seedClip(dir);
+    const first = mediakitFetch({ tool: "enhance-video", taskId: "task-old", polls: ["running"] });
+    const cap = capture(
+      { MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "1" },
+      { fetch: first.fetch },
+    );
+    assert.equal(await run(["enhance", "--execute", "--project", dir], cap.io), 0, cap.err());
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    const file = path.join(dir, ".lumen", "runs", id, "record.json");
+    const rec = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    delete rec.pending;
+    Object.assign(rec, { status: "error", error: `MediaKit task task-old did not finish\nrun: ${id}` });
+    await writeFile(file, JSON.stringify(rec));
+    const done = mediakitFetch({ tool: "enhance-video", taskId: "task-old", polls: ["completed"] });
+    const res = capture({ MEDIAKIT_ENHANCE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: done.fetch });
+    assert.equal(await run(["runs", "resume", id, "--project", dir], res.io), 0, res.err());
+    assert.equal(await readFile(path.join(dir, "out", `enhance-${id}.mp4`), "utf8"), "mp4-bytes");
+    assertNoSecrets(await readFile(file, "utf8"));
   });
 });
 

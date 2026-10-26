@@ -7,7 +7,7 @@ import { fileExists } from "../fsutil.js";
 import { flagString, parseFlags, requireRestEmpty, runMode } from "../flags.js";
 import type { IO } from "../io.js";
 import { LAYOUT } from "../project.js";
-import { settle } from "../runs.js";
+import { settle, type OutputFile } from "../runs.js";
 import { parseShotlistData } from "../shotlist.js";
 import { findShots } from "../walk.js";
 import { isRemoteMedia } from "../media.js";
@@ -35,6 +35,27 @@ async function oneVideo(project: string, flag: string | undefined): Promise<stri
     throw new CliError("pass --video or put exactly one video in refs/ (mp4, mov, mkv, webm, avi, m4v)");
   }
   return path.join(refs, videos[0]);
+}
+
+/** Same artifacts execute writes: understand JSON, plus a shot list when the shots validate. */
+export async function materializeBreakdown(project: string, runId: string, task: unknown): Promise<OutputFile[]> {
+  const understand = path.join(project, LAYOUT.refs, `${runId}.video-understand.json`);
+  const files: OutputFile[] = [{ path: understand, text: `${JSON.stringify(task, null, 2)}\n` }];
+  const shots = findShots(task);
+  if (shots === undefined) return files;
+  let parsed;
+  try {
+    parsed = parseShotlistData(shots, "video-understand result");
+  } catch {
+    return files;
+  }
+  if (parsed.length === 0) return files;
+  const md = path.join(project, LAYOUT.shotlistMd);
+  const target = (await fileExists(md))
+    ? path.join(project, LAYOUT.refs, `${runId}.shotlist.json`)
+    : path.join(project, LAYOUT.shotlistJson);
+  files.push({ path: target, text: `${JSON.stringify(parsed, null, 2)}\n` });
+  return files;
 }
 
 async function promptFrom(project: string, file: string): Promise<string> {
@@ -77,6 +98,8 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     if (mode === "execute" && !isRemoteMedia(video) && !(await fileExists(video))) {
       throw new CliError(`video not found: ${video}`);
     }
+    const understand = path.join(project, LAYOUT.refs, `${runId}.video-understand.json`);
+    ctx.resume = { videoFile: understand, receipt: understand };
     const outcome = await runMediakit(MODEL, binding, video, runId, mode, io, ctx.secret, prompt, undefined, {
       preferModels,
       level,
@@ -85,21 +108,6 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     if (mode !== "execute" || outcome.task === undefined) return;
-    const understand = path.join(project, LAYOUT.refs, `${runId}.video-understand.json`);
-    ctx.files.push({ path: understand, text: `${JSON.stringify(outcome.task, null, 2)}\n` });
-    const shots = findShots(outcome.task);
-    if (shots === undefined) return;
-    let parsed;
-    try {
-      parsed = parseShotlistData(shots, "video-understand result");
-    } catch {
-      return;
-    }
-    if (parsed.length === 0) return;
-    const md = path.join(project, LAYOUT.shotlistMd);
-    const target = (await fileExists(md))
-      ? path.join(project, LAYOUT.refs, `${runId}.shotlist.json`)
-      : path.join(project, LAYOUT.shotlistJson);
-    ctx.files.push({ path: target, text: `${JSON.stringify(parsed, null, 2)}\n` });
+    ctx.files.push(...(await materializeBreakdown(project, runId, outcome.task)));
   });
 }

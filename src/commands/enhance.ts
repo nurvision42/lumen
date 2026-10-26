@@ -4,11 +4,11 @@ import { missingKey } from "../config.js";
 import { CliError } from "../errors.js";
 import { fileExists } from "../fsutil.js";
 import { flagString, parseFlags, requireRestEmpty, runMode } from "../flags.js";
-import { fetchOf, perform } from "../http.js";
+import { fetchOf, perform, type HttpCall } from "../http.js";
 import type { IO } from "../io.js";
 import { isRemoteMedia } from "../media.js";
 import { LAYOUT, outputPath } from "../project.js";
-import { settle } from "../runs.js";
+import { settle, type OutputFile } from "../runs.js";
 import { resolveEnhance, runMediakit, type EnhanceTool } from "../clients/mediakit.js";
 import { adoptBinding } from "./session.js";
 import { readdir } from "node:fs/promises";
@@ -48,6 +48,24 @@ function enhanceModel(value: string | undefined): EnhanceTool {
     throw new CliError("--model must be enhance-video or enhance-video-generative", 2);
   }
   return id;
+}
+
+/** https results become the mp4; vod/tos/mediakit URIs are recorded and not turned into a fake file. */
+export async function materializeEnhance(
+  videoUrl: string,
+  calls: HttpCall[],
+  io: IO,
+  paths: { videoFile: string; receipt: string },
+): Promise<OutputFile[]> {
+  if (/^https?:\/\//i.test(videoUrl)) {
+    const downloaded = await perform(
+      calls,
+      { method: "GET", url: videoUrl, headers: {}, body: { kind: "empty" } },
+      { mode: "execute", fetchImpl: fetchOf(io), auth: false },
+    );
+    return [{ path: paths.videoFile, bytes: downloaded.body }];
+  }
+  return [{ path: paths.receipt, text: `${JSON.stringify({ video_url: videoUrl }, null, 2)}\n` }];
 }
 
 function parseFps(value: string | undefined): number | undefined {
@@ -95,26 +113,18 @@ export async function enhanceCommand(args: string[], project: string, io: IO, co
     if (mode === "execute" && !isRemoteMedia(video) && !(await fileExists(video))) {
       throw new CliError(`video not found: ${video}`);
     }
+    const videoFile = outputPath(project, {
+      shot,
+      folder: "clip",
+      filename: `enhance-${runId}.mp4`,
+      out: flagString(values, "out"),
+    });
+    const receipt = path.join(project, LAYOUT.refs, `${runId}.enhance.json`);
+    ctx.resume = { videoFile, receipt };
     const outcome = await runMediakit(model, binding, video, runId, mode, io, ctx.secret, undefined, enhance);
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     if (mode !== "execute" || outcome.videoUrl === undefined) return;
-    if (/^https?:\/\//i.test(outcome.videoUrl)) {
-      const downloaded = await perform(
-        ctx.calls,
-        { method: "GET", url: outcome.videoUrl, headers: {}, body: { kind: "empty" } },
-        { mode: "execute", fetchImpl: fetchOf(io), auth: false },
-      );
-      const out = outputPath(project, {
-        shot,
-        folder: "clip",
-        filename: `enhance-${runId}.mp4`,
-        out: flagString(values, "out"),
-      });
-      ctx.files.push({ path: out, bytes: downloaded.body });
-      return;
-    }
-    const note = path.join(project, LAYOUT.refs, `${runId}.enhance.json`);
-    ctx.files.push({ path: note, text: `${JSON.stringify({ video_url: outcome.videoUrl }, null, 2)}\n` });
+    ctx.files.push(...(await materializeEnhance(outcome.videoUrl, ctx.calls, io, { videoFile, receipt })));
   });
 }

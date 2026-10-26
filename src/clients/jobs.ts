@@ -44,12 +44,22 @@ export class PendingTaskError extends TransportError {
   readonly taskId: string;
   readonly provider: string;
   readonly lastStatus: string;
-  constructor(message: string, calls: HttpCall[], response: unknown, provider: string, taskId: string, lastStatus: string) {
+  readonly pollUrl?: string;
+  constructor(
+    message: string,
+    calls: HttpCall[],
+    response: unknown,
+    provider: string,
+    taskId: string,
+    lastStatus: string,
+    pollUrl?: string,
+  ) {
     super(message, calls, response);
     this.name = "PendingTaskError";
     this.provider = provider;
     this.taskId = taskId;
     this.lastStatus = lastStatus;
+    this.pollUrl = pollUrl;
   }
 }
 
@@ -81,10 +91,12 @@ export async function awaitTask(
   opts: SendOptions,
   io: IO,
   label: string,
-  pending: { provider: string; taskId: string },
+  pending: { provider: string; taskId: string; pollUrl?: string },
+  /** When set, these limits are used as-is. Callers that need a minimum window apply it first. */
+  budget?: { max: number; ms: number },
 ): Promise<HttpResult> {
-  const limits = jobPollLimits(io.env);
-  const max = effectiveMaxPolls(limits);
+  const limits = budget ?? jobPollLimits(io.env);
+  const max = budget === undefined ? effectiveMaxPolls(limits) : limits.max;
   let current = initial;
   let state = stateOf(current.json);
   let polls = 0;
@@ -99,6 +111,7 @@ export async function awaitTask(
         pending.provider,
         pending.taskId,
         last,
+        pending.pollUrl ?? nextUrl,
       );
     }
     if (polls > 0) await pause(io, limits.ms);

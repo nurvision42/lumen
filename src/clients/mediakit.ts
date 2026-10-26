@@ -18,7 +18,6 @@ import type { RunMode } from "../flags.js";
 import {
   fetchOf,
   joinUrl,
-  pause,
   perform,
   publicResult,
   TransportError,
@@ -29,6 +28,7 @@ import {
 import type { IO } from "../io.js";
 import { contentTypeFor, isRemoteMedia } from "../media.js";
 import { findString } from "../walk.js";
+import { awaitTask } from "./jobs.js";
 import { jsonCall } from "./wire.js";
 
 export type MediakitTool = "video-understand-router" | "enhance-video" | "enhance-video-generative";
@@ -110,13 +110,29 @@ export interface UnderstandOptions {
 const SUCCESS = new Set(["completed", "succeeded", "success"]);
 const FAILURE = new Set(["failed", "error", "canceled", "cancelled"]);
 
-function pollLimits(env: NodeJS.ProcessEnv): { max: number; ms: number } {
-  const max = Number(env.MEDIAKIT_MAX_POLLS ?? 90);
-  const ms = Number(env.MEDIAKIT_POLL_MS ?? 2000);
-  return {
-    max: Number.isFinite(max) && max > 0 ? Math.floor(max) : 90,
-    ms: Number.isFinite(ms) && ms >= 0 ? ms : 2000,
+/** Enough for standard 4K / professional (often 20–30+ minutes per minute of video). */
+export const MEDIAKIT_MIN_WINDOW_MS = 30 * 60_000;
+const DEFAULT_POLLS = 180;
+const DEFAULT_POLL_MS = 10_000;
+
+/**
+ * Poll budget for MediaKit enhance and breakdown.
+ * Defaults are 180 × 10s = 30 minutes. A positive interval never waits less than that.
+ * `MEDIAKIT_POLL_MS=0` honors `MEDIAKIT_MAX_POLLS` exactly so tests can exhaust the window immediately.
+ */
+export function mediakitPollLimits(env: NodeJS.ProcessEnv): { max: number; ms: number } {
+  const max = Number(env.MEDIAKIT_MAX_POLLS ?? DEFAULT_POLLS);
+  const ms = Number(env.MEDIAKIT_POLL_MS ?? DEFAULT_POLL_MS);
+  const limits = {
+    max: Number.isFinite(max) && max > 0 ? Math.floor(max) : DEFAULT_POLLS,
+    ms: Number.isFinite(ms) && ms >= 0 ? ms : DEFAULT_POLL_MS,
   };
+  if (limits.ms <= 0) return limits;
+  return { max: Math.max(limits.max, Math.ceil(MEDIAKIT_MIN_WINDOW_MS / limits.ms)), ms: limits.ms };
+}
+
+export function mediakitPollUrl(base: string, taskId: string): string {
+  return joinUrl(base, `/api/v1/tasks/${encodeURIComponent(taskId)}`);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -236,29 +252,37 @@ export function planMediakit(
   return [upload, put, submit, poll];
 }
 
-async function pollTask(
+export function publishedMediakit(task: HttpResult): { response: unknown; task: unknown; videoUrl?: string } {
+  const videoUrlOut = findString(task.json, "video_url");
+  return {
+    response: publicResult(task),
+    task: task.json,
+    ...(videoUrlOut === undefined ? {} : { videoUrl: videoUrlOut }),
+  };
+}
+
+/** Poll `GET /api/v1/tasks/{id}` until it finishes. Exhausting the window throws {@link PendingTaskError}. */
+export async function pollMediakitTask(
   calls: HttpCall[],
   base: string,
   taskId: string,
   opts: SendOptions,
   io: IO,
 ): Promise<HttpResult> {
-  const limits = pollLimits(io.env);
-  let last: HttpResult | undefined;
-  for (let i = 0; i < limits.max; i++) {
-    const call: HttpCall = {
-      method: "GET",
-      url: joinUrl(base, `/api/v1/tasks/${encodeURIComponent(taskId)}`),
-      headers: {},
-      body: { kind: "empty" },
-    };
-    last = await perform(calls, call, opts);
-    const state = taskState(last.json);
-    if (state === "ok") return last;
-    if (state === "fail") throw new TransportError(`MediaKit task ${taskId} failed`, calls, publicResult(last));
-    if (i < limits.max - 1) await pause(io, limits.ms);
-  }
-  throw new TransportError(`MediaKit task ${taskId} did not finish`, calls, last === undefined ? null : publicResult(last));
+  const pollUrl = mediakitPollUrl(base, taskId);
+  // The submit body is not a task snapshot. Seed a pending result so the first GET happens immediately.
+  const initial: HttpResult = {
+    status: 0,
+    contentType: "application/json",
+    bytes: 0,
+    body: new Uint8Array(),
+    json: { status: "pending", task_id: taskId },
+  };
+  return awaitTask(calls, initial, pollUrl, {}, taskState, opts, io, `MediaKit task ${taskId}`, {
+    provider: "mediakit",
+    taskId,
+    pollUrl,
+  }, mediakitPollLimits(io.env));
 }
 
 export async function runMediakit(
@@ -308,13 +332,7 @@ export async function runMediakit(
   if (taskState(last.json) !== "ok") {
     const taskId = findString(last.json, "task_id");
     if (taskId === undefined) throw new TransportError("MediaKit response has no task_id", calls, publicResult(last));
-    last = await pollTask(calls, binding.baseUrl, taskId, opts, io);
+    last = await pollMediakitTask(calls, binding.baseUrl, taskId, opts, io);
   }
-  const videoUrlOut = findString(last.json, "video_url");
-  return {
-    calls,
-    response: publicResult(last),
-    task: last.json,
-    ...(videoUrlOut === undefined ? {} : { videoUrl: videoUrlOut }),
-  };
+  return { calls, ...publishedMediakit(last) };
 }
