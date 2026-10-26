@@ -288,7 +288,7 @@ test("kitta design sends the prompt and fishaudio provider", async () => {
 
 test("execute without an API key fails and still writes an error run", async () => {
   await withDir(async (dir) => {
-    await bind(dir, "enhance-video-generative", "mediakit", "https://mediakit.example", "MEDIAKIT_KEY", "queue-a");
+    await bind(dir, "enhance-video", "mediakit", "https://mediakit.example", "MEDIAKIT_KEY", "queue-a");
     const cap = capture({});
     assert.equal(
       await run(["enhance", "--video", "refs/in.mp4", "--execute", "--project", dir], cap.io),

@@ -345,7 +345,7 @@ test("doctor lists unbound models and does not print secret values", async () =>
     assert.match(text, /gpt-image-2: yunqiao https:\/\/yunqiao\.example\/v1 YUNQIAO_API_KEY present/);
     assert.match(text, /seedance-2: unbound/);
     assert.match(text, /voice-synthesis: unbound/);
-    assert.match(text, /enhance-video-generative: unbound/);
+    assert.match(text, /enhance-video: unbound/);
     assert.match(text, /breakdown prompt: default/);
     assert.match(text, /breakdown models: doubao-seed-2-1-lite-260915/);
     assert.match(text, /breakdown level: Quality/);
