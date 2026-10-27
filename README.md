@@ -97,7 +97,6 @@ lumen cuts --video <file>
 lumen enhance [--video file] [--shot N] [--out file]
 lumen runs list|show <id>|resume <id> [--task <taskId>] [--out <file>]
 lumen concat
-lumen library status|list|find|add|connect feishu
 lumen skill install [--target grokbot|agents|<path>] [--clean]
 lumen doctor
 ```
@@ -105,8 +104,6 @@ lumen doctor
 `lumen sprite` 用 ffmpeg 按真实时间戳抽帧，再用 sharp 排成多宫格。`--every`、`--frames`、`--every-frame`、`--at`、`--ranges` 选帧；不选时优先用拆解结果（每镜抽头、中、尾，超过 3 秒再按每秒 1 张补），没有拆解就做场景切点，再没有就按 1 秒间隔。`--rows` 默认 3，用来分页。`--transcript <file>` 在格子下加台词。只写 `--to`，不覆盖已有文件。`lumen cuts` 只输出切点时间和分数。ffmpeg / ffprobe 的查找顺序是显式路径（`LUMEN_FFMPEG`、`LUMEN_FFPROBE` 或配置里的 `tools.ffmpeg` / `tools.ffprobe`）、PATH、缓存、按平台下载并校验哈希。sharp 先加载本机已经装好的模块，没有再装进缓存。这些都不进 `dependencies`，`npm install` 不会下载它们。`lumen setup ffmpeg` 可以提前准备二进制。`lumen doctor` 打印三者的路径、版本和来源（`config`、`path`、`cache`、`download`；sharp 的本机模块来源是 `module`），找不到就是 `missing`，doctor 本身不下载。细则见 `skills/lumen/references/雪碧图/SKILL.md`。
 
 `lumen download` 只保存 `douyin.com` 链接（含短链）到 `--to` 指定的新文件，不覆盖已有文件。它立刻下载，不走 dry-run，也不把密钥或视频直链写进审计。密钥不能写在命令行上。安装后由用户自己运行 `lumen setup --key tikhub`：终端不回显，写入本机凭据库（`~/.config/lumen/credentials/` 或 `$XDG_CONFIG_HOME/lumen/credentials/`），不进项目、不打印。也可以由用户自己设置 `TIKHUB_API_KEY`。缺密钥时，错误信息会写出要运行的 `lumen setup --key tikhub`。不要在对话里向用户要密钥。保存后的文件可以交给 `lumen breakdown --video <该文件>`，拆解不要再传 prompt。细则见 `skills/lumen/references/视频下载/SKILL.md`。
-
-`lumen library` 把可复用的人物、音色和供应商编号放在用户自己的飞书多维表格里。默认 `lumen library connect feishu` 把飞书授权二维码写成 PNG，并打印 `qr:` 路径。把图片发到对话里，用户用飞书手机扫。手机上可以新建应用或绑定已有应用，不必填写 App ID 或 App Secret。然后再登录，并选择或新建 Base。不打开浏览器。没选素材库时，生成命令照常。密钥不打印。用法见 `skills/lumen/references/素材库/SKILL.md`。
 
 `fish design|clone|synth` 分别等价于 `gen voice --model voice-design-1|voice-clone|voice-synthesis`。
 
@@ -340,5 +337,3 @@ Every generation writes `.lumen/runs/<id>/record.json` and `record.md` with the 
 `lumen sprite` builds a contact sheet. ffmpeg keeps real frame timestamps and sharp lays out the grid. With no selector it reads a breakdown, then scene cuts, then a 1 second interval. `lumen cuts` prints cut times and scores. ffmpeg and ffprobe resolve from `LUMEN_FFMPEG` / `LUMEN_FFPROBE` or `tools.ffmpeg` / `tools.ffprobe`, then PATH, then the cache, then a hashed download. sharp loads an already installed module, then the cache, then an on-demand install. None of those packages are npm dependencies. `lumen setup ffmpeg` can download the binaries first.
 
 `lumen doctor` reports where this lumen is installed, whether the `lumen` command on PATH is this copy, whether `~/.local/bin` is on PATH, and the config and cache directories. It also reports the skill directory, its version, whether that version matches the CLI, and whether another lumen skill is present. It also reports the path, version, and source of ffmpeg, ffprobe, and sharp (or `missing`), each model's binding, whether the named env var is set, whether the breakdown prompt is `default` or `set`, and whether the TikHub key is `present` or `missing`. It does not download binaries, and it never prints the prompt or a key.
-
-`lumen library` stores reusable people, voices, and provider asset ids in a Feishu base. The default command is `lumen library connect feishu`: it writes the Feishu app-authorization QR to a PNG and prints `qr: <path>`. Attach that image in chat. The user scans it with the Feishu phone app, which offers 新建应用 or 绑定已有应用. That path does not ask for an App ID or App Secret. A second `qr:` line is the sign-in image. Then pick or create a base. No browser page is opened. Generation does not require a library. App secrets and user tokens stay under `~/.config/lumen/` and are not printed. See `skills/lumen/references/素材库/SKILL.md`.

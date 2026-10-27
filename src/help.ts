@@ -18,7 +18,6 @@ Usage:
   lumen enhance [--model enhance-video|enhance-video-generative] [--video file] [--shot N] [--out file] [--tool-version standard] [--scene aigc] [--resolution 1080p|2k|4k] [--fps 30] [--bitrate-level medium] [--enhance-style natural]
   lumen runs list|show <id>|resume <id>
   lumen concat [--project dir]
-  lumen library status|list|find|add|connect feishu
   lumen skill install [--target grokbot|agents|<path>] [--clean]
   lumen doctor
 
@@ -49,10 +48,6 @@ Backends, one binding per model (no family fallback):
             lumen setup ffmpeg downloads the binaries ahead of time. Default rows are 3. Existing --to files are not overwritten.
   cuts      Scene-change candidates and scores. --sample-rate and --threshold adjust the scan.
   concat   ffmpeg → out/film.mp4 (stub; ffmpeg is not invoked yet)
-  library  Feishu base for reusable people, voices, and provider asset ids.
-           lumen library connect feishu writes a QR image and prints qr: <file>. Attach that PNG.
-           The Feishu phone offers 新建应用 or 绑定已有应用. No App ID or App Secret. Then pick or create a base.
-           No browser page. No selected library is required for gen. Secrets are not printed.
 
 Install (user directory, no sudo):
   bash scripts/install.sh

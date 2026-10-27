@@ -40,7 +40,7 @@ test("package install does not depend on sharp or ffmpeg packages", async () => 
     optionalDependencies?: Record<string, string>;
     files?: string[];
   };
-  assert.deepEqual(Object.keys(pkg.dependencies ?? {}).sort(), ["qrcode", "zod"]);
+  assert.deepEqual(Object.keys(pkg.dependencies ?? {}).sort(), ["zod"]);
   assert.equal(pkg.optionalDependencies, undefined);
   assert.equal(pkg.files?.includes("skills"), true);
   const lock = await readFile(path.join(root, "package-lock.json"), "utf8");

@@ -15,7 +15,7 @@ test("help and version name lumen and the planned backends", async () => {
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { version: string };
   const help = capture();
   assert.equal(await run(["--help"], help.io), 0);
-  for (const word of ["lumen", "init", "validate", "breakdown", "download", "setup", "tikhub", "TIKHUB_API_KEY", "sprite", "cuts", "concat", "doctor", "yunqiao", "grsai", "haomao", "kitta", "fishaudio.org", "MediaKit", "models", "providers", "runs", "enhance", "library", "feishu"]) {
+  for (const word of ["lumen", "init", "validate", "breakdown", "download", "setup", "tikhub", "TIKHUB_API_KEY", "sprite", "cuts", "concat", "doctor", "yunqiao", "grsai", "haomao", "kitta", "fishaudio.org", "MediaKit", "models", "providers", "runs", "enhance"]) {
     assert.match(help.out(), new RegExp(word.replace(".", "\\.")));
   }
 
@@ -39,9 +39,6 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(skill, /lumen fish design/);
   assert.match(skill, /lumen 是本地视频工具集/);
   assert.match(skill, /单独用/);
-  assert.match(skill, /先查库/);
-  assert.match(skill, /references\/素材库\/SKILL\.md/);
-  assert.match(skill, /没选素材库/);
   assert.match(skill, /doubao-seed-2-1-lite-260915/);
   assert.match(skill, /不要问用户选模型/);
   assert.match(skill, /Quality/);
