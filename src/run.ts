@@ -9,7 +9,6 @@ import { enhanceCommand } from "./commands/enhance.js";
 import { fishCommand } from "./commands/fish.js";
 import { genCommand } from "./commands/gen.js";
 import { initCommand } from "./commands/init.js";
-import { libraryCommand } from "./commands/library.js";
 import { modelsCommand } from "./commands/models.js";
 import { providersCommand } from "./commands/providers.js";
 import { setupCommand } from "./commands/setup.js";
@@ -80,8 +79,6 @@ export async function run(argv: string[], io: IO = defaultIO()): Promise<number>
         return await spriteCommand(args, project, io);
       case "cuts":
         return await cutsCommand(args, project, io);
-      case "library":
-        return await libraryCommand(args, io);
       default:
         throw new CliError(`unknown command: ${command}\n\n${helpText(readVersion())}`, 2);
     }

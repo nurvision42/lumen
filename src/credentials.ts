@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { CliError } from "./errors.js";
-import { lumenHome } from "./library/store.js";
+import { configDir } from "./install/locate.js";
 
 /** Host credential name for the TikHub lookup key. It is not a project setting. */
 export const TIKHUB_CREDENTIAL = "tikhub.api";
 
 export function tikhubCredentialFile(env: NodeJS.ProcessEnv): string | undefined {
-  const home = lumenHome(env);
+  const home = configDir(env);
   if (home === undefined) return undefined;
   return path.join(home, "credentials", TIKHUB_CREDENTIAL);
 }
