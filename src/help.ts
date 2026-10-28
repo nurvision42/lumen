@@ -21,6 +21,11 @@ Usage:
   lumen runs list|show <id>|resume <id>
   lumen concat [--project dir]
   lumen skill install [--target grokbot|agents|<path>] [--clean]
+  lumen feishu setup|app|login|status|logout|scopes
+  lumen feishu search <keyword>
+  lumen feishu ls [folder]
+  lumen feishu upload|download|mkdir|move|rm
+  lumen feishu bitable|doc|sheet|wiki|comment|perm|board
   lumen doctor
 
 Default mode is --dry-run: the audit records the request and nothing is sent.
@@ -58,6 +63,14 @@ Backends, one binding per model (no family fallback):
             lumen setup ffmpeg downloads the binaries ahead of time. Default rows are 3. Existing --to files are not overwritten.
   cuts      Scene-change candidates and scores. --sample-rate and --threshold adjust the scan.
   concat   ffmpeg → out/film.mp4 (stub; ffmpeg is not invoked yet)
+  feishu   User-identity Feishu (Lark) drive, docs, sheets, bitable, and wiki.
+           lumen feishu setup scans a page where the user creates an app or picks an existing one.
+           That page is prefilled with the user scopes. Manual fallback: set FEISHU_APP_ID and
+           FEISHU_APP_SECRET, then lumen feishu app. lumen feishu login stores a user access token
+           (not a tenant token) in ~/.config/lumen/feishu with mode 600 and refreshes it.
+           Data commands print JSON. Delete and link sharing require --yes.
+           Callback login redirect: http://127.0.0.1:9753/callback
+           Does not call lark-cli. Read skills/lumen/references/飞书/SKILL.md.
 
 Install (user directory, no sudo):
   bash scripts/install.sh
