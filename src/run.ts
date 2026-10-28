@@ -7,7 +7,6 @@ import { cutsCommand } from "./commands/cuts.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { downloadCommand } from "./commands/download.js";
 import { enhanceCommand } from "./commands/enhance.js";
-import { feishuCommand } from "./commands/feishu.js";
 import { fishCommand } from "./commands/fish.js";
 import { genCommand } from "./commands/gen.js";
 import { initCommand } from "./commands/init.js";
@@ -63,8 +62,6 @@ export async function run(argv: string[], io: IO = defaultIO()): Promise<number>
         return await genCommand(args, project, io, extracted.argv);
       case "fish":
         return await fishCommand(args, project, io, extracted.argv);
-      case "feishu":
-        return await feishuCommand(args, io);
       case "enhance":
         return await enhanceCommand(args, project, io, extracted.argv);
       case "runs":

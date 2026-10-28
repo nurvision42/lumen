@@ -42,8 +42,6 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **加字幕。** 只把已经确认的字幕压进画面，不负责识别。用本机 ffmpeg 硬压，不调用云端加字幕。默认白字、半透明灰圆角底；竖屏在顶部居中，横屏在底部居中。`lumen captions burn --video <file> --subs <file> --to <mp4>`。这条命令会立刻压制。先读 `skills/lumen/references/加字幕/SKILL.md`。
 
-**飞书。** 用用户身份访问这个人的整个云盘，登录一次就能搜索和读写全部文件，不必转发链接。`lumen feishu setup` 扫码创建或选择已有自建应用并预填用户身份权限，然后完成用户授权。已有 App ID 时用 `lumen feishu app` 再 `lumen feishu login`。云盘、文档、表格、多维表格、知识库都可以单独用。先读 `skills/lumen/references/飞书/SKILL.md`。不要把 App Secret 或令牌写进仓库、命令或对话。
-
 **记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs show <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id>` 接着等并取回结果，不要重新提交。
 
 **拼接。** `lumen concat` 把镜头接成一条成片。它仍是占位，不调用外部程序。
