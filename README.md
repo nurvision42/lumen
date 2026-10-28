@@ -94,6 +94,8 @@ lumen setup --key tikhub
 lumen setup ffmpeg
 lumen sprite --video <file> --to <image>
 lumen cuts --video <file>
+lumen captions transcribe --video <file>
+lumen captions burn --video <file> --subs <file> --to <mp4>
 lumen enhance [--video file] [--shot N] [--out file]
 lumen runs list|show <id>|resume <id> [--task <taskId>] [--out <file>]
 lumen concat
@@ -103,6 +105,8 @@ lumen doctor
 
 `lumen sprite` 用 ffmpeg 按真实时间戳抽帧，再用 sharp 排成多宫格。`--every`、`--frames`、`--every-frame`、`--at`、`--ranges` 选帧；不选时优先用拆解结果（每镜抽头、中、尾，超过 3 秒再按每秒 1 张补），没有拆解就做场景切点，再没有就按 1 秒间隔。`--rows` 默认 3，用来分页。`--transcript <file>` 在格子下加台词。只写 `--to`，不覆盖已有文件。`lumen cuts` 只输出切点时间和分数。ffmpeg / ffprobe 的查找顺序是显式路径（`LUMEN_FFMPEG`、`LUMEN_FFPROBE` 或配置里的 `tools.ffmpeg` / `tools.ffprobe`）、PATH、缓存、按平台下载并校验哈希。sharp 先加载本机已经装好的模块，没有再装进缓存。这些都不进 `dependencies`，`npm install` 不会下载它们。`lumen setup ffmpeg` 可以提前准备二进制。`lumen doctor` 打印三者的路径、版本和来源（`config`、`path`、`cache`、`download`；sharp 的本机模块来源是 `module`），找不到就是 `missing`，doctor 本身不下载。细则见 `skills/lumen/references/雪碧图/SKILL.md`。
 
+`lumen captions transcribe` 用 MediaKit `asr-subtitles` 把语音认成带时间的字幕。默认 `--dry-run`，`--execute` 才上传并识别。本地文件的每条结束时间会裁到 ffprobe 读到的片长，避免黑尾。项目里已有镜头口播，或已有成功的语音合成、声音克隆时，会对照文案；对得上就写出已确认的 JSON。没有文案时 JSON 的 `confirmed` 为 false，要加字幕须再带 `--confirm`。`lumen captions burn` 只用本机 ffmpeg 把已确认的字幕硬压进画面，不调用云端加字幕。它会立刻压制；`--dry-run` 只打印位置和字号。默认白字、`rgba(70,70,70,0.51)` 圆角底，竖屏顶部、横屏底部，字号是短边的 0.039。细则见 `skills/lumen/references/转字幕/SKILL.md` 和 `skills/lumen/references/加字幕/SKILL.md`。
+
 `lumen download` 只保存 `douyin.com` 链接（含短链）到 `--to` 指定的新文件，不覆盖已有文件。它立刻下载，不走 dry-run，也不把密钥或视频直链写进审计。密钥不能写在命令行上。安装后由用户自己运行 `lumen setup --key tikhub`：终端不回显，写入本机凭据库（`~/.config/lumen/credentials/` 或 `$XDG_CONFIG_HOME/lumen/credentials/`），不进项目、不打印。也可以由用户自己设置 `TIKHUB_API_KEY`。缺密钥时，错误信息会写出要运行的 `lumen setup --key tikhub`。不要在对话里向用户要密钥。保存后的文件可以交给 `lumen breakdown --video <该文件>`，拆解不要再传 prompt。细则见 `skills/lumen/references/视频下载/SKILL.md`。
 
 `fish design|clone|synth` 分别等价于 `gen voice --model voice-design-1|voice-clone|voice-synthesis`。
@@ -111,7 +115,7 @@ lumen doctor
 
 ## 模型与供应商
 
-内置供应商：图像 `yunqiao`（云桥）和 `grsai`，Seedance `haomao`（好猫）和 `beeftv`（仅 `seedance-2-fast`），语音 `kitta`（fishaudio.org），拆解和增强 `mediakit`。同一个供应商可以给不同模型配不同的密钥。没有绑定就是错误 `no provider binding for <id>`，不会改用另一个模型。
+内置供应商：图像 `yunqiao`（云桥）和 `grsai`，Seedance `haomao`（好猫）和 `beeftv`（仅 `seedance-2-fast`），语音 `kitta`（fishaudio.org），拆解、增强和转字幕 `mediakit`。同一个供应商可以给不同模型配不同的密钥。没有绑定就是错误 `no provider binding for <id>`，不会改用另一个模型。
 
 | 模型 | 可用供应商 |
 | --- | --- |
@@ -119,7 +123,7 @@ lumen doctor
 | `seedance-2`、`seedance-2.5` | haomao |
 | `seedance-2-fast` | haomao、beeftv |
 | `voice-design-1`、`voice-clone`、`voice-synthesis` | kitta |
-| `video-understand-router`、`enhance-video`、`enhance-video-generative` | mediakit |
+| `video-understand-router`、`enhance-video`、`enhance-video-generative`、`asr-subtitles` | mediakit |
 
 每个内置供应商都自带官方默认 `baseUrl`，绑定里可以不写；写了（配置或 `--base-url`）就用你写的。密钥仍由你自己配。
 
@@ -331,6 +335,8 @@ Omitting `--prompt` sends the built-in 拉片 prompt printed in the Chinese sect
 Enhance writes `--out`, or `shots/NN/clip/enhance-<id>.mp4`, or `out/enhance-<id>.mp4`. An https result is downloaded. A `vod` / `tos` / `mediakit` result is stored as a URL, not a fake file. Defaults are the 标准版 values above; pass the flags to override them.
 
 Every generation writes `.lumen/runs/<id>/record.json` and `record.md` with the prompt, binding, and wire calls. Authorization headers, long secrets, URL userinfo and query strings (including presigned `auth_key`), and base64 payloads are redacted. `lumen runs list` and `runs show <id>` read them.
+
+`lumen captions transcribe` calls MediaKit `asr-subtitles` (its own binding, not another model's key). It defaults to `--dry-run`; `--execute` uploads and recognizes. Local cue ends are clamped to the ffprobe duration. A shot-list voice-over or a finished voice-synthesis / voice-clone run is aligned when the text matches (`fit` ≥ 0.55) and the JSON is then `confirmed`. Without that copy, `confirmed` stays false. `lumen captions burn` hard-subs with local ffmpeg immediately (pass `--dry-run` to preview). It refuses an unconfirmed `lumen.captions` JSON unless `--confirm` is set. The default look is white `#FFFFFF` on a rounded `rgba(70,70,70,0.51)` box, optically centered on the glyph ink, short side × 0.039, portrait top (`317/2560` of height) and landscape bottom (`225/1440` of height). See `skills/lumen/references/转字幕/SKILL.md` and `skills/lumen/references/加字幕/SKILL.md`.
 
 `lumen download "<douyin-url>" --to <path>` saves a douyin.com video to a new file. It does not take a key argument. `lumen setup --key tikhub` prompts without echo and writes the lookup key into the machine credential store (`~/.config/lumen/credentials/`). `TIKHUB_API_KEY` is the fallback when that store is empty. The key is not written into the project and is not printed. A missing key names `lumen setup --key tikhub`. Do not ask for the key in conversation. The saved file is a `lumen breakdown --video` input; do not pass a prompt. See `skills/lumen/references/视频下载/SKILL.md`.
 
