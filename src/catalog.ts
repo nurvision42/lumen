@@ -3,7 +3,7 @@ import { CliError } from "./errors.js";
 export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
 export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2.5"] as const;
 export const FISH_MODELS = ["voice-clone", "voice-design-1", "voice-synthesis"] as const;
-export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video", "enhance-video-generative"] as const;
+export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video", "enhance-video-generative", "asr-subtitles"] as const;
 
 export const IMAGE_ASPECTS = [
   "auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16",
@@ -145,6 +145,12 @@ export const MODELS: readonly ModelInfo[] = [
     id: "enhance-video-generative",
     kind: "mediakit",
     summary: "MediaKit enhance-video-generative 大模型版: resolutions 1080p, 2k (default 1080p); not 4k",
+    providers: ["mediakit"],
+  },
+  {
+    id: "asr-subtitles",
+    kind: "mediakit",
+    summary: "MediaKit asr-subtitles: speech to timed cues. lumen clamps each end to the file duration and can align a known script",
     providers: ["mediakit"],
   },
 ];

@@ -104,14 +104,19 @@ function mockJson(call: HttpCall): unknown {
   }
   if (call.method === "PUT") return { success: true };
   if (url.endsWith("/files/uploads")) return { url: "https://cdn.example/mock-upload.bin" };
-  if (url.includes("video-understand-router") || url.includes("/enhance-video")) {
+  if (url.includes("video-understand-router") || url.includes("/enhance-video") || url.includes("asr-subtitles")) {
     return { success: true, task_id: "mock-task" };
   }
   if (url.includes("/api/v1/tasks/")) {
     return {
       success: true,
       status: "completed",
-      result: { video_url: "mediakit://mock-video", contents: "mock understanding" },
+      result: {
+        video_url: "mediakit://mock-video",
+        contents: "mock understanding",
+        duration: 2,
+        subtitles: [{ start_time: 0.2, end_time: 1.5, subtitle_text: "mock line" }],
+      },
     };
   }
   if (url.includes("/images/")) return { created: 0, data: [{ b64_json: "aGVsbG8=" }] };

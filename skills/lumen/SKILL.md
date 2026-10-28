@@ -1,6 +1,6 @@
 # lumen
 
-lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放在一个项目文件夹里。每一项也能单独用：一张图、一条视频、一段 fish 语音、一次下载、一次拆解、一张雪碧图、一次增强，都不必先跑完整条流水线。
+lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放在一个项目文件夹里。每一项也能单独用：一张图、一条视频、一段 fish 语音、一次下载、一次拆解、一张雪碧图、一次增强、一次转字幕、一次加字幕，都不必先跑完整条流水线。
 
 ## 安装
 
@@ -37,6 +37,10 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 **雪碧图。** 把一条本地视频抽成多宫格。用户要看镜头格子或时间轴缩略图时才用，不要因为出现了视频就自动出雪碧图。`lumen sprite --video <file> --to refs/sheet.png`。切点候选用 `lumen cuts --video <file>`。细则读 `skills/lumen/references/雪碧图/SKILL.md`。这条命令会立刻抽帧出图。电脑上有 ffmpeg、ffprobe、sharp 就用电脑的；没有再下载到本机缓存。可以先跑 `lumen setup ffmpeg`。
 
 **拆解、增强。** 把一条成片拆成镜头，或增强一条已有视频。可以对单个文件做。用户要拆镜头时才跑，不要因为出现了视频就自动拆解。`lumen breakdown` · `lumen enhance`。模型 `video-understand-router`、`enhance-video`、`enhance-video-generative`，供应商只有 `mediakit`。拆解先读 `skills/lumen/references/视频拆解/SKILL.md`。只传视频，不要传 prompt。拆解默认用 `doubao-seed-2-1-lite-260915`，`level` 为 `Quality`，需要音频，不要问用户选模型。要换时改项目 `lumen.config.json` 或 `~/.config/lumen/providers.json` 里的 `breakdown.preferModels`、`breakdown.level`、`breakdown.needAudio`。`lumen enhance` 不传旗标就是标准版：`tool_version` `standard`、`scene` `aigc`、`resolution` `4k`、`fps` `30`、`bitrate_level` `medium`、`enhance_style` `natural`。标准版和专业版的 `--resolution` 可以是 `1080p`、`2k`、`4k`，不传仍是 `4k`。大模型版用 `--model enhance-video-generative`，分辨率只有 `1080p` 和 `2k`（默认 `1080p`，不要传 `4k`）。要换标准版参数时用 `--tool-version`、`--scene`、`--resolution`、`--fps`、`--bitrate-level`、`--enhance-style`。两支增强模型分开绑定。
+
+**转字幕。** 把一条视频里的话认成带时间的字幕，并把每条结束时间裁到片长以内。项目里镜头表已有口播，或前面做过语音合成、声音克隆时，自动对照文案；对得上就改错漏，不必再确认。单独丢来一条视频、没有文案时，只写出识别结果，确认后再加字幕。`lumen captions transcribe --video <file>`。默认 `--dry-run`，真正识别加 `--execute`。模型 `asr-subtitles`，供应商只有 `mediakit`。先读 `skills/lumen/references/转字幕/SKILL.md`。
+
+**加字幕。** 只把已经确认的字幕压进画面，不负责识别。用本机 ffmpeg 硬压，不调用云端加字幕。默认白字、半透明灰圆角底；竖屏在顶部居中，横屏在底部居中。`lumen captions burn --video <file> --subs <file> --to <mp4>`。这条命令会立刻压制。先读 `skills/lumen/references/加字幕/SKILL.md`。
 
 **记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs show <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id>` 接着等并取回结果，不要重新提交。
 

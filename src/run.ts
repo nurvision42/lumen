@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { extractProject } from "./args.js";
 import { breakdownCommand } from "./commands/breakdown.js";
+import { captionsCommand } from "./commands/captions.js";
 import { concatCommand } from "./commands/concat.js";
 import { cutsCommand } from "./commands/cuts.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -79,6 +80,8 @@ export async function run(argv: string[], io: IO = defaultIO()): Promise<number>
         return await spriteCommand(args, project, io);
       case "cuts":
         return await cutsCommand(args, project, io);
+      case "captions":
+        return await captionsCommand(args, project, io, extracted.argv);
       default:
         throw new CliError(`unknown command: ${command}\n\n${helpText(readVersion())}`, 2);
     }

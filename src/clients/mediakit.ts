@@ -154,7 +154,7 @@ export function mediaUri(fileId: string): string {
   return `mediakit://${fileId}`;
 }
 
-function uploadHeaders(value: unknown): Record<string, string> {
+export function uploadHeaders(value: unknown): Record<string, string> {
   const record = asRecord(value);
   const raw = record?.upload_headers ?? asRecord(record?.result)?.upload_headers;
   if (!Array.isArray(raw)) return {};

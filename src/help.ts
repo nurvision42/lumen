@@ -15,6 +15,8 @@ Usage:
   lumen setup ffmpeg
   lumen sprite --video <file> --to <image> [--every s|--frames n|--every-frame|--at t|--ranges json] [--columns n] [--rows n] [--cell px] [--transcript file] [--json]
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
+  lumen captions transcribe --video <file> [--script <file>|--no-script] [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
+  lumen captions burn --video <file> --subs <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
   lumen enhance [--model enhance-video|enhance-video-generative] [--video file] [--shot N] [--out file] [--tool-version standard] [--scene aigc] [--resolution 1080p|2k|4k] [--fps 30] [--bitrate-level medium] [--enhance-style natural]
   lumen runs list|show <id>|resume <id>
   lumen concat [--project dir]
@@ -42,6 +44,14 @@ Backends, one binding per model (no family fallback):
                          scene is sent for standard only, unless --scene is set
                          local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}
                          still running when polling ends stays running (exit 0); lumen runs resume <id> continues and saves the result
+  captions transcribe   MediaKit asr-subtitles. Default --dry-run; --execute recognizes speech.
+            Each cue end is clamped to the probed file duration. A shot-list voice-over or a
+            finished voice run is aligned automatically when it matches; otherwise the JSON
+            stays unconfirmed until burn --confirm. Bind asr-subtitles to mediakit.
+  captions burn         Burns a confirmed JSON, or an SRT/ASS file, with ffmpeg. Runs immediately.
+            --dry-run prints position, font size, and margin and does not write. Rounded
+            translucent boxes are overlays, not ASS BorderStyle. Default: white on
+            rgba(70,70,70,0.51); portrait top, landscape bottom; font size is the short side × 0.039.
   sprite    Contact sheet. ffmpeg extracts real frame times; sharp lays them out.
             Resolution is config (LUMEN_FFMPEG / LUMEN_FFPROBE or tools.ffmpeg / tools.ffprobe), then PATH, then the cache, then a hashed download.
             sharp loads a local install, then the cache, then an on-demand install. Neither is an npm dependency of lumen.
