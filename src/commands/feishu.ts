@@ -2,7 +2,7 @@ import { createInterface } from "node:readline/promises";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { CliError } from "../errors.js";
-import { flagString, parseFlags, requireRestEmpty, type FlagKind } from "../flags.js";
+import { flagList, flagString, parseFlags, requireRestEmpty, type FlagKind } from "../flags.js";
 import { fail, line, type IO } from "../io.js";
 import {
   beginDeviceLogin,
@@ -17,7 +17,7 @@ import {
   waitForCallback,
   type DeviceChallenge,
 } from "../feishu/auth.js";
-import { attachFile, createRecord, listFields, listTables, parseJsonObject, parseJsonValue, searchRecords, updateRecord } from "../feishu/bitable.js";
+import { attachFile, createApp, createField, createRecord, createTable, createView, fieldBodies, fieldBody, listFields, listTables, parseJsonObject, parseJsonValue, parseViewType, searchRecords, setViewGroup, setViewSort, updateField, updateRecord, viewConfig } from "../feishu/bitable.js";
 import { addComment, getPermission, grantMember, listComments, listMembers, updateShare, whiteboardNodes } from "../feishu/collab.js";
 import { DEFAULT_CALLBACK_PORT } from "../feishu/endpoints.js";
 import { createDoc, parseDocKind, readDoc, writeDoc } from "../feishu/docs.js";
@@ -42,7 +42,7 @@ lumen feishu download --token <token> --to <path>
 lumen feishu mkdir --name <name> [--folder <token>]
 lumen feishu move --token <token> --type <type> --folder <token>
 lumen feishu rm --token <token> --type <type> --yes
-lumen feishu bitable tables|fields|records|create|update|attach
+lumen feishu bitable tables|fields|records|create|update|attach|create-app|create-table|create-field|update-field|create-view|view-sort|view-group
 lumen feishu doc get|create|write
 lumen feishu sheet info|get|put|create
 lumen feishu wiki spaces|ls|search|node
@@ -498,7 +498,111 @@ async function bitable(args: string[], io: IO): Promise<number> {
     printJson(io, await attachFile(client, requiredFlag(values, "app"), requiredFlag(values, "table"), requiredFlag(values, "record"), requiredFlag(values, "field"), path.resolve(io.cwd, requiredFlag(values, "file"))));
     return 0;
   }
-  throw new CliError("lumen feishu bitable tables|fields|records|create|update|attach", 2);
+  if (op === "create-app") {
+    const { values, rest: extra } = flags(rest, { name: "string", folder: "string" });
+    requireRestEmpty(extra);
+    const name = requiredFlag(values, "name");
+    const folder = flagString(values, "folder");
+    const { client, app } = await authorized(io);
+    printJson(io, await createApp(client, name, folder, app.brand));
+    return 0;
+  }
+  if (op === "create-table") {
+    const { values, rest: extra } = flags(rest, { app: "string", name: "string", "view-name": "string", fields: "string", "fields-file": "string" });
+    requireRestEmpty(extra);
+    const viewName = flagString(values, "view-name");
+    const fieldsRaw = await readJsonInput(values, "fields", "fields-file");
+    if (viewName !== undefined && fieldsRaw === undefined) throw new CliError("--view-name requires --fields", 2);
+    const fields = fieldsRaw === undefined ? undefined : fieldBodies(fieldsRaw, "--fields");
+    const { client } = await authorized(io);
+    printJson(io, await createTable(client, requiredFlag(values, "app"), requiredFlag(values, "name"), {
+      ...(viewName === undefined ? {} : { viewName }),
+      ...(fields === undefined ? {} : { fields }),
+    }));
+    return 0;
+  }
+  if (op === "create-field" || op === "update-field") {
+    const spec: Record<string, FlagKind> = { ...FIELD_FLAGS, ...(op === "update-field" ? { "field-id": "string" as const } : {}) };
+    const { values, rest: extra } = flags(rest, spec);
+    requireRestEmpty(extra);
+    const appToken = requiredFlag(values, "app");
+    const table = requiredFlag(values, "table");
+    if (op === "update-field") requiredFlag(values, "field-id");
+    const body = await loadFieldBody(values);
+    const { client } = await authorized(io);
+    printJson(io, op === "create-field" ? await createField(client, appToken, table, body) : await updateField(client, appToken, table, requiredFlag(values, "field-id"), body));
+    return 0;
+  }
+  if (op === "create-view") {
+    const { values, rest: extra } = flags(rest, { app: "string", table: "string", name: "string", type: "string", sort: "string", "sort-file": "string", group: "string", "group-file": "string" });
+    requireRestEmpty(extra);
+    const sort = await readJsonInput(values, "sort", "sort-file");
+    const group = await readJsonInput(values, "group", "group-file");
+    if (sort !== undefined) viewConfig(sort, "sort");
+    if (group !== undefined) viewConfig(group, "group");
+    const viewType = parseViewType(flagString(values, "type"));
+    const name = requiredFlag(values, "name");
+    const { client } = await authorized(io);
+    printJson(io, await createView(client, requiredFlag(values, "app"), requiredFlag(values, "table"), name, viewType, {
+      ...(sort === undefined ? {} : { sort }),
+      ...(group === undefined ? {} : { group }),
+    }));
+    return 0;
+  }
+  if (op === "view-sort" || op === "view-group") {
+    const spec: Record<string, FlagKind> = {
+      app: "string",
+      table: "string",
+      view: "string",
+      ...(op === "view-sort" ? { sort: "string" as const, "sort-file": "string" as const } : { group: "string" as const, "group-file": "string" as const }),
+    };
+    const { values, rest: extra } = flags(rest, spec);
+    requireRestEmpty(extra);
+    const config = op === "view-sort" ? await readJsonInput(values, "sort", "sort-file") : await readJsonInput(values, "group", "group-file");
+    if (config === undefined) throw new CliError(op === "view-sort" ? "--sort is required" : "--group is required", 2);
+    viewConfig(config, op === "view-sort" ? "sort" : "group");
+    const { client } = await authorized(io);
+    const appToken = requiredFlag(values, "app");
+    const table = requiredFlag(values, "table");
+    const view = requiredFlag(values, "view");
+    printJson(io, op === "view-sort" ? await setViewSort(client, appToken, table, view, config) : await setViewGroup(client, appToken, table, view, config));
+    return 0;
+  }
+  throw new CliError("lumen feishu bitable tables|fields|records|create|update|attach|create-app|create-table|create-field|update-field|create-view|view-sort|view-group", 2);
+}
+
+const FIELD_FLAGS: Record<string, FlagKind> = {
+  app: "string",
+  table: "string",
+  name: "string",
+  type: "string",
+  option: "list",
+  formatter: "string",
+  "link-table": "string",
+  "back-field": "string",
+  multiple: "boolean",
+  field: "string",
+  "field-file": "string",
+};
+
+async function loadFieldBody(values: Record<string, string | boolean | string[] | undefined>): Promise<Record<string, unknown>> {
+  const raw = await readJsonInput(values, "field", "field-file");
+  const named = ["name", "type", "formatter", "link-table", "back-field"];
+  const hasFlag = named.some((name) => flagString(values, name) !== undefined) || flagList(values, "option").length > 0 || typeof values.multiple === "boolean";
+  if (raw !== undefined) {
+    if (hasFlag) throw new CliError("use either --field/--field-file or the field flags", 2);
+    return fieldBody(raw, "--field");
+  }
+  const multiple = values.multiple;
+  return fieldBody({
+    name: requiredFlag(values, "name"),
+    type: requiredFlag(values, "type"),
+    ...(flagList(values, "option").length > 0 ? { options: flagList(values, "option") } : {}),
+    ...(flagString(values, "formatter") !== undefined ? { formatter: flagString(values, "formatter") } : {}),
+    ...(flagString(values, "link-table") !== undefined ? { linkTable: flagString(values, "link-table") } : {}),
+    ...(flagString(values, "back-field") !== undefined ? { backField: flagString(values, "back-field") } : {}),
+    ...(typeof multiple === "boolean" ? { multiple } : {}),
+  }, "--field");
 }
 
 async function doc(args: string[], io: IO): Promise<number> {
@@ -568,8 +672,8 @@ async function wiki(args: string[], io: IO): Promise<number> {
   if (op === "spaces") {
     const { values, rest: extra } = flags(rest, { "page-token": "string" });
     requireRestEmpty(extra);
-    const { client } = await authorized(io);
-    printJson(io, await listSpaces(client, flagString(values, "page-token")));
+    const { client, app } = await authorized(io);
+    printJson(io, await listSpaces(client, flagString(values, "page-token"), app.brand === "lark" ? "en" : "zh"));
     return 0;
   }
   if (op === "ls") {

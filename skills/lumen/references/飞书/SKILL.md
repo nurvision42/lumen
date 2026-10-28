@@ -96,13 +96,13 @@ http://127.0.0.1:9753/callback
 电子表格、多维表格：
 
 - `sheets:spreadsheet` 查看、评论、编辑和管理电子表格
-- `bitable:app` 查看、评论、编辑和管理多维表格
+- `bitable:app` 查看、评论、编辑和管理多维表格（含新建多维表格、数据表、字段和视图；分组和排序走 base v3，同一 scope）
 
 知识库：
 
 - `wiki:wiki` 查看、编辑和管理知识库
 - `wiki:space:retrieve` 知识空间列表
-- `wiki:space:read` 知识空间信息
+- `wiki:space:read` 知识空间信息（含「我的文档库」`my_library`）
 - `wiki:node:retrieve` 节点列表
 - `wiki:node:read` 节点信息
 - `wiki:node:create` 创建节点
@@ -173,16 +173,43 @@ lumen feishu rm --token <token> --type file --yes
 
 ## 多维表格
 
-token 用搜索结果里的 bitable token，不要等用户转发链接。
+token 用搜索结果里的 bitable token，不要等用户转发链接。新建的多维表格会在 JSON 里返回 `appToken` 和 `url`。
 
 ```text
+lumen feishu bitable create-app --name 排期
+lumen feishu bitable create-app --name 排期 --folder <文件夹 token>
+lumen feishu bitable create-table --app <app token> --name 任务
+lumen feishu bitable create-table --app <app token> --name 任务 --view-name 表格 --fields '[{"name":"标题","type":"text"},{"name":"状态","type":"select","options":["待办","完成"]}]'
 lumen feishu bitable tables --app <app token>
 lumen feishu bitable fields --app <app token> --table <table id>
+lumen feishu bitable create-field --app <app token> --table <table id> --name 标题 --type text
+lumen feishu bitable create-field --app <app token> --table <table id> --name 状态 --type select --option 待办 --option 完成
+lumen feishu bitable create-field --app <app token> --table <table id> --name 数量 --type number --formatter 0.00
+lumen feishu bitable create-field --app <app token> --table <table id> --name 素材 --type attachment
+lumen feishu bitable create-field --app <app token> --table <table id> --name 关联任务 --type link --link-table <目标 table id>
+lumen feishu bitable create-field --app <app token> --table <table id> --name 关联任务 --type duplex --link-table <目标 table id> --back-field 来源
+lumen feishu bitable update-field --app <app token> --table <table id> --field-id <field id> --name 状态 --type select --option 待办 --option 完成
+lumen feishu bitable create-field --app <app token> --table <table id> --field-file field.json
 lumen feishu bitable records --app <app token> --table <table id> --filter '{"conjunction":"and","conditions":[{"field_name":"状态","operator":"is","value":["完成"]}]}'
 lumen feishu bitable create --app <app token> --table <table id> --fields '{"标题":"新行","关联":{"linkRecordIds":["recXXXX"]}}'
 lumen feishu bitable update --app <app token> --table <table id> --record <record id> --fields '{"标题":"已改"}'
 lumen feishu bitable attach --app <app token> --table <table id> --record <record id> --field 附件 --file ./clip.mp4
+lumen feishu bitable create-view --app <app token> --table <table id> --name 看板 --type kanban --group '[{"field":"状态","desc":false}]'
+lumen feishu bitable view-sort --app <app token> --table <table id> --view <view id> --sort '[{"field":"截止时间","desc":false}]'
+lumen feishu bitable view-group --app <app token> --table <table id> --view <view id> --group '[{"field":"状态","desc":false}]'
 ```
+
+`create-app` 调用 `POST /open-apis/bitable/v1/apps`。不带 `--folder` 时建在云空间根目录。返回 `appToken`、`url`、`name`、`defaultTableId`。
+
+`create-table` 返回 `tableId`。`--view-name` 是默认视图名，必须同时给 `--fields`。字段数组的第一项是索引列，只能是文本、数字、日期、电话、超链接、公式或地理位置。
+
+`--type` 可以用 `text`（1）、`select`（3，单选）、`number`（2）、`attachment`（17）、`link`（18，单向关联）或 `duplex`（21，双向关联）。也接受数字，例如 `--type 18`。单选用重复的 `--option`。单向关联要 `--link-table`。双向关联还要 `--back-field`（对侧字段名）。`--multiple` 控制关联能否多选，不传则交给接口默认值。
+
+整份字段定义可以写进 JSON：`--field` 或 `--field-file`。对象可以是上面的简写（`name`、`type`、`options`、`linkTable`、`backField`），也可以是接口原样（`field_name`、`type`、`property`）。`--fields` / `--fields-file` 给 `create-table` 用，必须是数组。不要和字段旗标混用。
+
+`update-field` 要 `--field-id`，请求体仍要带字段名和类型。改单选时，JSON 里带上已有选项的 `id` 才能保留原选项。
+
+`create-view` 的 `--type` 是 `grid`（默认）、`kanban`、`gallery`、`gantt` 或 `form`，返回 `viewId`。分组和排序是 OpenAPI 的 base v3：`PUT /open-apis/base/v3/bases/:app/tables/:table/views/:view/group` 和 `.../sort`。`--group` 最多 3 条，`--sort` 最多 10 条；空数组表示清空。`field` 填字段 id 或字段名，`desc` 为 true 时降序。分组可用于表格、看板、甘特；排序还可用于画册。`--sort-file`、`--group-file` 从文件读 JSON。
 
 筛选条件原样传给记录搜索接口。关联字段读出来是 `linkRecordIds` 数组；写入时用这个对象，或直接写记录 id 数组。附件字段接受大文件，内部分片上传后再把 `file_token` 追加到该字段。`--fields-file`、`--filter-file` 可以改从文件读 JSON。
 
@@ -199,11 +226,14 @@ lumen feishu sheet get --token <spreadsheet token> --range "<sheetId>!A1:C10"
 lumen feishu sheet put --token <spreadsheet token> --range "<sheetId>!A1:B2" --values '[["a",1],["b",2]]'
 lumen feishu wiki spaces
 lumen feishu wiki ls --space <space id>
+lumen feishu wiki ls --space my_library
 lumen feishu wiki search 规范
 lumen feishu wiki node --token <wiki token>
 ```
 
 `--kind docx` 是新版文档，`--mode replace` 会清掉正文再写。`--kind doc` 是旧版文档，只在文末追加段落。电子表格的 range 必须带工作表 id，例如 `sheetId!A1:C10`。知识库节点结果里的 `objToken` 和 `objType` 才是底层文档的 token，wiki token 本身不能直接当 docx token。
+
+`lumen feishu wiki spaces` 会按 `page_token` 把列表翻完。某一页因为权限过滤可能是空的，但 `has_more` 仍为 true，不能只看第一页。不传 `space_type`，这样团队空间和旧版个人空间（`person`）都会回来。获取知识空间列表本身不返回「我的文档库」，所以结果里会再请求 `GET /open-apis/wiki/v2/spaces/my_library`，并把该空间放在最前（`space_type` 为 `my_library`）。已在列表里的不重复。列出里面的节点用返回的 `space_id`，或 `--space my_library`。`--page-token` 只作为起点，后面的页仍会取完，输出 `hasMore: false`。
 
 ## 评论、分享、画板
 

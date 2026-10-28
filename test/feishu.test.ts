@@ -6,7 +6,7 @@ import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { chunkPlan, uploadBitableMedia, uploadDriveFile } from "../src/feishu/drive.js";
-import { denormalizeFields, normalizeFields } from "../src/feishu/bitable.js";
+import { denormalizeFields, fieldBodies, fieldBody, normalizeFields, viewConfig } from "../src/feishu/bitable.js";
 import { encodeAddons, registrationPageUrl } from "../src/feishu/register.js";
 import { USER_SCOPES } from "../src/feishu/scopes.js";
 import { appFile, sessionFile, writeApp, writeSession } from "../src/feishu/store.js";
@@ -502,6 +502,221 @@ test("missing app credentials name setup and the manual command", async () => {
     const help = capture(env(home));
     assert.equal(await run(["--help"], help.io), 0);
     assert.match(help.out(), /lumen feishu setup/);
+  });
+});
+
+test("field bodies cover text, select, number, attachment, and both link directions", () => {
+  assert.deepEqual(fieldBody({ name: "标题", type: "text" }, "--field"), { field_name: "标题", type: 1 });
+  assert.deepEqual(fieldBody({ name: "数量", type: "数字", formatter: "0.00" }, "--field"), {
+    field_name: "数量",
+    type: 2,
+    property: { formatter: "0.00" },
+  });
+  assert.deepEqual(fieldBody({ name: "状态", type: "select", options: ["待办", { name: "完成", color: 1 }] }, "--field"), {
+    field_name: "状态",
+    type: 3,
+    property: { options: [{ name: "待办" }, { name: "完成", color: 1 }] },
+  });
+  assert.deepEqual(fieldBody({ field_name: "素材", type: 17 }, "--field"), { field_name: "素材", type: 17 });
+  assert.deepEqual(fieldBody({ name: "关联", type: "18", linkTable: "tblB" }, "--field"), {
+    field_name: "关联",
+    type: 18,
+    property: { table_id: "tblB" },
+  });
+  assert.deepEqual(fieldBody({ name: "双向", type: "duplex", table_id: "tblB", backField: "来源", multiple: false }, "--field"), {
+    field_name: "双向",
+    type: 21,
+    property: { table_id: "tblB", multiple: false, back_field_name: "来源" },
+  });
+  assert.deepEqual(fieldBody({ field_name: "单向关联", type: 18, property: { table_id: "tblB", multiple: true } }, "--field"), {
+    field_name: "单向关联",
+    type: 18,
+    property: { table_id: "tblB", multiple: true },
+  });
+  assert.throws(() => fieldBody({ name: "双向", type: "双向关联", linkTable: "tblB" }, "--field"), /other side/);
+  assert.throws(() => fieldBody({ name: "标题", type: "text", linkTable: "tblB" }, "--field"), /target table/);
+  assert.throws(() => fieldBodies({ name: "标题", type: "text" }, "--fields"), /JSON array/);
+  assert.deepEqual(viewConfig([{ field: "状态", desc: false }], "sort"), { sort_config: [{ field: "状态", desc: false }] });
+  assert.deepEqual(viewConfig({ group_config: [{ field_name: "状态" }] }, "group"), { group_config: [{ field: "状态", desc: false }] });
+  assert.deepEqual(viewConfig([], "sort"), { sort_config: [] });
+  assert.throws(() => viewConfig(Array.from({ length: 11 }, () => ({ field: "状态" })), "sort"), /at most 10/);
+  assert.throws(() => viewConfig([{ field: "a" }, { field: "b" }, { field: "c" }, { field: "d" }], "group"), /at most 3/);
+});
+
+test("bitable schema flags are rejected before login", async () => {
+  await withDir(async (home) => {
+    const duplex = capture(env(home));
+    assert.equal(await run(["feishu", "bitable", "create-field", "--app", "basc", "--table", "tbl", "--name", "关联", "--type", "duplex", "--link-table", "tblB"], duplex.io), 2);
+    assert.match(duplex.err(), /other side/);
+    const mixed = capture(env(home));
+    assert.equal(await run(["feishu", "bitable", "create-field", "--app", "basc", "--table", "tbl", "--name", "标题", "--type", "text", "--field", "{\"field_name\":\"标题\",\"type\":1}"], mixed.io), 2);
+    assert.match(mixed.err(), /use either/);
+    const view = capture(env(home));
+    assert.equal(await run(["feishu", "bitable", "create-table", "--app", "basc", "--name", "任务", "--view-name", "表格"], view.io), 2);
+    assert.match(view.err(), /--view-name requires --fields/);
+    const grouped = capture(env(home));
+    assert.equal(await run(["feishu", "bitable", "view-group", "--app", "basc", "--table", "tbl", "--view", "vew", "--group", "[{\"field\":\"a\"},{\"field\":\"b\"},{\"field\":\"c\"},{\"field\":\"d\"}]"], grouped.io), 2);
+    assert.match(grouped.err(), /at most 3/);
+    assert.equal(`${duplex.out()}${duplex.err()}${mixed.out()}${view.out()}`.includes(SECRET), false);
+  });
+});
+
+test("bitable schema commands and wiki spaces", async () => {
+  await withDir(async (home) => {
+    const config = env(home);
+    await writeApp(config, { appId: APP_ID, appSecret: SECRET, brand: "feishu", source: "manual" });
+    await writeSession(config, {
+      appId: APP_ID,
+      accessToken: "u-access",
+      refreshToken: "u-refresh",
+      expiresAt: Date.now() + 60_000_000,
+      refreshExpiresAt: Date.now() + 86_400_000,
+      scope: USER_SCOPES.join(" "),
+      tokenType: "Bearer",
+    });
+    const fieldFile = path.join(home, "field.json");
+    await writeFile(fieldFile, JSON.stringify({ field_name: "素材", type: 17 }));
+    let libraryInList = false;
+    const calls: Array<{ url: string; method: string; body: string }> = [];
+    const fetchImpl: NonNullable<import("../src/io.js").IO["fetch"]> = async (url, init) => {
+      const target = String(url);
+      const method = init?.method ?? "GET";
+      const body = bodyText(init?.body);
+      calls.push({ url: target, method, body });
+      assert.equal(body.includes(SECRET), false);
+      assert.equal(target.includes(SECRET), false);
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer u-access");
+      if (method === "POST" && target.endsWith("/bitable/v1/apps")) {
+        const parsed = JSON.parse(body) as { name?: string; folder_token?: string };
+        if (parsed.folder_token !== undefined) {
+          return jsonResponse({
+            code: 0,
+            data: { app: { app_token: "bascNEW", name: parsed.name, folder_token: parsed.folder_token, url: "https://example.feishu.cn/base/bascNEW", default_table_id: "tbl0" } },
+          });
+        }
+        return jsonResponse({ code: 0, data: { app: { app_token: "bascROOT", name: parsed.name, default_table_id: "tblRoot" } } });
+      }
+      if (method === "POST" && new URL(target).pathname.endsWith("/tables")) {
+        return jsonResponse({ code: 0, data: { table_id: "tblNew", default_view_id: "vew0", field_id_list: ["fld1", "fld2"] } });
+      }
+      if (method === "POST" && target.includes("/fields")) {
+        const parsed = JSON.parse(body) as { field_name?: string; type?: number; property?: unknown };
+        return jsonResponse({ code: 0, data: { field: { field_id: "fldNew", field_name: parsed.field_name, type: parsed.type, property: parsed.property } } });
+      }
+      if (method === "PUT" && target.includes("/fields/")) {
+        const parsed = JSON.parse(body) as { field_name?: string; type?: number; property?: unknown };
+        return jsonResponse({ code: 0, data: { field: { field_id: "fldOld", field_name: parsed.field_name, type: parsed.type, property: parsed.property } } });
+      }
+      if (method === "POST" && target.includes("/bitable/v1/") && target.endsWith("/views")) {
+        return jsonResponse({ code: 0, data: { view: { view_id: "vewKanban", view_name: "看板", view_type: "kanban" } } });
+      }
+      if (method === "PUT" && target.includes("/base/v3/") && (target.endsWith("/sort") || target.endsWith("/group"))) {
+        return jsonResponse({ code: 0, data: JSON.parse(body) as unknown });
+      }
+      if (target.includes("/wiki/v2/spaces/my_library")) {
+        const parsed = new URL(target);
+        assert.equal(parsed.searchParams.get("lang"), "zh");
+        return jsonResponse({ code: 0, data: { space: { name: "我的文档库", space_id: "sp-lib", space_type: "my_library", description: "", visibility: "private" } } });
+      }
+      if (target.includes("/wiki/v2/spaces")) {
+        const parsed = new URL(target);
+        assert.equal(parsed.searchParams.get("space_type"), null);
+        assert.equal(parsed.searchParams.get("page_size"), "50");
+        const token = parsed.searchParams.get("page_token");
+        if (token === null) return jsonResponse({ code: 0, data: { items: [], has_more: true, page_token: "next" } });
+        assert.equal(token, "next");
+        const items = libraryInList
+          ? [{ name: "我的文档库", space_id: "sp-lib", space_type: "my_library" }, { name: "团队", space_id: "sp-team", space_type: "team" }]
+          : [{ name: "个人空间", space_id: "sp-person", space_type: "person" }, { name: "团队", space_id: "sp-team", space_type: "team" }];
+        return jsonResponse({ code: 0, data: { items, has_more: false } });
+      }
+      throw new Error(`unexpected ${method} ${target}`);
+    };
+
+    const created = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "create-app", "--name", "排期", "--folder", "fld1"], created.io), 0, created.err());
+    const appJson = JSON.parse(created.out()) as { appToken: string; url: string; defaultTableId: string; folderToken: string };
+    assert.equal(appJson.appToken, "bascNEW");
+    assert.equal(appJson.url, "https://example.feishu.cn/base/bascNEW");
+    assert.equal(appJson.defaultTableId, "tbl0");
+    assert.equal(appJson.folderToken, "fld1");
+    assert.equal(created.out().includes("u-access"), false);
+    assert.equal(created.out().includes(SECRET), false);
+
+    const rooted = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "create-app", "--name", "根目录"], rooted.io), 0, rooted.err());
+    assert.equal(JSON.parse(rooted.out()).url, "https://www.feishu.cn/base/bascROOT");
+
+    const table = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "create-table", "--app", "bascNEW", "--name", "任务", "--view-name", "表格", "--fields", "[{\"name\":\"标题\",\"type\":\"text\"},{\"name\":\"状态\",\"type\":\"select\",\"options\":[\"待办\",\"完成\"]}]"], table.io), 0, table.err());
+    assert.deepEqual(JSON.parse(table.out()), { tableId: "tblNew", defaultViewId: "vew0", fieldIdList: ["fld1", "fld2"] });
+    const tableCall = calls.find((call) => call.method === "POST" && call.url.endsWith("/tables"));
+    assert.deepEqual(JSON.parse(tableCall?.body ?? "{}"), {
+      table: {
+        name: "任务",
+        default_view_name: "表格",
+        fields: [
+          { field_name: "标题", type: 1 },
+          { field_name: "状态", type: 3, property: { options: [{ name: "待办" }, { name: "完成" }] } },
+        ],
+      },
+    });
+
+    const linked = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "create-field", "--app", "bascNEW", "--table", "tblNew", "--name", "关联任务", "--type", "duplex", "--link-table", "tblB", "--back-field", "来源", "--multiple"], linked.io), 0, linked.err());
+    const linkCall = calls.find((call) => call.method === "POST" && call.url.includes("/fields"));
+    assert.deepEqual(JSON.parse(linkCall?.body ?? "{}"), {
+      field_name: "关联任务",
+      type: 21,
+      property: { table_id: "tblB", multiple: true, back_field_name: "来源" },
+    });
+    assert.equal(JSON.parse(linked.out()).fieldId, "fldNew");
+
+    const attached = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "create-field", "--app", "bascNEW", "--table", "tblNew", "--field-file", fieldFile], attached.io), 0, attached.err());
+    const fileCall = calls.filter((call) => call.method === "POST" && call.url.includes("/fields")).at(-1);
+    assert.deepEqual(JSON.parse(fileCall?.body ?? "{}"), { field_name: "素材", type: 17 });
+
+    const updated = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "update-field", "--app", "bascNEW", "--table", "tblNew", "--field-id", "fldOld", "--name", "状态", "--type", "select", "--option", "待办", "--option", "完成"], updated.io), 0, updated.err());
+    const updateCall = calls.find((call) => call.method === "PUT" && call.url.includes("/fields/fldOld"));
+    assert.deepEqual(JSON.parse(updateCall?.body ?? "{}"), {
+      field_name: "状态",
+      type: 3,
+      property: { options: [{ name: "待办" }, { name: "完成" }] },
+    });
+
+    const view = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "create-view", "--app", "bascNEW", "--table", "tblNew", "--name", "看板", "--type", "kanban", "--group", "[{\"field\":\"状态\",\"desc\":false}]"], view.io), 0, view.err());
+    const viewJson = JSON.parse(view.out()) as { viewId: string; viewType: string; group: { group_config: unknown } };
+    assert.equal(viewJson.viewId, "vewKanban");
+    assert.equal(viewJson.viewType, "kanban");
+    assert.deepEqual(viewJson.group.group_config, [{ field: "状态", desc: false }]);
+    assert.ok(calls.some((call) => call.method === "PUT" && call.url.endsWith("/views/vewKanban/group")));
+
+    const sorted = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "bitable", "view-sort", "--app", "bascNEW", "--table", "tblNew", "--view", "vewGrid", "--sort", "[{\"field\":\"截止时间\",\"desc\":true}]"], sorted.io), 0, sorted.err());
+    const sortCall = calls.find((call) => call.method === "PUT" && call.url.endsWith("/views/vewGrid/sort"));
+    assert.deepEqual(JSON.parse(sortCall?.body ?? "{}"), { sort_config: [{ field: "截止时间", desc: true }] });
+
+    calls.length = 0;
+    const spaces = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "wiki", "spaces"], spaces.io), 0, spaces.err());
+    const listed = JSON.parse(spaces.out()) as { items: Array<{ space_id: string; space_type: string }>; hasMore: boolean };
+    assert.equal(listed.hasMore, false);
+    assert.deepEqual(listed.items.map((item) => item.space_id), ["sp-lib", "sp-person", "sp-team"]);
+    const spaceGets = calls.filter((call) => call.method === "GET" && call.url.includes("/wiki/v2/spaces") && !call.url.includes("my_library"));
+    assert.equal(spaceGets.length, 2);
+    assert.equal(new URL(spaceGets[0]?.url ?? "").searchParams.get("page_token"), null);
+    assert.equal(new URL(spaceGets[1]?.url ?? "").searchParams.get("page_token"), "next");
+    assert.equal(spaces.out().includes("u-access"), false);
+    assert.equal(spaces.out().includes(SECRET), false);
+
+    libraryInList = true;
+    const again = capture(config, { fetch: fetchImpl, cwd: home });
+    assert.equal(await run(["feishu", "wiki", "spaces"], again.io), 0, again.err());
+    const deduped = JSON.parse(again.out()) as { items: Array<{ space_id: string }> };
+    assert.deepEqual(deduped.items.map((item) => item.space_id), ["sp-lib", "sp-team"]);
   });
 });
 
