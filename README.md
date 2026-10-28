@@ -100,11 +100,8 @@ lumen enhance [--video file] [--shot N] [--out file]
 lumen runs list|show <id>|resume <id> [--task <taskId>] [--out <file>]
 lumen concat
 lumen skill install [--target grokbot|agents|<path>] [--clean]
-lumen feishu setup|app|login|status|search|ls|bitable|doc|sheet|wiki
 lumen doctor
 ```
-
-`lumen feishu` 用用户身份访问这个人的云盘、文档、电子表格、多维表格和知识库，不调用飞书 CLI。`lumen feishu setup` 给出链接，用户在飞书页面里新建或选择已有自建应用，并确认预填的用户身份权限；随后再做一次用户授权。手动后备是设置 `FEISHU_APP_ID` 与 `FEISHU_APP_SECRET` 后运行 `lumen feishu app`。令牌写在 `~/.config/lumen/feishu/`，文件权限 `600`。数据命令输出 JSON。删除和改分享必须带 `--yes`。细则见 `skills/lumen/references/飞书/SKILL.md`。
 
 `lumen sprite` 用 ffmpeg 按真实时间戳抽帧，再用 sharp 排成多宫格。`--every`、`--frames`、`--every-frame`、`--at`、`--ranges` 选帧；不选时优先用拆解结果（每镜抽头、中、尾，超过 3 秒再按每秒 1 张补），没有拆解就做场景切点，再没有就按 1 秒间隔。`--rows` 默认 3，用来分页。`--transcript <file>` 在格子下加台词。只写 `--to`，不覆盖已有文件。`lumen cuts` 只输出切点时间和分数。ffmpeg / ffprobe 的查找顺序是显式路径（`LUMEN_FFMPEG`、`LUMEN_FFPROBE` 或配置里的 `tools.ffmpeg` / `tools.ffprobe`）、PATH、缓存、按平台下载并校验哈希。sharp 先加载本机已经装好的模块，没有再装进缓存。这些都不进 `dependencies`，`npm install` 不会下载它们。`lumen setup ffmpeg` 可以提前准备二进制。`lumen doctor` 打印三者的路径、版本和来源（`config`、`path`、`cache`、`download`；sharp 的本机模块来源是 `module`），找不到就是 `missing`，doctor 本身不下载。细则见 `skills/lumen/references/雪碧图/SKILL.md`。
 
