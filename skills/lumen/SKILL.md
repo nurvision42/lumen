@@ -57,4 +57,4 @@ haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fas
 
 ## ycyapi
 
-`ycyapi` 只提供 `seedance-2.5`，上游模型名 `seedance2.5-A`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY`（`--model-alias` 可覆盖上游 id）。分辨率 `480p` / `720p` / `1080p`（lumen 默认 `720p`），时长 4–30 秒，比例不含 `adaptive`。参考素材接受公网 HTTPS，或本地文件（先经 beeftv 素材库上传再提交；本地时还要有 beeftv 绑定及其 Key，通常绑 `seedance-2-fast`），上限图 30 / 视频 10 / 音频 10。不支持首尾帧、`--task-type`（Auto / edit / extend）、remix、4K。
+`ycyapi` 只提供 `seedance-2.5`，上游模型名 `seedance2.5-A`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY`（`--model-alias` 可覆盖上游 id）。分辨率 `480p` / `720p` / `1080p`（lumen 默认 `720p`），时长 4–30 秒，比例不含 `adaptive`。参考素材接受公网 HTTPS，或本地文件。配置了 `tos` 时，本地文件上传到火山引擎 TOS（私有桶，预签名 GET，约 3 天），不需要 beeftv；没配 `tos` 时仍经 beeftv 素材库上传（本地时还要有 beeftv 绑定及其 Key，通常绑 `seedance-2-fast`）。上限图 30 / 视频 10 / 音频 10。不支持首尾帧、`--task-type`（Auto / edit / extend）、remix、4K。`--dry-run` 列出计划中的 TOS 上传，不必先有密钥。

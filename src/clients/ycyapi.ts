@@ -16,12 +16,14 @@ import {
   withMediaSources,
   type UploadKind,
 } from "./beeftv.js";
+import { mapLocalMediaViaTos } from "./tos.js";
 
 /**
  * YCY API Seedance 2.5 (docs on https://ycyapi.cn via channel 22-SD-2.5视频).
  * POST {base}/v1/videos, GET {base}/v1/videos/{id}, GET|HEAD {base}/v1/videos/{id}/content.
- * Wire model seedance2.5-A. HTTPS refs pass through; local image/video/audio refs upload via BeefTV
- * video-references, then the returned https URLs go into `references`.
+ * Wire model seedance2.5-A. HTTPS refs pass through. Local image/video/audio refs upload to
+ * Volcengine TOS when `tos` is configured (presigned GET, private bucket), otherwise via BeefTV
+ * video-references. The returned https URLs go into `references`.
  */
 export const YCYAPI_SEEDANCE_MODELS: Record<string, string> = {
   "seedance-2.5": "seedance2.5-A",
@@ -48,7 +50,7 @@ function isHttps(source: string): boolean {
 function assertMediaRefs(request: VideoRequest): void {
   for (const ref of request.references) {
     if (!isHttps(ref.source) && !isLocalMedia(ref.source)) {
-      throw new CliError(`ycyapi media must be https:// or a local file (uploaded via beeftv): ${ref.source}`);
+      throw new CliError(`ycyapi media must be https:// or a local file (uploaded via TOS when configured, otherwise beeftv): ${ref.source}`);
     }
   }
 }
@@ -122,10 +124,16 @@ export async function runYcyapiVideo(
   let wired = request;
   let plannedUploads: unknown[] = [];
   if (locals.length > 0) {
-    const upload = resolveBeeftvUploadForYcyapi(config, io.env, mode !== "dry-run");
-    const mapped = await mapLocalMediaViaBeeftv(locals, upload.baseUrl, mode, io, upload.apiKey, calls);
-    wired = withMediaSources(request, mapped.urls);
-    plannedUploads = mapped.plannedUploads;
+    if (config.tos !== undefined) {
+      const mapped = await mapLocalMediaViaTos(locals, config.tos, mode, io, calls);
+      wired = withMediaSources(request, mapped.urls);
+      plannedUploads = mapped.plannedUploads;
+    } else {
+      const upload = resolveBeeftvUploadForYcyapi(config, io.env, mode !== "dry-run");
+      const mapped = await mapLocalMediaViaBeeftv(locals, upload.baseUrl, mode, io, upload.apiKey, calls);
+      wired = withMediaSources(request, mapped.urls);
+      plannedUploads = mapped.plannedUploads;
+    }
   }
   const planned = planYcyapiVideo(wired, binding);
   if (mode === "dry-run") {

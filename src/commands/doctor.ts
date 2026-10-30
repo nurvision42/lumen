@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { MODELS } from "../catalog.js";
 import { isDeferredPrompt } from "../catalog.js";
+import { tosDoctorLine } from "../clients/tos.js";
 import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, globalConfigPath, loadConfig, projectConfigPath } from "../config.js";
 import { tikhubKeyPresent } from "../credentials.js";
 import { rejectUnknown } from "../args.js";
@@ -62,6 +63,7 @@ export async function doctorCommand(args: string[], project: string, io: IO): Pr
   line(io, `breakdown level: ${breakdownLevel(loaded.config.breakdown)}`);
   line(io, `breakdown needAudio: ${breakdownNeedAudio(loaded.config.breakdown)}`);
   line(io, `tikhub key: ${(await tikhubKeyPresent(io.env)) ? "present" : "missing"}`);
+  line(io, tosDoctorLine(loaded.config.tos, io.env));
   line(io, `project config: ${projectConfigPath(project)}`);
   const global = globalConfigPath(io.env);
   if (global !== undefined) line(io, `global config: ${global}`);
