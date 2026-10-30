@@ -17,7 +17,7 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 
 三种形态互斥。`frame` 必须有首帧；有尾帧就必须有首帧，两张图的比例最好一致，否则尾帧会被拉开。`reference` 至少一条 `--ref`，不能再带首尾帧。需要严格卡住首尾画面时用 `frame`，不要靠提示词在参考图里「假装首帧」。
 
-参考写法：`image|https://...|true`、`video|https://...|false`、`audio|https://...`。person-reference 只留在审计里。执行时要 `https://` URL。
+参考写法：`image|https://...|true`、`video|https://...|false`、`audio|https://...`，或本地路径。person-reference 只留在审计里。haomao 会上传本地文件；ycyapi 本地文件经 beeftv 上传；也可直接传公网 `https://`。
 
 ## `omni_reference_task_type`
 
@@ -63,10 +63,11 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 
 ## ycyapi
 
-绑 `ycyapi` 时：上游模型 `seedance2.5-A`，默认用官方域名。只走文生或公网 HTTPS 参考素材；创建任务发 `prompt`、`seconds`、`resolution`、`aspect_ratio`，有参考时再带 `references[{type,role,source}]`。lumen 默认分辨率仍是 `720p`。不支持 `shape frame`（首尾帧）、`--task-type`、`aspect-ratio adaptive`、`duration -1`、4K、本地文件上传。参考上限与上表相同（图 30 / 视频 10 / 音频 10），素材必须是公网 HTTPS。
+绑 `ycyapi` 时：上游模型 `seedance2.5-A`，默认用官方域名。文生或参考素材均可；创建任务发 `prompt`、`seconds`、`resolution`、`aspect_ratio`，有参考时再带 `references[{type,role,source}]`。公网 HTTPS 原样透传；本地图/视频/音频先上传到 beeftv 素材库，再把返回的 https 填进 `references`。因此本地素材时还要绑好 beeftv（通常 `seedance-2-fast`）并配置其 API Key。lumen 默认分辨率仍是 `720p`。不支持 `shape frame`（首尾帧）、`--task-type`、`aspect-ratio adaptive`、`duration -1`、4K。参考上限与上表相同（图 30 / 视频 10 / 音频 10）。
 
 ```bash
 lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY
+lumen providers set seedance-2-fast --provider beeftv --api-key-env BEEFTV_API_KEY   # 本地素材上传需要
 lumen gen video --model seedance-2.5 --shape text --prompt "海边日落" --duration 4 --aspect-ratio 16:9 --resolution 720p
 ```
 

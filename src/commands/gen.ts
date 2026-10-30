@@ -163,7 +163,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
       taskType: flagString(values, "task-type"),
     });
     ctx.params = request;
-    const { binding } = await adoptBinding(ctx, project, io.env, modelId);
+    const { binding, config } = await adoptBinding(ctx, project, io.env, modelId);
     assertVideoProviderRules(request, binding.provider);
     if (mode === "execute" && !ctx.keyPresent) throw missingKey(binding);
     const videoFile = outputPath(project, {
@@ -174,13 +174,14 @@ export async function genVideo(args: string[], project: string, io: IO, command:
     });
     const receipt = `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`;
     ctx.resume = { videoFile, receipt };
-    const runner =
-      binding.provider === "beeftv"
-        ? runBeeftvVideo
-        : binding.provider === "ycyapi"
-          ? runYcyapiVideo
-          : runVideo;
-    const outcome = await runner(request, binding, mode, io, ctx.secret, videoFile, receipt);
+    let outcome;
+    if (binding.provider === "beeftv") {
+      outcome = await runBeeftvVideo(request, binding, mode, io, ctx.secret, videoFile, receipt);
+    } else if (binding.provider === "ycyapi") {
+      outcome = await runYcyapiVideo(request, binding, mode, io, ctx.secret, videoFile, receipt, config);
+    } else {
+      outcome = await runVideo(request, binding, mode, io, ctx.secret, videoFile, receipt);
+    }
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     ctx.files = outcome.files;
