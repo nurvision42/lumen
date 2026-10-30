@@ -489,8 +489,9 @@ export function assertVideoProviderRules(request: VideoRequest, provider: string
       throw new CliError("ycyapi seedance does not support 4K; use 480p, 720p, or 1080p");
     }
     for (const ref of request.references) {
-      if (!/^https:\/\//i.test(ref.source)) {
-        throw new CliError(`ycyapi media must be a public https:// URL (no local upload): ${ref.source}`);
+      const local = !/^[a-z][a-z0-9+.-]*:/i.test(ref.source) || /^[a-z]:[\\/]/i.test(ref.source);
+      if (!/^https:\/\//i.test(ref.source) && !local) {
+        throw new CliError(`ycyapi media must be https:// or a local file (uploaded via beeftv): ${ref.source}`);
       }
     }
   }
