@@ -101,6 +101,9 @@ export async function awaitTask(
   let state = stateOf(current.json);
   let polls = 0;
   let failures = 0;
+  // The provider has already accepted the task (and may have charged). Flush the id
+  // before any poll or download so a kill mid-wait still leaves a resumable record.
+  await flushRemoteTask(io, calls, initial, nextUrl, pending);
   while (state === "pending") {
     if (polls >= max) {
       const last = String(asRecord(current.json)?.status ?? "unknown");
@@ -131,6 +134,30 @@ export async function awaitTask(
     throw new TransportError(`${label} ${status}`, calls, publicResult(current));
   }
   return current;
+}
+
+function notedStatus(value: unknown): string {
+  const status = asRecord(value)?.status;
+  return typeof status === "string" && status.length > 0 ? status : "submitted";
+}
+
+/** Persist the remote id before the poll loop. No-op when no run recorder is installed (resume). */
+export async function flushRemoteTask(
+  io: IO,
+  calls: HttpCall[],
+  initial: HttpResult,
+  nextUrl: string,
+  pending: { provider: string; taskId: string; pollUrl?: string },
+): Promise<void> {
+  if (io.noteRemoteTask === undefined || pending.taskId.length === 0) return;
+  await io.noteRemoteTask({
+    provider: pending.provider,
+    taskId: pending.taskId,
+    lastStatus: notedStatus(initial.json),
+    pollUrl: pending.pollUrl ?? nextUrl,
+    calls,
+    response: publicResult(initial),
+  });
 }
 
 export async function awaitHaomaoTask(

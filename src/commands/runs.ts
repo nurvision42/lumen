@@ -14,7 +14,8 @@ export async function runsCommand(args: string[], project: string, io: IO): Prom
     const records = await listRunRecords(project);
     if (records.length === 0) line(io, "no runs");
     for (const record of records) {
-      line(io, `${record.id}  ${record.status}  ${record.modelId}  ${record.mode}`);
+      const task = record.pending === undefined ? "" : `  task ${record.pending.taskId}`;
+      line(io, `${record.id}  ${record.status}  ${record.modelId}  ${record.mode}${task}`);
     }
     return 0;
   }
