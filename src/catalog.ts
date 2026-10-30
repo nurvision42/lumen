@@ -491,7 +491,7 @@ export function assertVideoProviderRules(request: VideoRequest, provider: string
     for (const ref of request.references) {
       const local = !/^[a-z][a-z0-9+.-]*:/i.test(ref.source) || /^[a-z]:[\\/]/i.test(ref.source);
       if (!/^https:\/\//i.test(ref.source) && !local) {
-        throw new CliError(`ycyapi media must be https:// or a local file (uploaded via TOS when configured, otherwise beeftv): ${ref.source}`);
+        throw new CliError(`ycyapi media must be https:// or a local file (local files upload through TOS): ${ref.source}`);
       }
     }
   }

@@ -220,7 +220,9 @@ export function requireTosCredentials(settings: TosConfig, env: NodeJS.ProcessEn
     access.value === undefined ? `access key ${access.names.join(" or ")}` : undefined,
     secret.value === undefined ? `secret key ${secret.names.join(" or ")}` : undefined,
   ].filter((item): item is string => item !== undefined);
-  throw new CliError(`tos upload needs ${missing.join(" and ")}\nset the env var (values are not stored in config)`);
+  throw new CliError(
+    `tos upload needs ${missing.join(" and ")}\nAdd "tos": {} (or a full tos block) and set VOLC_ACCESSKEY and VOLC_SECRETKEY. Values are not stored in config.`,
+  );
 }
 
 export function tosDoctorLine(settings: TosConfig | undefined, env: NodeJS.ProcessEnv): string {
@@ -252,7 +254,8 @@ async function withRetry<T>(io: IO, fn: () => Promise<T>): Promise<T> {
 
 /**
  * Upload distinct local files to TOS and map each source to a presigned https GET.
- * Dry-run records the PUT and uses {{upload:sha256}} — no keys required.
+ * Dry-run records the PUT and uses {{upload:sha256}} and does not send.
+ * Keys are still required, so a missing AK/SK fails before any request.
  * The same sha256 is uploaded once per run.
  */
 export async function mapLocalMediaViaTos(
@@ -264,6 +267,7 @@ export async function mapLocalMediaViaTos(
 ): Promise<{ urls: Map<string, string>; plannedUploads: PlannedTosUpload[] }> {
   const described = await Promise.all(locals.map((item) => describeTosUpload(item.source, item.kind, io.cwd, settings.bucket)));
   const plannedUploads = described.filter((item, index) => described.findIndex((other) => other.sha256 === item.sha256) === index);
+  const creds = requireTosCredentials(settings, io.env);
   if (mode === "dry-run") {
     for (const up of plannedUploads) calls.push(tosPutCall(settings, up));
     return {
@@ -271,7 +275,6 @@ export async function mapLocalMediaViaTos(
       plannedUploads,
     };
   }
-  const creds = requireTosCredentials(settings, io.env);
   const opts: SendOptions = { mode, fetchImpl: fetchOf(io), auth: false, timeoutMs: TOS_UPLOAD_TIMEOUT_MS };
   const bySha = new Map<string, string>();
   for (const up of plannedUploads) {
