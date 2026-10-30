@@ -20,7 +20,7 @@ export const VIDEO_SHAPES = ["text", "frame", "reference"] as const;
 /** Official Seedance 2.5 omni-reference subtasks. `auto` is the default when `--task-type` is omitted. */
 export const OMNI_TASK_TYPES = ["auto", "reference", "edit", "extend"] as const;
 
-export const PROVIDERS = ["yunqiao", "grsai", "haomao", "kitta", "mediakit", "beeftv"] as const;
+export const PROVIDERS = ["yunqiao", "grsai", "haomao", "kitta", "mediakit", "beeftv", "ycyapi"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /**
@@ -34,6 +34,7 @@ export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
   kitta: "https://fishaudio.org",
   mediakit: "https://mediakit.cn-beijing.volces.com",
   beeftv: "https://enterprise.beefapi.com",
+  ycyapi: "https://ycyapi.cn",
 };
 
 /**
@@ -109,7 +110,13 @@ export const MODELS: readonly ModelInfo[] = [
     id,
     kind: "video" as const,
     summary: "Seedance TextVideo, FrameVideo, and ReferenceVideo",
-    providers: (id === "seedance-2-fast" ? ["haomao", "beeftv"] : ["haomao"]) as readonly ProviderId[],
+    providers: (
+      id === "seedance-2-fast"
+        ? ["haomao", "beeftv"]
+        : id === "seedance-2.5"
+          ? ["haomao", "ycyapi"]
+          : ["haomao"]
+    ) as readonly ProviderId[],
   })),
   {
     id: "voice-design-1",
@@ -458,6 +465,34 @@ export function assertVideoProviderRules(request: VideoRequest, provider: string
   }
   if (provider === "haomao" && request.modelId === "seedance-2.5" && request.shape === "frame" && request.aspectRatio !== "adaptive") {
     throw new CliError("haomao seedance-2.5 frame mode takes only aspect-ratio adaptive");
+  }
+  if (provider === "ycyapi") {
+    if (request.modelId !== "seedance-2.5") {
+      throw new CliError("ycyapi only serves seedance-2.5");
+    }
+    if (request.webSearch) {
+      throw new CliError("ycyapi seedance does not accept web-search");
+    }
+    if (request.shape === "frame" || request.firstFrame !== undefined || request.lastFrame !== undefined) {
+      throw new CliError("ycyapi seedance does not support first/last frame (shape frame)");
+    }
+    if (request.omniTaskTypeSpecified) {
+      throw new CliError("ycyapi seedance does not support --task-type (Auto / edit / extend / remix)");
+    }
+    if (request.duration === -1) {
+      throw new CliError("ycyapi seedance duration is a whole number from 4 to 30 (not -1 / Auto)");
+    }
+    if (request.aspectRatio === "adaptive") {
+      throw new CliError("ycyapi seedance does not support aspect-ratio adaptive");
+    }
+    if (request.resolution === "4k" || request.resolution === "4K") {
+      throw new CliError("ycyapi seedance does not support 4K; use 480p, 720p, or 1080p");
+    }
+    for (const ref of request.references) {
+      if (!/^https:\/\//i.test(ref.source)) {
+        throw new CliError(`ycyapi media must be a public https:// URL (no local upload): ${ref.source}`);
+      }
+    }
   }
 }
 

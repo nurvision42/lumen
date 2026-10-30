@@ -5,7 +5,7 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 
 # Seedance 2.5 使用说明
 
-本文件只管怎么用 `lumen` 调用 `seedance-2.5`（别名 `2.5`）。模型绑 `haomao`。这不是 MediaKit，也不是 Seedance 2.0。2.0 的时长、分辨率和首帧比例不能拿来用。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。
+本文件只管怎么用 `lumen` 调用 `seedance-2.5`（别名 `2.5`）。模型可绑 `haomao` 或 `ycyapi`。这不是 MediaKit，也不是 Seedance 2.0。2.0 的时长、分辨率和首帧比例不能拿来用。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。
 
 ## 三种形态
 
@@ -60,6 +60,15 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 硬上限之内，这些数量更稳：主体音视频 1–5 个、单段 5–10 秒；主体图 1–8 张；编辑用的视频短于 20 秒，配图 1–5 张。
 
 方舟不接受直接上传含真人人脸的参考图或参考视频。本账号近 30 天内由 Seedance 2.5 或 2.0 生成的含人脸原片可以二次创作。
+
+## ycyapi
+
+绑 `ycyapi` 时：上游模型 `seedance2.5-A`，默认用官方域名。只走文生或公网 HTTPS 参考素材；创建任务发 `prompt`、`seconds`、`resolution`、`aspect_ratio`，有参考时再带 `references[{type,role,source}]`。lumen 默认分辨率仍是 `720p`。不支持 `shape frame`（首尾帧）、`--task-type`、`aspect-ratio adaptive`、`duration -1`、4K、本地文件上传。参考上限与上表相同（图 30 / 视频 10 / 音频 10），素材必须是公网 HTTPS。
+
+```bash
+lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY
+lumen gen video --model seedance-2.5 --shape text --prompt "海边日落" --duration 4 --aspect-ratio 16:9 --resolution 720p
+```
 
 ## 提交
 

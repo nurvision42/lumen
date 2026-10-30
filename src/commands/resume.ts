@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { finishHaomaoVideo } from "../clients/seedance.js";
 import { finishBeeftvVideo } from "../clients/beeftv.js";
+import { finishYcyapiVideo } from "../clients/ycyapi.js";
 import { pollMediakitTask, publishedMediakit } from "../clients/mediakit.js";
 import { PendingTaskError } from "../clients/jobs.js";
 import { CliError } from "../errors.js";
@@ -63,7 +64,7 @@ function mediakitPending(record: RunRecord, project: string, overrides: { out?: 
 /** Older runs recorded a still-processing task as an error; recover the id from that message. */
 function derivePending(record: RunRecord, project: string, overrides: { task?: string; out?: string }): PendingTask | undefined {
   const mediakitFromError = /MediaKit task (\S+)/.exec(record.error ?? "")?.[1];
-  const seedanceFromError = /(?:haomao|beeftv) task (\S+)/.exec(record.error ?? "")?.[1];
+  const seedanceFromError = /(?:haomao|beeftv|ycyapi) task (\S+)/.exec(record.error ?? "")?.[1];
   const taskId = overrides.task ?? record.pending?.taskId ?? seedanceFromError ?? mediakitFromError;
   if (taskId === undefined) return undefined;
   const provider =
@@ -99,7 +100,7 @@ async function resumeSeedance(
       method: "GET",
       url: joinUrl(
         baseUrl,
-        pending.provider === "beeftv"
+        pending.provider === "beeftv" || pending.provider === "ycyapi"
           ? `/v1/videos/${encodeURIComponent(pending.taskId)}`
           : `/contents/generations/tasks/${encodeURIComponent(pending.taskId)}`,
       ),
@@ -108,7 +109,13 @@ async function resumeSeedance(
     },
     opts,
   );
-  return (pending.provider === "beeftv" ? finishBeeftvVideo : finishHaomaoVideo)(
+  const finish =
+    pending.provider === "beeftv"
+      ? finishBeeftvVideo
+      : pending.provider === "ycyapi"
+        ? finishYcyapiVideo
+        : finishHaomaoVideo;
+  return finish(
     calls,
     baseUrl,
     first,
@@ -157,8 +164,8 @@ export async function resumeRun(
   }
   const pending = derivePending(record, project, overrides);
   if (pending === undefined) throw new CliError(`run ${id} has no remote task to resume (pass --task <id>)`, 2);
-  if (pending.provider !== "haomao" && pending.provider !== "beeftv" && pending.provider !== "mediakit") {
-    throw new CliError(`resume supports haomao, beeftv, and mediakit tasks, not ${pending.provider}`, 2);
+  if (pending.provider !== "haomao" && pending.provider !== "beeftv" && pending.provider !== "ycyapi" && pending.provider !== "mediakit") {
+    throw new CliError(`resume supports haomao, beeftv, ycyapi, and mediakit tasks, not ${pending.provider}`, 2);
   }
   if (pending.provider === "mediakit" && record.modelId !== "video-understand-router" && !ENHANCE_MODELS.has(record.modelId)) {
     throw new CliError(`resume does not know how to finish mediakit model ${record.modelId}`, 2);
