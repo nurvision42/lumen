@@ -17,7 +17,7 @@ Usage:
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
   lumen captions transcribe --video <file> [--script <file>|--no-script] [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
   lumen captions burn --video <file> --subs <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
-  lumen enhance [--model enhance-video|enhance-video-generative] [--video file] [--shot N] [--out file] [--tool-version standard] [--scene aigc] [--resolution 1080p|2k|4k] [--fps 30] [--bitrate-level medium] [--enhance-style natural]
+  lumen enhance [--video file] [--shot N] [--out file] [--dry-run|--execute|--mock]
   lumen runs list|show <id>|resume <id>
   lumen concat [--project dir]
   lumen skill install [--target grokbot|agents|<path>] [--clean]
@@ -35,14 +35,16 @@ Backends, one binding per model (no family fallback):
   download    douyin.com only. Saves a file for breakdown. No key on the command line.
               lumen setup --key tikhub stores it in the machine credential store, or set TIKHUB_API_KEY.
               Do not ask for the key in conversation. A missing key names the setup command.
-  breakdown / enhance    MediaKit video-understand-router and enhance-video
+  breakdown / enhance    MediaKit video-understand-router and enhance-video-generative
                          breakdown sends prefer_models doubao-seed-2-1-lite-260915, level Quality, need_audio true
                          omitted --prompt sends the built-in 拉片 prompt; do not pass one
                          override with breakdown.preferModels, breakdown.level, or breakdown.needAudio
-                         enhance defaults: tool_version standard, scene aigc, resolution 4k, fps 30, bitrate_level medium, enhance_style natural
-                         enhance-video standard and professional accept resolution 1080p, 2k, 4k (default 4k)
-                         enhance-video-generative accepts resolution 1080p, 2k (default 1080p), not 4k
-                         scene is sent for standard only, unless --scene is set
+                         enhance is only enhance-video-generative at 2k and 30 fps. No model, resolution,
+                         fps, tool-version, scene, bitrate, or style flag.
+                         Before submit, prints a cost estimate at 10 yuan/min (large-model 2K ≤30fps).
+                         After an https mp4 downloads, lumen adds monochrome film grain at strength 0.55
+                         (half-resolution grain, output bitrate matched to that file, audio copied).
+                         There is no separate grain command. Do not add grain again.
                          local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}
                          still running when polling ends stays running (exit 0); lumen runs resume <id> continues and saves the result
   captions transcribe   MediaKit asr-subtitles. Default --dry-run; --execute recognizes speech.

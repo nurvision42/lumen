@@ -73,19 +73,11 @@ export function assertEnhanceResolution(tool: EnhanceTool, toolVersion: string |
   return normalized;
 }
 
-/** Defaults are 标准版 on enhance-video. `scene` is only applied for tool_version standard unless the caller set one. */
+/** Defaults are 标准版 on enhance-video. `lumen enhance` always uses the generative branch: 2k and 30 fps. */
 export function resolveEnhance(input: EnhanceOptions | undefined, tool: EnhanceTool = "enhance-video"): ResolvedEnhance {
   if (tool === "enhance-video-generative") {
-    if (filled(input?.toolVersion) !== undefined || filled(input?.scene) !== undefined || filled(input?.enhanceStyle) !== undefined) {
-      throw new CliError("enhance-video-generative does not take --tool-version, --scene, or --enhance-style", 2);
-    }
-    const resolution = assertEnhanceResolution(tool, undefined, filled(input?.resolution) ?? ENHANCE_GENERATIVE_RESOLUTION);
-    const bitrateLevel = filled(input?.bitrateLevel);
-    return {
-      resolution,
-      ...(input?.fps === undefined ? {} : { fps: input.fps }),
-      ...(bitrateLevel === undefined ? {} : { bitrateLevel }),
-    };
+    void input;
+    return { resolution: ENHANCE_GENERATIVE_RESOLUTION, fps: ENHANCE_FPS };
   }
   const toolVersion = filled(input?.toolVersion) ?? ENHANCE_TOOL_VERSION;
   const explicitScene = filled(input?.scene);
@@ -110,7 +102,7 @@ export interface UnderstandOptions {
 const SUCCESS = new Set(["completed", "succeeded", "success"]);
 const FAILURE = new Set(["failed", "error", "canceled", "cancelled"]);
 
-/** Enough for standard 4K / professional (often 20–30+ minutes per minute of video). */
+/** Enough for a 2K 30fps large-model enhance, which can take most of this window per minute of video. */
 export const MEDIAKIT_MIN_WINDOW_MS = 30 * 60_000;
 const DEFAULT_POLLS = 180;
 const DEFAULT_POLL_MS = 10_000;

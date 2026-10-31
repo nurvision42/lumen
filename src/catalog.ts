@@ -77,9 +77,10 @@ export const ENHANCE_SCENE = "aigc";
 export const ENHANCE_RESOLUTION = "4k";
 /** Selectable tiers for enhance-video standard and professional. */
 export const ENHANCE_VIDEO_RESOLUTIONS = ["1080p", "2k", "4k"] as const;
-/** 大模型版. 4k is not accepted. Unset `--resolution` sends 1080p. */
+/** 大模型版 tiers the API accepts. `lumen enhance` always sends 2k. */
 export const ENHANCE_GENERATIVE_RESOLUTIONS = ["1080p", "2k"] as const;
-export const ENHANCE_GENERATIVE_RESOLUTION = "1080p";
+/** Fixed by `lumen enhance`. Not a flag. */
+export const ENHANCE_GENERATIVE_RESOLUTION = "2k";
 export const ENHANCE_FPS = 30;
 export const ENHANCE_BITRATE_LEVEL = "medium";
 export const ENHANCE_STYLE = "natural";
@@ -145,13 +146,13 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: "enhance-video",
     kind: "mediakit",
-    summary: "MediaKit enhance-video 标准版/专业版: resolutions 1080p, 2k, 4k (default 4k); standard defaults scene aigc, fps 30, bitrate_level medium, enhance_style natural",
+    summary: "MediaKit enhance-video 标准版/专业版. lumen enhance does not call this model",
     providers: ["mediakit"],
   },
   {
     id: "enhance-video-generative",
     kind: "mediakit",
-    summary: "MediaKit enhance-video-generative 大模型版: resolutions 1080p, 2k (default 1080p); not 4k",
+    summary: "MediaKit enhance-video-generative. lumen enhance always sends 2k and 30 fps, then adds monochrome film grain",
     providers: ["mediakit"],
   },
   {

@@ -146,7 +146,7 @@ async function resumeMediakit(
   if (result.videoUrl === undefined) return { response: result.response, files: [] };
   return {
     response: result.response,
-    files: await materializeEnhance(result.videoUrl, calls, io, { videoFile: pending.videoFile, receipt: pending.receipt }),
+    files: await materializeEnhance(result.videoUrl, calls, io, project, { videoFile: pending.videoFile, receipt: pending.receipt }),
   };
 }
 
