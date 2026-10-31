@@ -1,4 +1,4 @@
-import type { LumenConfig, ModelBinding } from "../config.js";
+import type { ModelBinding } from "../config.js";
 import type { MediaRef, VideoRequest } from "../catalog.js";
 import { CliError } from "../errors.js";
 import type { RunMode } from "../flags.js";
@@ -191,12 +191,6 @@ export async function uploadBeeftvOne(calls: HttpCall[], baseUrl: string, up: Pl
     throw new TransportError(`beeftv upload complete for ${up.path} returned no url`, calls, publicResult(done));
   }
   return url;
-}
-/** Find any model bound to beeftv (used when another provider uploads local media through BeefTV). */
-export function findBeeftvBinding(config: LumenConfig): { modelId: string; binding: ModelBinding } | undefined {
-  const entry = Object.entries(config.models).find(([, binding]) => binding.provider === "beeftv");
-  if (entry === undefined) return undefined;
-  return { modelId: entry[0], binding: entry[1] };
 }
 
 /**

@@ -31,6 +31,18 @@
         "ffmpeg": { "type": "string", "minLength": 1 },
         "ffprobe": { "type": "string", "minLength": 1 }
       }
+    },
+    "tos": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Volcengine TOS for local media that a provider can only fetch over HTTPS. An empty object uses the defaults. Absent means TOS is not configured.",
+      "properties": {
+        "bucket": { "type": "string", "minLength": 1, "default": "lumen42" },
+        "region": { "type": "string", "minLength": 1, "default": "cn-beijing" },
+        "endpoint": { "type": "string", "minLength": 1, "default": "tos-cn-beijing.volces.com" },
+        "accessKeyEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "VOLC_ACCESSKEY" },
+        "secretKeyEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "VOLC_SECRETKEY" }
+      }
     }
   },
   "$defs": {

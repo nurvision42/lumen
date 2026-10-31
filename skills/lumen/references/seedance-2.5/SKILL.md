@@ -17,7 +17,7 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 
 三种形态互斥。`frame` 必须有首帧；有尾帧就必须有首帧，两张图的比例最好一致，否则尾帧会被拉开。`reference` 至少一条 `--ref`，不能再带首尾帧。需要严格卡住首尾画面时用 `frame`，不要靠提示词在参考图里「假装首帧」。
 
-参考写法：`image|https://...|true`、`video|https://...|false`、`audio|https://...`，或本地路径。person-reference 只留在审计里。haomao 会上传本地文件；ycyapi 本地文件经 beeftv 上传；也可直接传公网 `https://`。
+参考写法：`image|https://...|true`、`video|https://...|false`、`audio|https://...`，或本地路径。person-reference 只留在审计里。haomao 会上传本地文件；ycyapi 的本地文件只上传到火山引擎 TOS，需要配置 `tos` 和密钥；也可直接传公网 `https://`。
 
 ## `omni_reference_task_type`
 
@@ -63,11 +63,11 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 
 ## ycyapi
 
-绑 `ycyapi` 时：上游模型 `seedance2.5-A`，默认用官方域名。文生或参考素材均可；创建任务发 `prompt`、`seconds`、`resolution`、`aspect_ratio`，有参考时再带 `references[{type,role,source}]`。公网 HTTPS 原样透传；本地图/视频/音频先上传到 beeftv 素材库，再把返回的 https 填进 `references`。因此本地素材时还要绑好 beeftv（通常 `seedance-2-fast`）并配置其 API Key。lumen 默认分辨率仍是 `720p`。不支持 `shape frame`（首尾帧）、`--task-type`、`aspect-ratio adaptive`、`duration -1`、4K。参考上限与上表相同（图 30 / 视频 10 / 音频 10）。
+绑 `ycyapi` 时：上游模型 `seedance2.5-A`，默认用官方域名。文生或参考素材均可；创建任务发 `prompt`、`seconds`、`resolution`、`aspect_ratio`，有参考时再带 `references[{type,role,source}]`。公网 HTTPS 原样透传。本地图/视频/音频只上传到火山引擎 TOS（AK/SK PutObject，返回约 3 天的预签名 GET，桶保持私有），再把 https 填进 `references`。`"tos": {}` 使用缺省桶 `lumen42`、地域 `cn-beijing`、端点 `tos-cn-beijing.volces.com`，密钥环境变量 `VOLC_ACCESSKEY` / `VOLC_SECRETKEY`（也认 `VOLCENGINE_ACCESS_KEY` / `VOLCENGINE_SECRET_KEY`）。没有 `tos` 或没有密钥会失败，并提示补上这两项，不会改走 beeftv。配好之后 `--dry-run` 列出计划上传且不发送。lumen 默认分辨率仍是 `720p`。不支持 `shape frame`（首尾帧）、`--task-type`、`aspect-ratio adaptive`、`duration -1`、4K。参考上限与上表相同（图 30 / 视频 10 / 音频 10）。
 
 ```bash
 lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY
-lumen providers set seedance-2-fast --provider beeftv --api-key-env BEEFTV_API_KEY   # 本地素材上传需要
+# 本地素材：在 lumen.config.json 里加 "tos": {}，并设置 VOLC_ACCESSKEY / VOLC_SECRETKEY
 lumen gen video --model seedance-2.5 --shape text --prompt "海边日落" --duration 4 --aspect-ratio 16:9 --resolution 720p
 ```
 

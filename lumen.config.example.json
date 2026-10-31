@@ -70,5 +70,12 @@
     "preferModels": ["doubao-seed-2-1-lite-260915"],
     "level": "Quality",
     "needAudio": true
+  },
+  "tos": {
+    "bucket": "lumen42",
+    "region": "cn-beijing",
+    "endpoint": "tos-cn-beijing.volces.com",
+    "accessKeyEnv": "VOLC_ACCESSKEY",
+    "secretKeyEnv": "VOLC_SECRETKEY"
   }
 }

@@ -15,6 +15,19 @@ export const bindingSchema = z
   })
   .strict();
 
+const envName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+
+/** Partial TOS block as written in a config file. Omitted fields use TOS_DEFAULTS. */
+export const tosSettingsSchema = z
+  .object({
+    bucket: z.string().min(1).optional(),
+    region: z.string().min(1).optional(),
+    endpoint: z.string().min(1).optional(),
+    accessKeyEnv: envName.optional(),
+    secretKeyEnv: envName.optional(),
+  })
+  .strict();
+
 export const configSchema = z
   .object({
     models: z.record(z.string(), bindingSchema).optional(),
@@ -35,6 +48,7 @@ export const configSchema = z
       })
       .strict()
       .optional(),
+    tos: tosSettingsSchema.optional(),
   })
   .strict();
 
@@ -43,8 +57,53 @@ export type StoredBinding = z.infer<typeof bindingSchema>;
 /** A binding with baseUrl resolved (user value, else the provider's built-in default). */
 export type ModelBinding = StoredBinding & { baseUrl: string; baseUrlDefault?: boolean };
 
-export interface StoredConfig extends Omit<LumenConfig, "models"> {
+/** TOS settings exactly as stored. An empty object still means TOS is configured. */
+export type TosSettings = z.infer<typeof tosSettingsSchema>;
+
+/** TOS settings with defaults filled in. Present on LumenConfig only when a tos block exists. */
+export interface TosConfig {
+  bucket: string;
+  region: string;
+  endpoint: string;
+  accessKeyEnv: string;
+  secretKeyEnv: string;
+}
+
+/** Defaults for the existing private bucket. Credentials stay in the named env vars. */
+export const TOS_DEFAULTS: TosConfig = {
+  bucket: "lumen42",
+  region: "cn-beijing",
+  endpoint: "tos-cn-beijing.volces.com",
+  accessKeyEnv: "VOLC_ACCESSKEY",
+  secretKeyEnv: "VOLC_SECRETKEY",
+};
+
+/** Strip a scheme or path so the endpoint is a host the bucket can be prefixed onto. */
+export function normalizeTosEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim().replace(/\/+$/, "");
+  const noScheme = trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  return (noScheme.split("/")[0] ?? "").trim();
+}
+
+export function resolveTos(settings: TosSettings): TosConfig {
+  const endpoint = normalizeTosEndpoint(settings.endpoint ?? TOS_DEFAULTS.endpoint);
+  const bucket = (settings.bucket ?? TOS_DEFAULTS.bucket).trim();
+  const region = (settings.region ?? TOS_DEFAULTS.region).trim();
+  if (bucket.length === 0) throw new CliError("tos.bucket is empty");
+  if (region.length === 0) throw new CliError("tos.region is empty");
+  if (endpoint.length === 0) throw new CliError("tos.endpoint is empty");
+  return {
+    bucket,
+    region,
+    endpoint,
+    accessKeyEnv: settings.accessKeyEnv ?? TOS_DEFAULTS.accessKeyEnv,
+    secretKeyEnv: settings.secretKeyEnv ?? TOS_DEFAULTS.secretKeyEnv,
+  };
+}
+
+export interface StoredConfig extends Omit<LumenConfig, "models" | "tos"> {
   models: Record<string, StoredBinding>;
+  tos?: TosSettings;
 }
 
 /** Fill in the provider's default baseUrl when the binding does not set one. */
@@ -72,6 +131,8 @@ export interface LumenConfig {
     needAudio?: boolean;
   };
   tools: ToolPaths;
+  /** Set only when a config file contains a tos block. Absent means TOS is not configured. */
+  tos?: TosConfig;
 }
 
 export const EMPTY_CONFIG: LumenConfig = { models: {}, breakdown: {}, tools: {} };
@@ -96,6 +157,7 @@ export function parseConfig(raw: unknown, label: string): StoredConfig {
     models: parsed.data.models ?? {},
     breakdown: parsed.data.breakdown ?? {},
     tools: parsed.data.tools ?? {},
+    ...(parsed.data.tos === undefined ? {} : { tos: parsed.data.tos }),
   };
 }
 
@@ -120,6 +182,7 @@ export async function writeConfigFile(file: string, config: StoredConfig): Promi
     models: config.models,
     breakdown: config.breakdown,
     ...(Object.keys(tools).length === 0 ? {} : { tools }),
+    ...(config.tos === undefined ? {} : { tos: config.tos }),
   };
   await writeFile(file, `${JSON.stringify(body, null, 2)}\n`);
 }
@@ -141,14 +204,22 @@ export async function loadConfig(project: string, env: NodeJS.ProcessEnv): Promi
   for (const id of Object.keys(models)) {
     sources[id] = id in local.models ? "project" : "global";
   }
+  const tos = mergeTos(global.tos, local.tos);
   return {
     config: {
       models,
       breakdown: mergeBreakdown(global.breakdown, local.breakdown),
       tools: mergeTools(global.tools, local.tools),
+      ...(tos === undefined ? {} : { tos }),
     },
     sources,
   };
+}
+
+/** A tos block in either file enables TOS. Project fields replace the same global fields. */
+function mergeTos(global: TosSettings | undefined, local: TosSettings | undefined): TosConfig | undefined {
+  if (global === undefined && local === undefined) return undefined;
+  return resolveTos({ ...global, ...local });
 }
 
 function listedModels(value: readonly string[] | undefined): readonly string[] | undefined {
