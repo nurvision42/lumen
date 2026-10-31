@@ -5,7 +5,7 @@ description: 用 seedance-2 或 seedance-2-fast 调用 lumen 之前先读。只�
 
 # Seedance 2.0 使用说明
 
-本文件只管怎么用 `lumen` 调用 `seedance-2`、`seedance-2-fast`（别名 `standard`、`fast`）。两支都绑 `haomao`，不是 MediaKit；`seedance-2-fast` 也可以绑 `beeftv`（本地素材自动上传）。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。
+本文件只管怎么用 `lumen` 调用 `seedance-2`、`seedance-2-fast`（别名 `standard`、`fast`）。两支都绑 `haomao`，不是 MediaKit；`seedance-2-fast` 也可以绑 `beeftv`（本地素材自动上传）。提示词用中文写。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。不要把提示词翻译成英文。
 
 ## 三种形态
 

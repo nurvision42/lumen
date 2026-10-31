@@ -147,8 +147,8 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   const pe = await readFile(path.join(root, "skills", "lumen", "references", "seedance-提示词写法", "SKILL.md"), "utf8");
   assert.match(pe, /name:\s*"Seedance 提示词写法"/);
   assert.ok(Buffer.byteLength(pe, "utf8") >= 20000);
-  assert.match(pe, /提示词正文只用英文/);
-  assert.match(pe, /no subtitles, no music/);
+  assert.match(pe, /提示词用中文写/);
+  assert.match(pe, /不要字幕，不要音乐/);
   assert.match(pe, /精准主体、动作细节、场景环境、机身\/色调、焦段\/镜别\/运镜、约束/);
   assert.match(pe, /机身\/色调/);
   assert.match(pe, /焦段\/镜别\/运镜/);
@@ -157,7 +157,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(pe, /机身是 iPhone 原相机时/);
   assert.match(pe, /不写视场角，不写光圈或焦段编号/);
   assert.match(pe, /路径 B 每一镜仍可写景别和一种运镜/);
-  assert.match(pe, /iPhone native-camera look, computational HDR/);
+  assert.match(pe, /iPhone 原相机观感，计算摄影 HDR/);
   assert.equal(/镜头运镜|光影色调/.test(pe), false);
   assert.match(pe, /拍摄设定/);
   assert.match(pe, /拍摄设定\/SKILL\.md/);
@@ -171,7 +171,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   const fences = [...pe.matchAll(/```text\n([\s\S]*?)```/g)].map((match) => match[1] ?? "");
   assert.ok(fences.length >= 10);
   for (const block of fences) {
-    assert.equal(/[\u4e00-\u9fff]/.test(block), false);
+    assert.equal(/[\u4e00-\u9fff]/.test(block), true);
   }
   assert.match(pe, /Seedance 2\.5/);
   assert.match(pe, /可选：关键帧/);
@@ -192,19 +192,20 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(look, /大画幅数字/);
   assert.match(look, /180°/);
   assert.match(look, /f\/1\.4/);
-  assert.match(look, /ultra-sharp clinical rendering/);
-  assert.match(look, /84° field of view/);
+  assert.match(look, /极致锐利的临床成像/);
+  assert.match(look, /84° 视场角/);
   assert.match(look, /运镜/);
   assert.match(look, /MV01/);
-  assert.match(look, /locked-off stable framing throughout this time range/);
+  assert.match(look, /这一时间段内机位锁定，取景稳定/);
   assert.match(look, /MS01/);
   assert.match(look, /经典静止/);
   assert.match(look, /SR01/);
-  assert.match(look, /constant real-time playback/);
+  assert.match(look, /按实时匀速播放/);
   assert.match(look, /CB10/);
   assert.match(look, /iPhone 原相机/);
-  assert.match(look, /iPhone native-camera look, computational HDR, clean digital sharpness, colour and contrast as the built-in camera app recorded them/);
-  assert.match(look, /选了 iPhone 原相机，机身只写那一句英文/);
+  assert.match(look, /iPhone 原相机观感，计算摄影 HDR，干净的数字锐度，色彩和反差与内置相机应用记录的一致/);
+  assert.match(look, /选了 iPhone 原相机，机身只写那一句中文/);
+  assert.match(look, /提示词用中文写/);
   assert.equal(/这里不规定这些句子放在整段还是分镜/.test(look), true);
   assert.equal(/全片|每一镜|路径 A|路径 B|presets\.yaml|锐利干净的成像/.test(look), false);
   assert.equal(/higgsfield|电影感|cinematic/i.test(look), false);
@@ -243,30 +244,30 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.equal(/\/v1\/|images\/generations|images\/edits/.test(imageUsage), false);
   assert.match(imagePe, /name:\s*"GPT Image 提示词写法"/);
   assert.ok(Buffer.byteLength(imagePe, "utf8") >= 12000);
-  assert.match(imagePe, /提示词正文只用英文/);
+  assert.match(imagePe, /提示词用中文写/);
   assert.match(imagePe, /场景、主体、细节、约束/);
   assert.match(imagePe, /用途/);
-  assert.match(imagePe, /photorealistic/);
-  assert.match(imagePe, /Change only/);
-  assert.match(imagePe, /Preserve/);
+  assert.match(imagePe, /照片级真实/);
+  assert.match(imagePe, /只改/);
+  assert.match(imagePe, /保留/);
   assert.match(imagePe, /image 1/);
-  assert.match(imagePe, /the second image/);
+  assert.match(imagePe, /第二张图/);
   assert.match(imagePe, /拍摄设定\/SKILL\.md/);
   assert.match(imagePe, /机身是 iPhone 原相机时/);
-  assert.match(imagePe, /iPhone native-camera look, computational HDR, clean digital sharpness, colour and contrast as the built-in camera app recorded them/);
+  assert.match(imagePe, /iPhone 原相机观感，计算摄影 HDR，干净的数字锐度，色彩和反差与内置相机应用记录的一致/);
   assert.match(imagePe, /不写视场角，不写光圈/);
-  assert.match(imagePe, /fully transparent background/);
+  assert.match(imagePe, /完全透明的背景/);
   assert.match(imagePe, /棋盘格/);
-  assert.match(imagePe, /preserve the transparent background/);
-  assert.match(imagePe, /exactly once/);
-  assert.match(imagePe, /Do not redesign the character/);
-  assert.match(imagePe, /full body visible, feet included/);
+  assert.match(imagePe, /保留透明背景/);
+  assert.match(imagePe, /只出现一次/);
+  assert.match(imagePe, /不要重新设计这个角色/);
+  assert.match(imagePe, /全身可见，包含双脚/);
   assert.equal(/CB01|LN01|MV01|presets\.yaml/.test(imagePe), false);
   assert.equal(/lumen gen|--duration|--task-type|https?:\/\//.test(imagePe), false);
   const imageFences = [...imagePe.matchAll(/```text\n([\s\S]*?)```/g)].map((match) => match[1] ?? "");
   assert.ok(imageFences.length >= 12);
   for (const block of imageFences) {
-    assert.equal(/[\u4e00-\u9fff]/.test(block), false);
+    assert.equal(/[\u4e00-\u9fff]/.test(block), true);
   }
 
   for (const [dir, name] of [

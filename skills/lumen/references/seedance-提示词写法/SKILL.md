@@ -5,22 +5,22 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 # Seedance 提示词写法
 
-本文件的说明用中文。交给模型的提示词正文只用英文：模板、样例、默认约束都是英文。不要把中文写进模型收到的正文。
+本文件的说明用中文。提示词用中文写。模板、样例、默认约束都是中文。不要把中文提示词再翻译成英文交给模型。
 
 本文件只写提示词，不提交任务。`seedance-2`、`seedance-2-fast` 的形态、时长、比例、素材和提交见 `seedance-2/SKILL.md`。`seedance-2.5` 见 `seedance-2.5/SKILL.md`。那些数字不写进提示词，也不在这里再列一张表。
 
-机身、镜头、视场、光圈或景深、光、色、类型、调色、运镜、运镜风格和可选变速，都从 `skills/lumen/references/拍摄设定/SKILL.md` 的「写入」列取英文句子。图像也用那一份。这里不列预设，也不把中文名称或编号写进正文。
+机身、镜头、视场、光圈或景深、光、色、类型、调色、运镜、运镜风格和可选变速，都从 `skills/lumen/references/拍摄设定/SKILL.md` 的「写入」列取中文句子。图像也用那一份。这里不列预设，也不把编号或名称写进正文，也不要把「写入」列再翻译成英文。
 
 这些句子分两处放，不要混：
 
 - **机身/色调**：机身或胶片感、色板、类型里的光和色、调色。全片只写一次，放在设定段或全程保持。
 - **焦段/镜别/运镜**：景别、视场角或焦段、一种运镜。路径 A 整段一套。路径 B 每一镜一套。机身和色调不要抄进每一镜。
 
-机身是 iPhone 原相机时：机身/色调只写拍摄设定里那一句英文，跳过色板、胶片感、类型的光和色、调色。焦段、视场角、光圈、景深和镜头角色不从词库写入。路径 A 要写镜头时只留景别和一种运镜。路径 B 每一镜仍可写景别和一种运镜，用明文英文，不写视场角，不写光圈或焦段编号。
+机身是 iPhone 原相机时：机身/色调只写拍摄设定里那一句中文，跳过色板、胶片感、类型的光和色、调色。焦段、视场角、光圈、景深和镜头角色不从词库写入。路径 A 要写镜头时只留景别和一种运镜。路径 B 每一镜仍可写景别和一种运镜，用中文，不写视场角，不写光圈或焦段编号。
 
 本仓库不写白模、灰模或线框参考。
 
-角色必须念出的原文若用户给的是别的语言，只把那一句放进 `{}`。除此之外，标签、叙述、约束都是英文。
+角色必须念出的原文若用户给的是别的语言，只把那一句放进 `{}`。除此之外，叙述和约束都是中文。`[目标]` 这类标签属于正文，不是讲解包装。
 
 ## 原则
 
@@ -30,9 +30,9 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 4. **一份素材一件事**。写进正文的每一份都有明确职责。正文没写到的图、视频、音频不要上传，也不要传去生成。不要在正文里列未使用的编号。
 5. **用户指定的映射优先**。已经覆盖的槽位，不要再塞一张未点名的图去「增强」。
 6. **少问**。能从文字和可见素材判断的直接写。只有身份、数量、左右、编辑对象、延长方向或关键帧职责有多个等价答案时，合成一个问题，停下来等。不要同时交出可能被提交的临时正文。
-7. **正文只留可提交的英文句子**。不写分析、评测、密钥、修改理由。`[Goal]` 这类英文标签属于正文，不是讲解包装。
-8. **参数留在使用说明**。画幅、总时长、分辨率不写进提示词。用户要改画幅或改总时长、而不是改画面里的对象时，不要写成编辑；目标句后加 `This is not a video edit.` 原片只作内容参考。
-9. **不滥加约束**。不要自动加画质包、稳定包、水印、Logo 或分身禁令。用户没要字幕、也没要音乐时，只写 `no subtitles, no music`。
+7. **提示词用中文写**。正文只留可提交的中文句子。不写分析、评测、密钥、修改理由。`[目标]` 这类标签属于正文，不是讲解包装。
+8. **参数留在使用说明**。画幅、总时长、分辨率不写进提示词。用户要改画幅或改总时长、而不是改画面里的对象时，不要写成编辑；目标句后加 `这不是视频编辑。` 原片只作内容参考。
+9. **不滥加约束**。不要自动加画质包、稳定包、水印、Logo 或分身禁令。用户没要字幕、也没要音乐时，只写 `不要字幕，不要音乐`。
 10. **默认一条**。用户没要对比版时只出一条。
 11. **事实和观察分开**。名字、年龄、关系、结局以用户文字为准。素材只补直接看见或听见的东西。单人图不要同时定义两个会同时出场的人；多个候选人先一人一图、一组一图。
 
@@ -40,18 +40,18 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 ## 引用、主体、防歧义
 
-按实际上传或用户给出的顺序编号，从 1 开始。写进正文的标记是 `@ImageN`、`@VideoN`、`@AudioN`。用户原稿里的 `@图片N`、`@视频N`、`@音频N` 按同一序号改成这三枚英文标记，不要把中文标记留在正文里。编号原样保留，不因读不到文件就删掉、改号或改成无参考。读不到就不要声称看过，也不要补只有看过才能确定的五官、音色、动作或布景。
+按实际上传或用户给出的顺序编号，从 1 开始。写进正文的标记是 `@ImageN`、`@VideoN`、`@AudioN`。用户原稿里的 `@图片N`、`@视频N`、`@音频N` 按同一序号改成这三枚标记，不要把中文标记留在正文里。编号原样保留，不因读不到文件就删掉、改号或改成无参考。读不到就不要声称看过，也不要补只有看过才能确定的五官、音色、动作或布景。
 
 两种主体写法，选一种用到底：
 
-- 短句：`<Subject1> in @Image1`，或 `the short-haired girl in @Image1`。`@ImageN` 后面先接名词再接动词。
-- 要反复用：`Define the bobbed hair and dark brown apron in @Image1 as <Subject1>.` 之后只写 `<Subject1>`。
+- 短句：`<Subject1> 在 @Image1 中`，或 `@Image1 里的短发女孩`。`@ImageN` 后面先接名词再接动词。
+- 要反复用：`把 @Image1 里的波波头和深棕色围裙定义为 <Subject1>。` 之后只写 `<Subject1>`。
 
-一行只定义一个主体、一件道具或一处场景。不要写「人物 A 和人物 B 参考两张图」这种范围句。拆成两行英文。
+一行只定义一个主体、一件道具或一处场景。不要写「人物 A 和人物 B 参考两张图」这种范围句。拆成两行中文。
 
-错误：`@Image1 runs to the door`。数字会粘到动词上。
+错误：`@Image1 跑向门口`。数字会粘到动词上。
 
-正确：`<Subject1> in @Image1 runs to the door.` `The woman in @Image2 stands outside the counter.`
+正确：`@Image1 里的 <Subject1> 跑向门口。` `@Image2 里的女人站在柜台外。`
 
 不要在动作里裸写 `[asset-xxx]`。输入是 JSON 或带素材 ID 的长文时，按媒体出现顺序换成 `@ImageN` / `@VideoN` / `@AudioN`，再替换正文里的 ID。
 
@@ -73,12 +73,12 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 | 任务 | 什么时候 | 写进正文的骨架 |
 | --- | --- | --- |
-| 参考生成 | 新片子，素材提供人、物、场景、动作或声音 | `Using the short-haired girl in @ImageN, generate ...` |
-| 编辑 | 只改一条原片里的对象、区域或声音 | `Strictly edit @VideoN: ...`，再写保留范围 |
-| 延长 | 在原片之前或之后接新片段 | `Extend @VideoN forward in time` 或 `Extend @VideoN backward in time` |
-| 组合 | 借一张图改另一段视频 | `Using the object in @ImageN, strictly edit @VideoX: ...` |
+| 参考生成 | 新片子，素材提供人、物、场景、动作或声音 | `用 @ImageN 里的短发女孩，生成……` |
+| 编辑 | 只改一条原片里的对象、区域或声音 | `严格编辑 @VideoN：……`，再写保留范围 |
+| 延长 | 在原片之前或之后接新片段 | `把 @VideoN 在时间上向后延长` 或 `把 @VideoN 在时间上向前延长` |
+| 组合 | 借一张图改另一段视频 | `用 @ImageN 里的物体，严格编辑 @VideoX：……` |
 
-不要写「参考 @视频N」来表示编辑或延长。英文正文里也不要写 `reference @VideoN`。有多段视频时点名 `@VideoN`，不要写 `these videos`。
+不要写「参考 @视频N」来表示编辑或延长。正文里也不要写 `reference @VideoN`。有多段视频时点名 `@VideoN`，不要写 `these videos`。
 
 编辑、延长、组合走**路径 A**：一件事，一段或一组闭环，不拆成影视三段论。
 
@@ -93,7 +93,7 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 能短则短。四段可以并成一段，但这四件事要在：
 
-1. **素材**。一行一个 `@ImageN`、`@VideoN`、`@AudioN`，用英文写它负责人、声音、动作、场景还是风格，以及不采用什么。
+1. **素材**。一行一个 `@ImageN`、`@VideoN`、`@AudioN`，用中文写它负责人、声音、动作、场景还是风格，以及不采用什么。
 2. **一句**。主体 + 地点 + 事件。路径 A 若写镜头，把一套景别、视场角和一种运镜放在这里或全程保持，不要拆开。
 3. **时间**。按下一节的时间轴写。简单的一件事可以不拆。
 4. **全程保持**。机位、光线、色彩、环境、声音里需要一直不变的部分，加上约束。
@@ -108,28 +108,28 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 
 | 项 | 何时必写 | 缺了怎么办 |
 | --- | --- | --- |
-| 精准主体 | 必写 | 有图就绑到图上的可见特征，用英文写。只有「一个女孩」就保留泛指，不要发明五官 |
+| 精准主体 | 必写 | 有图就绑到图上的可见特征，用中文写。只有「一个女孩」就保留泛指，不要发明五官 |
 | 动作细节 | 必写 | 写成看得到的肢体和幅度。没有指定时用低、连续的小动作，不要替用户加上奔跑或跳跃 |
 | 场景环境 | 按需 | 路径 A 可以一句。有场景图就写采用布局、不采用图中人 |
-| 机身/色调 | 按需 | 全片一次。机身或胶片感、色板、类型里的光和色、调色。用户点了风格、点了光，或非写实必须锚定时才写；没指定就省略，不要另起一条光影，也不要补空泛氛围词。句子只从拍摄设定的「写入」列取，不抄整表，不写编号。机身是 iPhone 原相机时，这一项只留那一句，跳过色板、胶片感、类型色光和调色。动漫或非写实用英文可见结果锚定，例如 `flat cel shading, clean lines, only two shadow steps`，否则容易漂成实拍 |
-| 焦段/镜别/运镜 | 路径 B 必写；路径 A 有镜头意图时写 | 景别一句、视场角或焦段一句、一种运镜。都从拍摄设定取英文句子。路径 A 整段只写一套。路径 B 写进每一个 `Shot N` 或阶段，三样都要有，运镜只一种。不要同一镜又推又摇。推近或拉远要写起幅和落幅，并且不要再锁死一个固定视场角。运镜风格和变速可选，不代替这一镜的那一种运镜。机身是 iPhone 原相机时，不写焦段、视场角、光圈和景深；路径 B 仍可写景别和一种运镜 |
-| 约束 | 按需 | 用户没提字幕和音乐时，只写 `no subtitles, no music`。不要自动加画质包、水印或 Logo |
+| 机身/色调 | 按需 | 全片一次。机身或胶片感、色板、类型里的光和色、调色。用户点了风格、点了光，或非写实必须锚定时才写；没指定就省略，不要另起一条光影，也不要补空泛氛围词。句子只从拍摄设定的「写入」列取，不抄整表，不写编号。机身是 iPhone 原相机时，这一项只留那一句，跳过色板、胶片感、类型色光和调色。动漫或非写实用中文可见结果锚定，例如 `平涂赛璐璐，线条干净，阴影只有两档`，否则容易漂成实拍 |
+| 焦段/镜别/运镜 | 路径 B 必写；路径 A 有镜头意图时写 | 景别一句、视场角或焦段一句、一种运镜。都从拍摄设定取中文句子。路径 A 整段只写一套。路径 B 写进每一个 `Shot N` 或阶段，三样都要有，运镜只一种。不要同一镜又推又摇。推近或拉远要写起幅和落幅，并且不要再锁死一个固定视场角。运镜风格和变速可选，不代替这一镜的那一种运镜。机身是 iPhone 原相机时，不写焦段、视场角、光圈和景深；路径 B 仍可写景别和一种运镜 |
+| 约束 | 按需 | 用户没提字幕和音乐时，只写 `不要字幕，不要音乐`。不要自动加画质包、水印或 Logo |
 
 ## 画面写法
 
-1. **写看得见、量得着的画面**。情绪、类型、风格标签改成能拍到的主体、服饰、距离、光线和动作，用英文写进正文。身份和关系仍以用户文字为准。不写空标签，写 `wet asphalt in a narrow alley reflecting magenta and cyan neon, the two people about a palm apart, a low warm lamp on the wooden table`。
-2. **写目标，不堆禁令**。用要出现的状态代替一串禁止。下表左列是用户的限制，右列是写进正文的英文。
+1. **写看得见、量得着的画面**。情绪、类型、风格标签改成能拍到的主体、服饰、距离、光线和动作，用中文写进正文。身份和关系仍以用户文字为准。不写空标签，写 `窄巷里的湿沥青反射着品红和青色霓虹，两个人大约隔一掌，木桌上有一盏低暖灯`。
+2. **写目标，不堆禁令**。用要出现的状态代替一串禁止。下表左列是用户的限制，右列是写进正文的中文。
 
 | 堆叠的限制 | 写进正文 |
 | --- | --- |
-| 不要跑、动作别太大 | `walks the corridor at a walking pace, stride about one shoulder wide` |
-| 不要晃 | `the camera is locked, the horizon stays level` |
-| 不要多余的人 | `only these two people are in the frame` |
-| 不要暗、不要冷 | `warm window daylight, a soft highlight on the face` |
+| 不要跑、动作别太大 | `以步行速度走过走廊，步幅大约一肩宽` |
+| 不要晃 | `机位锁定，地平线保持水平` |
+| 不要多余的人 | `画面里只有这两个人` |
+| 不要暗、不要冷 | `温暖的窗边日光，脸上有一块柔和高光` |
 
 3. **优先可度量的说法**。速度（步行、约两秒一次转身）、尺度（约占画面高度三分之一、肩距约一掌）、光线（低处暖钨丝、侧逆光）、镜头内的相对节奏。不要为了显得精确，按总时长新造 `0–3s`。
 
-用户明确不要字幕时写 `no subtitles`。只去掉背景音乐时写 `Remove the background music. Keep the dialogue, lip sync, ambience, action sound, and the entire picture.` 不要把反向说法扩到其他东西上。
+用户明确不要字幕时写 `不要字幕`。只去掉背景音乐时写 `去掉背景音乐。保留对白、口型、环境声、动作声和整幅画面。` 不要把反向说法扩到其他东西上。
 
 内心活动改成表情、动作或台词，不新增事件。先让观众看清原因，再给反应；原因和反应能同框就同框，不要在原因出现之前切成纯脸特写。假装受伤就写皮肤、衣服和道具保持完整，不要写成真的伤口。
 
@@ -138,7 +138,7 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 - **Seedance 2 / fast**：用 `Shot 1`、`Shot 2`、`Shot 3`。不要写 `0–3s`，也不要把顺序写成中文镜头编号。路径 B 的每一镜写景别、视场角和一种运镜。机身是 iPhone 原相机时不写视场角，只写景别和一种运镜。
 - **Seedance 2.5**：秒数或镜头顺序都可以。秒数必须连续、不重叠，并且来自用户已经给出的事件时间。不要为了凑总时长新造 `0–3s`。用户没给数字时用 `Phase 1`，每个阶段一件主要的状态变化，并写结束时看得见什么。
 
-`Shot 1:` 这种编号是顺序，不是秒。Seedance 2.5 上如果用户已经给了时间段，保留他的数字，写成 `0-5s` 这种英文，不要改成别的编号，也不要加密。
+`Shot 1:` 这种编号是顺序，不是秒。Seedance 2.5 上如果用户已经给了时间段，保留他的数字，写成 `0-5s` 这种时间标记，不要改成别的编号，也不要加密。
 
 总时长比用户的事件更长时，只把已有动作、反应、停顿和过渡拉开。不要新增人物、主线和结局，也不要用空镜填满。交接要写清唯一物件换到谁手里，交出的人不再拿着。
 
@@ -147,96 +147,96 @@ description: "Seedance 2 与 2.5 的提示词写法。只写正文，不提交�
 单镜、编辑、延长、组合，直接写成一段或下面的短标签，不要强行安上三个中文标题。要写镜头时，整段只给一套景别、一套视场角、一种运镜。机身/色调有则全片一次，放在这一段里，不要拆镜头。机身是 iPhone 原相机时，视场角、光圈和镜头角色都不写，镜头只留景别和一种运镜。
 
 ```text
-[task sentence], [subject and assets], [place and action], [what stays], no subtitles, no music
+[任务句]，[主体和素材]，[地点和动作]，[保持不变的部分]，不要字幕，不要音乐
 ```
 
 参考：
 
 ```text
-Using the short-haired girl in @Image1, generate her eating cake by the window in @Image2. Warm daylight falls on the table. no subtitles, no music.
+用 @Image1 里的短发女孩，生成她在 @Image2 的窗边吃蛋糕。温暖的日光落在桌上。不要字幕，不要音乐。
 ```
 
 编辑：
 
 ```text
-Strictly edit @Video1: replace the perfume with the face cream in @Image1. The other people, props, and background stay as in @Video1. no subtitles, no music.
+严格编辑 @Video1：把香水换成 @Image1 里的面霜。其他人、道具和背景保持 @Video1 里的样子。不要字幕，不要音乐。
 ```
 
 延长：
 
 ```text
-Extend @Video1 forward in time. The new picture continues from the last frame: the two people walk on to the corner and stop, facing each other. Do not change anything already visible in @Video1. no subtitles, no music.
+把 @Video1 在时间上向后延长。新画面从最后一帧继续：两个人走到街角停下，面对面。不要改动 @Video1 里已经看得见的任何内容。不要字幕，不要音乐。
 ```
 
-用户没要音乐、也没要字幕，末尾就这一句 `no subtitles, no music`。不要再接画质、水印或 Logo。
+用户没要音乐、也没要字幕，末尾就这一句 `不要字幕，不要音乐`。不要再接画质、水印或 Logo。
 
 ## 路径 B 怎么组装
 
 多事件或多空间的参考生成用三段。编辑和延长不要走这三段。
 
-**第一段，设定和主体。** 用英文一句定场所。一次性绑完主体。脸和服装分开时写 `Face from @Image1. Costume from @Image2.` 机身/色调若要写，只在这一段或第三段写一次。运镜参考、环境声参考也在这里声明。首帧尾帧不写在这一段的同一句里，改到「可选：关键帧」。
+**第一段，设定和主体。** 用中文一句定场所。一次性绑完主体。脸和服装分开时写 `脸来自 @Image1。服装来自 @Image2。` 机身/色调若要写，只在这一段或第三段写一次。运镜参考、环境声参考也在这里声明。首帧尾帧不写在这一段的同一句里，改到「可选：关键帧」。
 
-**第二段，时间。** Seedance 2 / fast 用 `Shot 1`、`Shot 2`。Seedance 2.5 用 `Phase 1`，或用用户给过的秒数。每一镜必须有景别、视场角或焦段、一种运镜，英文句子从拍摄设定的「写入」列取，镜与镜可以不同。机身是 iPhone 原相机时，每一镜只写景别和一种运镜，不写视场角、焦段、光圈或景深。另外写主体动作与表情、位置变化、这一镜的声音。不要把机身、色板、类型或调色抄进每一镜。动作写肢体和幅度，优先低而连续，写过渡，情绪写成身体，不要只写 `sad`。
+**第二段，时间。** Seedance 2 / fast 用 `Shot 1`、`Shot 2`。Seedance 2.5 用 `Phase 1`，或用用户给过的秒数。每一镜必须有景别、视场角或焦段、一种运镜，中文句子从拍摄设定的「写入」列取，镜与镜可以不同。机身是 iPhone 原相机时，每一镜只写景别和一种运镜，不写视场角、焦段、光圈或景深。另外写主体动作与表情、位置变化、这一镜的声音。不要把机身、色板、类型或调色抄进每一镜。动作写肢体和幅度，优先低而连续，写过渡，情绪写成身体，不要只写「难过」。
 
-**第三段，全程保持。** 身份、服装、道具归属、空间方向、声音关系。机身/色调若没写在第一段，可以写在这里，仍然只一次。用户没指定字幕和音乐时写 `no subtitles, no music`。多人写清谁穿什么、相对哪个稳定物体站在哪一侧，用 `only these people are in the frame` 代替一长串分身禁令。
+**第三段，全程保持。** 身份、服装、道具归属、空间方向、声音关系。机身/色调若没写在第一段，可以写在这里，仍然只一次。用户没指定字幕和音乐时写 `不要字幕，不要音乐`。多人写清谁穿什么、相对哪个稳定物体站在哪一侧，用 `画面里只有这些人` 代替一长串分身禁令。
 
 ```text
-A modern women's dorm at dusk. film texture without heavy grain, gentle highlight roll-off, natural skin rendering. neutral realistic colour from the scene materials, white balance matched to the intended light.
-Face of <Subject1> from @Image1. Costume from @Image2. The wooden bed and desk in @Image3 are <Place1>. Camera movement follows the travelling shot in @Video1. Ambience from @Audio1.
+黄昏的现代女生宿舍。有胶片纹理但颗粒不重，高光滚降柔和，肤色自然。色彩来自场景材料的中性写实，白平衡对准预期的光。
+<Subject1> 的脸来自 @Image1。服装来自 @Image2。@Image3 里的木床和书桌是 <Place1>。运镜跟随 @Video1 里的移动镜头。环境声来自 @Audio1。
 
-Shot 1: a medium shot, about to the waist. 47° field-of-view anchor, natural-looking subject proportions and a balanced view of the space. the camera travelling with the subject at their pace. <Subject1> walks to the door at a walking pace, stride about one shoulder wide, stops, and takes a breath. Soft footsteps in the corridor.
-Shot 2: a medium close-up, head and shoulders. 63° field of view, close to how a person takes in a room, the environment readable around the subject. locked-off stable framing throughout this time range. <Subject1> pushes the door open. Roommates sit on the bed and look up. One says {How did the exam go?}
-Shot 3: a close-up, the face or one object filling most of the frame. 29° field of view, the background pulling up behind the face, the subject isolated from the room. the camera physically moving away from the subject. <Subject1> looks down, then up, and says {I was kidding}. End with the four of them between the bed and the desk. No fifth person.
+Shot 1：中景，大约到腰。47° 视场角锚点，主体比例看起来自然，空间观感平衡。摄影机以主体的速度跟着主体移动。<Subject1> 以步行速度走向门口，步幅大约一肩宽，停下，吸一口气。走廊里有轻脚步声。
+Shot 2：中近景，头和肩。63° 视场角，接近人眼看一间房的方式，主体周围的环境可读。这一时间段内机位锁定，取景稳定。<Subject1> 推开门。室友坐在床上看过来。一个人说 {考试怎么样？}
+Shot 3：特写，脸或一件物体占满画面的大部分。29° 视场角，背景收到脸后面，主体从房间里分离出来。摄影机在物理上离开主体。<Subject1> 低下头，再抬起来，说 {我开玩笑的}。结束时四个人在床和书桌之间。没有第五个人。
 
-Keep the face and costume of <Subject1>, the dorm layout, and the film texture and neutral colour above. no subtitles, no music.
+保持 <Subject1> 的脸和服装、宿舍布局，以及上面的胶片纹理和中性色彩。不要字幕，不要音乐。
 ```
 
 Seedance 2.5 且用户没给秒数时，把 `Shot 1` 换成 `Phase 1`，仍然不要写 `0–3s`。用户已经给了时间段时才用秒，并且连续、不重叠。
 
 ## 参考
 
-带素材、事件不止一句时，用这些英文标签。简单任务可以合并相邻段，但不能漏掉实际用到的素材。
+带素材、事件不止一句时，用这些标签。简单任务可以合并相邻段，但不能漏掉实际用到的素材。标签名可以留在正文里，标签里面的句子用中文写。
 
 ```text
-[Goal]
-Generate <event>. The core subject is <who>. This is not a video edit.
+[目标]
+生成 <事件>。核心主体是 <谁>。这不是视频编辑。
 
-[References]
-@Image1 supplies the face, hair, and costume of <who>. Do not use the picture's background.
-@Video1 supplies <action or camera move>. Do not use the people, costume, or place in the video.
-@Audio1 supplies the voice of <who>.
+[参考]
+@Image1 提供 <谁> 的脸、头发和服装。不要用这张图的背景。
+@Video1 提供 <动作或运镜>。不要用视频里的人、服装或地点。
+@Audio1 提供 <谁> 的声音。
 
-[Subjects]
-<Subject1> is @Image1 and keeps <fixed traits>.
+[主体]
+<Subject1> 是 @Image1，并保持 <固定特征>。
 
-[Events]
-Start: <state>.
-Main event: <continuous action>.
-End: <who is where, and who holds the object>.
+[事件]
+开始：<状态>。
+主要事件：<连续动作>。
+结束：<谁在哪里，谁拿着物件>。
 
-[Keep]
-Keep <identity, count, costume, prop ownership, and spatial direction>. no subtitles, no music.
+[保持]
+保持 <身份、人数、服装、道具归属和空间方向>。不要字幕，不要音乐。
 ```
 
-`This is not a video edit.` 只在用户要的是改构图或改总时长、原片只作内容参考时加。真的编辑、延长、首尾帧，不要加这句。
+`这不是视频编辑。` 只在用户要的是改构图或改总时长、原片只作内容参考时加。真的编辑、延长、首尾帧，不要加这句。
 
 多素材按这个顺序组织，不要用一句总括让模型自己分配：
 
 ```text
-[People]
-<PersonA> is @Image1. Use only the face, hair, and costume.
-<PersonB> is @Image2. Use only the face, hair, and costume.
-Do not swap their faces, costumes, actions, positions, or lines.
+[人物]
+<人物A> 是 @Image1。只用脸、头发和服装。
+<人物B> 是 @Image2。只用脸、头发和服装。
+不要交换他们的脸、服装、动作、位置或台词。
 
-[Props]
-<PropA> is @Image3. It belongs only to <PersonA>. There is one of them.
+[道具]
+<道具A> 是 @Image3。它只属于 <人物A>。只有一件。
 
-[Places]
-<PlaceA> is @Image4. Use only the space, materials, and light. Do not use the people in the picture.
+[场所]
+<场所A> 是 @Image4。只用空间、材质和光。不要用图里的人。
 
-[Action and sound]
-@Video1 supplies the action of <PersonA>. Do not use the people or place in the video.
-@Audio1 supplies the voice and the specified line of <PersonA>.
+[动作与声音]
+@Video1 提供 <人物A> 的动作。不要用视频里的人或地点。
+@Audio1 提供 <人物A> 的声音和指定的那一句台词。
 ```
 
 同一主体的正面、侧面、背面写成逐张职责，并写明成片里这个人只有一个。
@@ -244,7 +244,7 @@ Do not swap their faces, costumes, actions, positions, or lines.
 站位围绕门、桌子、柜台、车这些稳定物体写内外和朝向，不要只写屏幕左侧：
 
 ```text
-The clerk stays inside the glass counter, facing out. Two customers stand side by side outside the counter and speak to the clerk across it.
+店员留在玻璃柜台里面，面向外。两个顾客并排站在柜台外，隔着柜台对店员说话。
 ```
 
 站位图上的箭头、框和说明文字不是画面内容。
@@ -252,23 +252,23 @@ The clerk stays inside the glass counter, facing out. Two customers stand side b
 分场景时每一场只激活这一场用到的人和物，并写结束时的可见状态。下一场承接这个状态。
 
 ```text
-Phase 1: The inspector stands alone at the equipment bay, the recorder on their belt. They open the bay and take out the only memory card. End with the card only in their right hand.
-Phase 2: In the same room they insert the card into the recorder. End with the screen lit and the card still in the device.
-Phase 3: The archive room. The archivist is inside the wooden desk, the inspector outside it. The inspector sets the recorder in the center of the desk and says {This week's data is exported}. End with the recorder only on the desk.
+Phase 1：检查员独自站在设备舱前，记录仪挂在腰带上。他们打开舱门，取出唯一的存储卡。结束时卡只在他们右手里。
+Phase 2：还在同一间房，他们把卡插进记录仪。结束时屏幕亮着，卡仍在设备里。
+Phase 3：档案室。档案员在木桌里面，检查员在桌子外面。检查员把记录仪放在桌面中央，说 {这周的数据已经导出}。结束时记录仪只在桌上。
 ```
 
 长视频的阶段骨架：
 
 ```text
 [Phase 1]
-Start: <initial state>.
-Main event: <one event>.
-End: <visible state>.
+开始：<初始状态>。
+主要事件：<一件事>。
+结束：<看得见的状态>。
 
 [Phase 2]
-Carry over: <state that must remain>.
-Main event: <one event>.
-End: <visible state>.
+承接：<必须留下的状态>。
+主要事件：<一件事>。
+结束：<看得见的状态>。
 ```
 
 阶段数量跟事件走，不必凑成三段。提示词长了，先留主体、职责、事件和结束状态，压缩重复的风格词。
@@ -276,8 +276,8 @@ End: <visible state>.
 只有用户已经给了数字，或明确要求按秒控制交接、进出场或节拍时，才写：
 
 ```text
-0-5s: <start state>; <one event>; end on <state>.
-5-10s: carry over the previous state; <one event>; end on <state>.
+0-5s：<开始状态>；<一件事>；结束在 <状态>。
+5-10s：承接上一状态；<一件事>；结束在 <状态>。
 ```
 
 不要写到 0.5 秒，也不要声称能卡在某一帧。
@@ -288,52 +288,52 @@ End: <visible state>.
 
 先把原片里看得到的人、动物、道具和背景分成：替换、删除、保持。用户没点名的，默认保持。看不全原片时，不要假装数完了所有人；写完指定修改后，必须加上范围闭环的其中一句：
 
-- 局部修改：`Apart from the objects named above, every other visible person, prop, and background element in @Video1 stays as it is and is not replaced or removed.`
-- 用户明确只要留下某些对象：`Apart from the objects named to keep, remove every other visible subject in @Video1. Do not add anything that was not named.`
+- 局部修改：`除了上面点名的对象，@Video1 里其他看得见的人、道具和背景元素都保持原样，不被替换，也不被去掉。`
+- 用户明确只要留下某些对象：`除了点名要留下的对象，去掉 @Video1 里其他看得见的主体。不要添加没有点名的东西。`
 
 ```text
-[Edit]
-Strictly edit @Video1. Change only <original object> into <target>.
+[编辑]
+严格编辑 @Video1。只把 <原对象> 改成 <目标>。
 
-[Source]
-@Video1 is the only edit master. It supplies the original place, camera, camera move, action path, occlusion, and event order.
+[母版]
+@Video1 是唯一的编辑母版。它提供原来的地点、机位、运镜、动作路径、遮挡和事件顺序。
 
-[Target]
-@Image1 supplies the look or material of <target>. Do not use the picture's background or unrelated people.
+[外观]
+@Image1 提供 <目标> 的样子或材质。不要用这张图的背景或无关的人。
 
-[Scope]
-Change only <object and region>. The count of the target in the whole piece is <count>.
-Apart from the objects named above, every other visible person, prop, and background element in @Video1 stays as it is and is not replaced or removed.
+[范围]
+只改 <对象和区域>。整片里目标的数量是 <数量>。
+除了上面点名的对象，@Video1 里其他看得见的人、道具和背景元素都保持原样，不被替换，也不被去掉。
 
-[Timeline]
-<Target> replaces <original> at the same entrance, path, speed, and occlusion. Other people's actions, camera moves, and event order stay as in @Video1.
-no subtitles, no music.
+[时间线]
+<目标> 在相同的入画、路径、速度和遮挡上替换 <原对象>。其他人的动作、运镜和事件顺序保持 @Video1 里的样子。
+不要字幕，不要音乐。
 ```
 
 动态主体换成另一类时，写运动槽位，不要写一长串无关的保持清单：
 
 ```text
-Remove the red bicycle and its rider passing in front of the bench in @Video1. Replace them with the dark gray patrol cart in @Image1 at the same entrance, path, speed, and occlusion. The red bicycle and the rider do not appear in the result. The two people on the bench, the trees, and the road stay as in @Video1.
+去掉 @Video1 里从长椅前经过的红色自行车和骑车的人。用 @Image1 里的深灰色巡逻车，在相同的入画、路径、速度和遮挡上替换他们。结果里不再出现红色自行车和骑车的人。长椅上的两个人、树和路保持 @Video1 里的样子。
 ```
 
-能看清抓取、交接、进出场时，可以加少量条件：`Only after the chair joint is closed do the hands let go.` 看不清就不要按抽帧编时间段。编辑不能承诺逐帧重合。
+能看清抓取、交接、进出场时，可以加少量条件：`只有椅子关节合上之后，手才松开。` 看不清就不要按抽帧编时间段。编辑不能承诺逐帧重合。
 
 用户点名 `@Image3` 做外观时，不要把另一张更清晰的图写进正文，也不要把它传去生成。
 
 只改声音时，画面、口型时点、镜头和剪辑节奏仍属于母版。不要为了改一句台词重排动作。
 
 ```text
-[Edit]
-Strictly edit @Video1. Remove only the background music from the whole piece.
+[编辑]
+严格编辑 @Video1。只去掉整片的背景音乐。
 
-[Source]
-@Video1 is the only edit master. It supplies the picture, actions, lip-sync timing, camera, the other sounds, and the event order.
+[母版]
+@Video1 是唯一的编辑母版。它提供画面、动作、口型时点、机位、其他声音和事件顺序。
 
-[Scope]
-Remove only the background music.
+[范围]
+只去掉背景音乐。
 
-[Keep]
-Keep the dialogue, lip sync, ambience, action sound, and the entire picture. no subtitles.
+[保持]
+保留对白、口型、环境声、动作声和整幅画面。不要字幕。
 ```
 
 换音色或语言时，默认不改台词内容和张嘴的时点，除非用户明确要改词。
@@ -349,59 +349,59 @@ Keep the dialogue, lip sync, ambience, action sound, and the entire picture. no 
 向后，新片段的第一幅接尾帧：
 
 ```text
-@Video1 is the video to extend forward in time.
-@Image1 supplies the gardener's face, short hair, and pale green apron. Do not use the picture's background.
-@Image2 supplies the structure and material of the wicker basket. Do not use the garden or the people in the picture.
+@Video1 是要在时间上向后延长的视频。
+@Image1 提供园丁的脸、短发和浅绿色围裙。不要用这张图的背景。
+@Image2 提供柳条篮的结构和材质。不要用图里的花园或人。
 
-Extend @Video1 forward in time. The first frame of the extension continues the last frame of @Video1: the greenhouse bench, the gardener's position and facing, the locked medium camera, and the afternoon side light all continue. Other references do not replace that boundary frame.
+把 @Video1 在时间上向后延长。延长段的第一帧接上 @Video1 的最后一帧：温室长椅、园丁的位置和朝向、锁定的中景机位、午后的侧光都继续。其他参考不替换这一帧边界。
 
-Then the gardener lifts the wicker basket defined by @Image2 from under the bench and sets it on the middle shelf behind them with both hands. End with the basket only on that shelf, the gardener's hands off it, one half-step back.
+然后园丁用双手把 @Image2 定义的柳条篮从长椅下拿起，放到身后的中层架子上。结束时篮子只在那层架子上，园丁的手已经离开，人后退半步。
 
-Through the extension the gardener and the basket each stay one continuous object. They are not duplicated or split. no subtitles, no music.
+在延长段里，园丁和篮子各自保持为一个连续物体。它们不被复制，也不被拆开。不要字幕，不要音乐。
 ```
 
 向前，先写原片开始之前发生的事，再把原片首帧写成延长段的结束状态。只写「随后承接原视频」，容易把后面的人或道具提前放进来。
 
 ```text
-@Video1 is the video to extend backward in time.
+@Video1 是要在时间上向前延长的视频。
 
-Extend @Video1 backward in time. Before the original video starts, <one earlier event>.
+把 @Video1 在时间上向前延长。在原视频开始之前，<一件更早的事>。
 
-The last frame of the extension meets the first frame of @Video1: <pose, props, background, camera, light, sound, and motion trend> match.
+延长段的最后一帧接上 @Video1 的第一帧：<姿态、道具、背景、机位、光、声音和运动趋势> 对齐。
 
-People, props, or effects that belong only later in @Video1 do not appear early.
-Each subject stays one continuous object. It is not duplicated or split.
-no subtitles, no music.
+只在 @Video1 后段才出现的人、道具或效果，不要提前出现。
+每个主体保持为一个连续物体。它不被复制，也不被拆开。
+不要字幕，不要音乐。
 ```
 
 ## 可选：关键帧
 
-`@Image1 is the first frame.` 单独成句。`@Image2 is the last frame.` 也单独成句。不要写成 `opening reference` 或 `first-frame reference only`。角色句之外，另起一句写这一帧锁定的构图、位置、姿态、道具、场景和镜头方向。别的图再另起一句，不要和首帧句粘在一起。
+`@Image1 是第一帧。` 单独成句。`@Image2 是最后一帧。` 也单独成句。不要写成 `opening reference` 或 `first-frame reference only`。角色句之外，另起一句写这一帧锁定的构图、位置、姿态、道具、场景和镜头方向。别的图再另起一句，不要和首帧句粘在一起。
 
 首尾帧的画幅要一致。比例和时长本身不写进提示词，冲突交给使用说明。
 
 ```text
-@Image1 is the first frame.
-That first frame sets the baking bench, the decorator's position, the undecorated cake, and a frontal medium camera.
-@Image2 is the last frame.
-That last frame sets the finished cake in the center of the turntable, the decorator's hands off the cake, and the same frontal medium camera.
-@Image3 supplies the decorator's face, pinned hair, and white coat. It does not change the first-frame composition of @Image1 or the last-frame composition of @Image2.
-@Image4 supplies the cake's two tiers, white frosting, and blueberries. It does not change the first or last frame.
+@Image1 是第一帧。
+这一第一帧锁定烘焙台、裱花师的位置、还没装饰的蛋糕，以及正面中景机位。
+@Image2 是最后一帧。
+这一最后一帧锁定转盘中央的成品蛋糕、裱花师的手已经离开蛋糕，以及同一个正面中景机位。
+@Image3 提供裱花师的脸、盘起的头发和白外套。它不改变 @Image1 的第一帧构图，也不改变 @Image2 的最后一帧构图。
+@Image4 提供蛋糕的两层、白色糖霜和蓝莓。它不改变第一帧或最后一帧。
 
-The picture starts from the first frame in @Image1. The decorator turns the turntable, pipes a continuous cream ridge on both tiers, sets the blueberries one by one, and takes their hands away, arriving at the last frame in @Image2.
-Between the frames the cake stays the same object and the tools stay put. no subtitles, no music.
+画面从 @Image1 的第一帧开始。裱花师转动转盘，在两层上挤出连续的奶油棱，逐颗放上蓝莓，然后把手拿开，到达 @Image2 的最后一帧。
+两帧之间蛋糕保持为同一件物体，工具留在原处。不要字幕，不要音乐。
 ```
 
 多张过程图：第一句先声明顺序，再逐张写关键状态。这是语义锚点，不是要求在某一张上停住，也不承诺逐帧复刻。
 
 ```text
-Use @Image1 through @Image4, in that order, as keyframes.
-@Image1 is the first frame.
-That first frame sets <the opening composition and props>.
-@Image2 is the second key state: <what is visible when this step ends>.
-@Image4 is the last frame.
-That last frame sets <the ending composition and props>.
-The picture passes through these states in order, with continuous action between them. no subtitles, no music.
+按顺序使用 @Image1 到 @Image4，作为关键帧。
+@Image1 是第一帧。
+这一第一帧锁定 <开场构图和道具>。
+@Image2 是第二个关键状态：<这一步结束时看得见什么>。
+@Image4 是最后一帧。
+这一最后一帧锁定 <结束构图和道具>。
+画面按这个顺序经过这些状态，状态之间的动作连续。不要字幕，不要音乐。
 ```
 
 ## 可选：宫格分镜
@@ -409,14 +409,14 @@ The picture passes through these states in order, with continuous action between
 宫格只提供故事顺序和大致构图，不要求每格细节复刻。写明读取顺序，以及不采用的线、标注、占位人和格子的画法。
 
 ```text
-@Image1 is a nine-panel storyboard. Read it left to right, top to bottom, for shot order and rough composition. Do not use the lines, the text inside the panels, or the placeholder people.
-@Image2 defines the face and costume of <Subject>.
+@Image1 是九宫格分镜。从左到右、从上到下读，只取镜头顺序和大致构图。不要用格子里的线、文字或占位人。
+@Image2 定义 <Subject> 的脸和服装。
 
-Shot 1: <shot size, action, place>.
-Shot 2: <shot size, action, one camera move>.
-Shot 9: <ending action and what is visible at the end>.
+Shot 1：<景别、动作、地点>。
+Shot 2：<景别、动作、一种运镜>。
+Shot 9：<结束动作，以及结束时看得见什么>。
 
-no subtitles, no music.
+不要字幕，不要音乐。
 ```
 
 Seedance 2 / fast 保持 `Shot 1` 这种顺序。Seedance 2.5 在用户没给秒数时也可以用同样的镜头顺序；不要把格子编号改成 `0–3s`。
@@ -426,53 +426,53 @@ Seedance 2 / fast 保持 `Shot 1` 这种顺序。Seedance 2.5 在用户没给秒
 用户只给了情绪方向时，允许表演自己长出来。用户要控演技时用：情绪从哪到哪、触发事件、一两处看得到的反应、光或声音怎么跟着变。不要把眉、嘴、呼吸、手全部写满。
 
 ```text
-After the returned letter is set on the table, the hand tracing the cup rim stops, and her eyes land on the return mark.
-The brow tightens, the smile leaves, she inhales, and she turns the letter face down.
-She looks at the empty chair opposite, shoulders still level, and says {I understand}.
+退回的信被放上桌子之后，沿着杯沿划的那只手停住，她的眼睛落在退信标记上。
+眉收紧，笑意离开，她吸一口气，把信翻过去扣在桌上。
+她看向对面的空椅子，肩膀仍平，说 {我明白了}。
 ```
 
 用户只给了带引号的半句，就只说这半句。可以补表情和动作，不能把半句补成一段新台词。只描述说话意图、没有原文时，不编对白，改写口型、停顿和对方的反应。
 
-景别、视场角和运镜从拍摄设定各选一句英文。每一镜只一种运镜：固定、手持、推近、拉远、摇、移、跟、环绕，选一个。不要同一镜又推又摇。机身/色调不要写进这一镜。
+景别、视场角和运镜从拍摄设定各选一句中文。每一镜只一种运镜：固定、手持、推近、拉远、摇、移、跟、环绕，选一个。不要同一镜又推又摇。机身/色调不要写进这一镜。
 
 有多个人时写镜头跟着谁、从哪到哪：
 
 ```text
-a medium shot, about to the waist. 47° field-of-view anchor, natural-looking subject proportions and a balanced view of the space. the camera travelling with the subject at their pace, from the door to the edge of the bed, ending above the waist. The horizon stays level.
+中景，大约到腰。47° 视场角锚点，主体比例看起来自然，空间观感平衡。摄影机以主体的速度跟着主体移动，从门口到床边，结束在腰部以上。地平线保持水平。
 ```
 
-一镜到底要写连续经过哪些人和空间，句子用拍摄设定里「一镜到底」的英文，再补经过的人和地方。手持要写跟着谁、晃动有多大（例如步行中上下约一掌），英文用拍摄设定里的手持句。变焦要写从哪一格视场到哪一格、在什么事件上完成；固定视场和变焦不能管同一段时间。浅景深、移焦、暗角写可见结果：谁清楚、背景如何化开、焦点从哪件物到哪件物、四角暗而中心仍正常。焦距和光圈的数字不能代替这句可见结果；设备、光、色和运镜都去拍摄设定取「写入」列。
+一镜到底要写连续经过哪些人和空间，句子用拍摄设定里「一镜到底」的中文，再补经过的人和地方。手持要写跟着谁、晃动有多大（例如步行中上下约一掌），中文用拍摄设定里的手持句。变焦要写从哪一格视场到哪一格、在什么事件上完成；固定视场和变焦不能管同一段时间。浅景深、移焦、暗角写可见结果：谁清楚、背景如何化开、焦点从哪件物到哪件物、四角暗而中心仍正常。焦距和光圈的数字不能代替这句可见结果；设备、光、色和运镜都去拍摄设定取「写入」列。
 
-声音用一种括号，不要混用。括号里的词用英文，除非 `{}` 里是用户指定要念的原文：
+声音用一种括号，不要混用。括号里的词用中文，除非 `{}` 里是用户指定要念的原文：
 
 | 内容 | 符号 | 写进正文的例子 |
 | --- | --- | --- |
-| 音乐 | `()` | `(soft piano)` |
-| 音效 | `<>` | `<a distant bell>` |
-| 台词 | `{}` | `{Hello}` |
-| 要出现的字幕 | `[]` | `[Chapter One]` |
+| 音乐 | `()` | `(轻柔的钢琴)` |
+| 音效 | `<>` | `<远处的钟声>` |
+| 台词 | `{}` | `{你好}` |
+| 要出现的字幕 | `[]` | `[第一章]` |
 
 音效占用了 `<>` 时，主体名不要再用尖括号，改用普通名字。
 
 台词写：语言（仅当用户指定）+ 说话人 + `{原文}`。用户没指定口音或语种时，不要自行加上地区口音。多人对话逐段写谁在说，其他人闭口听。没给原文就不要编。
 
-无对白：`Mouths stay closed. There is no narration. Only the named ambience remains. no subtitles.`
+无对白：`嘴保持闭合。没有旁白。只留下点名的环境声。不要字幕。`
 
-要出现的字，用英文说明位置和时机，文字本身若必须是别的语言，只保留那一串字符：
+要出现的字，用中文说明位置和时机，文字本身若必须是别的语言，只保留那一串字符：
 
 - 广告语：文字、何时出现、在画面哪一块、怎么出现、颜色。
 - 字幕：底部字幕的原文，并写它跟着哪一句声音。
-- 气泡：谁说 `{line}`，说话时旁边出现气泡，气泡里是同一句。
+- 气泡：谁说 `{那一句}`，说话时旁边出现气泡，气泡里是同一句。
 
 精确公式、小字标牌和产品参数不能靠提示词保证。正文仍按最好的写法给出；必要时在正文外加一行，说明要靠已经做好的画面或后期，不要把这句写进提示词。
 
 产品不写「展示安装、运行和完成」。写成初始状态、一次操作、看得见的结果。每一阶段只一件事。
 
 ```text
-Phase 1: The humidifier is off, the tank is empty, and the lid sits to the right of the body. The operator lifts the tank off and fills it with water. End with the water below the max line.
-Phase 2: The tank goes back on, the lid closes, and the power key is pressed once. End with the hand off the key and the body unmoved.
-Phase 3: A fine white mist rises from the nozzle. The desktop stays dry. End with the same body, tank, and lid as at the start.
-no subtitles, no music.
+Phase 1：加湿器关着，水箱是空的，盖子放在机身右侧。操作者拿起水箱，把水加进去。结束时水面在最高刻度线以下。
+Phase 2：水箱装回去，盖上盖子，电源键按一次。结束时手离开按键，机身没有挪动。
+Phase 3：喷嘴升起一层细的白雾。桌面保持干燥。结束时机身、水箱和盖子与开始时相同。
+不要字幕，不要音乐。
 ```
 
 ## 样例
@@ -480,85 +480,85 @@ no subtitles, no music.
 路径 A，吃蛋糕：
 
 ```text
-Using the short-haired girl in @Image1, she sits by the window and eats cake. Warm daylight falls on the table. Her hands move only a little. no subtitles, no music.
+用 @Image1 里的短发女孩，她坐在窗边吃蛋糕。温暖的日光落在桌上。她的手只动一点点。不要字幕，不要音乐。
 ```
 
 路径 A，编辑：
 
 ```text
-Strictly edit @Video1: replace the passers-by with an empty street. The rest of the street and the light stay as in @Video1. Apart from the objects named above, every other visible person, prop, and background element in @Video1 stays as it is and is not replaced or removed. no subtitles, no music.
+严格编辑 @Video1：把路人换成空街。街道其余部分和光线保持 @Video1 里的样子。除了上面点名的对象，@Video1 里其他看得见的人、道具和背景元素都保持原样，不被替换，也不被去掉。不要字幕，不要音乐。
 ```
 
 路径 A，向后延长：
 
 ```text
-Extend @Video1 forward in time. The new picture continues from the last frame. She is the same person. She sets the cup on the counter and lets go. Do not change anything already visible in @Video1. no subtitles, no music.
+把 @Video1 在时间上向后延长。新画面从最后一帧继续。她还是同一个人。她把杯子放到柜台上，然后松手。不要改动 @Video1 里已经看得见的任何内容。不要字幕，不要音乐。
 ```
 
 路径 A，一套景别、视场和运镜，机身/色调只写一次：
 
 ```text
-Using the short-haired girl in @Image1, she sits by the window and eats cake. a medium shot, about to the waist. 47° field-of-view anchor, natural-looking subject proportions and a balanced view of the space. locked-off stable framing throughout this time range. film texture without heavy grain, gentle highlight roll-off, natural skin rendering. neutral realistic colour from the scene materials, white balance matched to the intended light. Her hands move only a little. no subtitles, no music.
+用 @Image1 里的短发女孩，她坐在窗边吃蛋糕。中景，大约到腰。47° 视场角锚点，主体比例看起来自然，空间观感平衡。这一时间段内机位锁定，取景稳定。有胶片纹理但颗粒不重，高光滚降柔和，肤色自然。色彩来自场景材料的中性写实，白平衡对准预期的光。她的手只动一点点。不要字幕，不要音乐。
 ```
 
 机身是 iPhone 原相机。全片只有那一句观感。分镜写景别和一种运镜，不写视场角、光圈或焦段：
 
 ```text
-iPhone native-camera look, computational HDR, clean digital sharpness, colour and contrast as the built-in camera app recorded them.
-Shot 1: a medium shot, about to the waist. the camera travelling with the subject at their pace. She walks to the door and stops.
-Shot 2: a close-up, the face or one object filling most of the frame. locked-off stable framing throughout this time range. She looks up.
-no subtitles, no music.
+iPhone 原相机观感，计算摄影 HDR，干净的数字锐度，色彩和反差与内置相机应用记录的一致。
+Shot 1：中景，大约到腰。摄影机以主体的速度跟着主体移动。她走到门口停下。
+Shot 2：特写，脸或一件物体占满画面的大部分。这一时间段内机位锁定，取景稳定。她抬起头。
+不要字幕，不要音乐。
 ```
 
 Seedance 2 / fast 的分镜。机身/色调在分镜外一次。每一镜的视场和运镜不同：
 
 ```text
-film texture without heavy grain, gentle highlight roll-off, natural skin rendering. neutral realistic colour from the scene materials, white balance matched to the intended light.
-Shot 1: a medium shot, about to the waist. 47° field-of-view anchor, natural-looking subject proportions and a balanced view of the space. the camera travelling with the subject at their pace. She walks to the door at a walking pace and stops.
-Shot 2: a close-up, the face or one object filling most of the frame. 29° field of view, the background pulling up behind the face, the subject isolated from the room. locked-off stable framing throughout this time range. She looks up.
-no subtitles, no music.
+有胶片纹理但颗粒不重，高光滚降柔和，肤色自然。色彩来自场景材料的中性写实，白平衡对准预期的光。
+Shot 1：中景，大约到腰。47° 视场角锚点，主体比例看起来自然，空间观感平衡。摄影机以主体的速度跟着主体移动。她以步行速度走到门口停下。
+Shot 2：特写，脸或一件物体占满画面的大部分。29° 视场角，背景收到脸后面，主体从房间里分离出来。这一时间段内机位锁定，取景稳定。她抬起头。
+不要字幕，不要音乐。
 ```
 
 Seedance 2.5，且用户已经给了时间段：
 
 ```text
-0-5s: she pushes the door and enters. End standing at the counter.
-5-10s: she sets the cup down. End with both hands off the cup.
-no subtitles, no music.
+0-5s：她推门走进来。结束时站在柜台前。
+5-10s：她把杯子放下。结束时两只手都离开杯子。
+不要字幕，不要音乐。
 ```
 
 手冲，三份素材都有职责：
 
 ```text
-[Goal]
-Generate a continuous picture of the barista finishing a pour-over and handing the coffee to the customer.
+[目标]
+生成一段连续画面：咖啡师完成手冲，把咖啡递给顾客。
 
-[References]
-@Image1 supplies the barista's face, short hair, and brown apron. Do not use the picture's background.
-@Image2 supplies the cafe's wooden bar, glass window, and afternoon warm light. Do not use the people in the picture.
-@Video1 supplies the wrist rhythm of the pour. Do not use the people, costume, or place in the video.
+[参考]
+@Image1 提供咖啡师的脸、短发和棕色围裙。不要用这张图的背景。
+@Image2 提供咖啡馆的木吧台、玻璃窗和午后暖光。不要用图里的人。
+@Video1 提供倒水时手腕的节奏。不要用视频里的人、服装或地点。
 
-[Events]
-Start with the barista inside the bar and the customer outside it, the dripper between them. The barista pours at the rhythm of @Video1, returns the dripper to the stand, and hands over the only cup with both hands. End with the coffee only in the customer's hands.
+[事件]
+开始时咖啡师在吧台里面，顾客在吧台外面，滤杯在两人之间。咖啡师按 @Video1 的节奏倒水，把滤杯放回支架，用双手递出唯一的杯子。结束时咖啡只在顾客手里。
 
-[Keep]
-Keep the barista's apron, who stands inside or outside the bar, and the cup count. no subtitles, no music.
+[保持]
+保持咖啡师的围裙、谁站在吧台里或外，以及杯子的数量。不要字幕，不要音乐。
 ```
 
 ## 交付
 
-默认只交英文提示词正文。不要加讲解标题、代码围栏或「优化说明」。正文内部的 `[Goal]`、`[References]`、`[Events]`、`[Keep]` 可以留。
+默认只交中文提示词正文。提示词用中文写。不要加讲解标题、代码围栏或「优化说明」。正文内部的 `[目标]`、`[参考]`、`[事件]`、`[保持]` 可以留。
 
 推断出来的映射写进职责段，不另附推理表。正文只出现真正使用的编号。没写进去的素材不要传去生成。
 
-和时长、比例、分辨率或素材上限冲突时，正文照写，正文外最多一句冲突说明，不把这些数字写回提示词。没有冲突就不要这句。两步任务在正文外标明第一步和第二步，并写明第二步用第一步的成片做新母版。两段正文各自仍是英文。
+和时长、比例、分辨率或素材上限冲突时，正文照写，正文外最多一句冲突说明，不把这些数字写回提示词。没有冲突就不要这句。两步任务在正文外标明第一步和第二步，并写明第二步用第一步的成片做新母版。两段正文各自仍是中文。
 
 写完再看一遍：
 
 - 主任务只有生成、编辑或延长里的一种；混合任务已经拆成两步。
 - 身份、数量、道具归属、结局没有被素材带跑。
 - 每个用到的素材只有一件事。正文没有未使用清单。提交只带正文里点到的素材。
-- 用户原来的序号还在，中文 `@图片` 已改成 `@Image`，没有新造用户没写过的编号，也没有假装看过读不到的文件。
+- 用户原来的序号还在，`@图片` 已改成 `@Image`，没有新造用户没写过的编号，也没有假装看过读不到的文件。
 - `@ImageN` 后面是名词，没有裸的素材 ID。
 - 编辑有唯一母版、范围闭环和时间线继承；没有写成「参考 @视频N」，也没有写成 `reference @VideoN`。
 - 延长方向和边界帧正确，同一个人没有变成两个，原片里的内容没有被改写。
@@ -567,6 +567,6 @@ Keep the barista's apron, who stands inside or outside the bar, and the cup coun
 - Seedance 2 / fast 用 `Shot 1`，没有 `0–3s`。Seedance 2.5 的秒数都是用户给的，连续且不重叠。
 - 路径 A 的景别、视场角、运镜如果写了，整段只有一套。机身/色调如果写了，全片只有一次。
 - 路径 B 的每一镜都有景别、视场角和一种运镜，句子来自拍摄设定，镜与镜可以不同。机身/色调不在每一镜重复。机身是 iPhone 原相机时，不写视场角、光圈、景深、镜头、色板、类型或调色；每一镜仍可写景别和一种运镜。
-- 拍摄设定只放了选中的英文句子；没选的维度没有写成 `Auto`。
-- 用户没要字幕和音乐时，有 `no subtitles, no music`，且没有自动加画质包、水印或 Logo。
-- 正文里没有中文句子。占位符都换成了具体的英文。
+- 拍摄设定只放了选中的中文句子；没选的维度没有写成 `Auto`。
+- 用户没要字幕和音乐时，有 `不要字幕，不要音乐`，且没有自动加画质包、水印或 Logo。
+- 提示词用中文写。占位符都换成了具体的中文。没有把正文翻译成英文。
