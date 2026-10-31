@@ -28,7 +28,7 @@ import {
 import type { IO } from "../io.js";
 import { contentTypeFor, isRemoteMedia } from "../media.js";
 import { findString } from "../walk.js";
-import { awaitTask } from "./jobs.js";
+import { awaitTask, flushRemoteTask } from "./jobs.js";
 import { jsonCall } from "./wire.js";
 
 export type MediakitTool = "video-understand-router" | "enhance-video" | "enhance-video-generative";
@@ -328,6 +328,7 @@ export async function runMediakit(
     toolBody(tool, videoUrl, runId, binding.group, prompt, enhance, understand),
   );
   let last = await perform(calls, submit, opts);
+  await flushSettledMediakitTask(io, calls, binding.baseUrl, last);
   if (taskState(last.json) === "fail") throw new TransportError("MediaKit task failed", calls, publicResult(last));
   if (taskState(last.json) !== "ok") {
     const taskId = findString(last.json, "task_id");
@@ -335,4 +336,12 @@ export async function runMediakit(
     last = await pollMediakitTask(calls, binding.baseUrl, taskId, opts, io);
   }
   return { calls, ...publishedMediakit(last) };
+}
+
+/** Submit already finished: persist its id before download. Pending tasks are flushed when polling starts. */
+export async function flushSettledMediakitTask(io: IO, calls: HttpCall[], base: string, submitted: HttpResult): Promise<void> {
+  const taskId = findString(submitted.json, "task_id");
+  if (taskId === undefined || taskState(submitted.json) === "pending") return;
+  const pollUrl = mediakitPollUrl(base, taskId);
+  await flushRemoteTask(io, calls, submitted, pollUrl, { provider: "mediakit", taskId, pollUrl });
 }

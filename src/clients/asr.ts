@@ -13,7 +13,7 @@ import {
 import type { IO } from "../io.js";
 import { contentTypeFor, isRemoteMedia } from "../media.js";
 import { findString } from "../walk.js";
-import { mediaUri, pollMediakitTask, taskState, uploadHeaders } from "./mediakit.js";
+import { flushSettledMediakitTask, mediaUri, pollMediakitTask, taskState, uploadHeaders } from "./mediakit.js";
 import { jsonCall } from "./wire.js";
 
 /** Languages the asr-subtitles tool accepts. Omitted means the service detects one. */
@@ -116,6 +116,7 @@ export async function runAsr(
     asrBody(videoUrl, runId, binding.group, options),
   );
   let last = await perform(calls, submit, opts);
+  await flushSettledMediakitTask(io, calls, binding.baseUrl, last);
   if (taskState(last.json) === "fail") throw new TransportError("MediaKit task failed", calls, publicResult(last));
   if (taskState(last.json) !== "ok") {
     const taskId = findString(last.json, "task_id");

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ModelBinding } from "./config.js";
 import { CliError } from "./errors.js";
@@ -7,8 +7,7 @@ import { fileExists } from "./fsutil.js";
 import type { HttpCall } from "./http.js";
 import { TransportError } from "./http.js";
 import { PendingTaskError } from "./clients/jobs.js";
-import type { IO } from "./io.js";
-import { line } from "./io.js";
+import { line, type IO, type RemoteTaskNote } from "./io.js";
 import { assertProject } from "./project.js";
 import { redactUrl, redactValue } from "./redact.js";
 import type { RunMode } from "./flags.js";
@@ -40,7 +39,10 @@ export interface RunRecord {
   resumedAt?: string[];
 }
 
-/** A remote task still running when the poll window ended; `lumen runs resume <id>` picks it up. */
+/**
+ * Remote task id for `lumen runs resume <id>`.
+ * Written as soon as submit returns, then updated if the poll window ends first.
+ */
 export interface PendingTask {
   provider: string;
   taskId: string;
@@ -131,12 +133,20 @@ export function runDir(project: string, id: string): string {
   return path.join(project, ".lumen", "runs", id);
 }
 
+async function writeAtomic(file: string, text: string): Promise<void> {
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, text);
+  await rename(tmp, file);
+}
+
 export async function writeRun(project: string, record: RunRecord, secrets: readonly string[]): Promise<void> {
   const safe = redactValue(record, secrets) as RunRecord;
   const dir = runDir(project, record.id);
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, "record.json"), `${JSON.stringify(safe, null, 2)}\n`);
-  await writeFile(path.join(dir, "record.md"), render(safe));
+  const body = `${JSON.stringify(safe, null, 2)}\n`;
+  // JSON first: resume and list read it. The markdown sidecar follows for `runs show`.
+  await writeAtomic(path.join(dir, "record.json"), body);
+  await writeAtomic(path.join(dir, "record.md"), render(safe));
 }
 
 export async function settle(
@@ -162,77 +172,119 @@ export async function settle(
   let error: string | undefined;
   let thrown: unknown;
   let pending: PendingTask | undefined;
-  try {
-    await work(id, ctx);
-    status = mode === "dry-run" ? "dry-run" : mode === "mock" ? "mock" : "ok";
-  } catch (err) {
-    if (err instanceof CliError && err.exitCode === 2) throw err;
-    if (err instanceof PendingTaskError && ctx.resume !== undefined && mode === "execute") {
-      status = "running";
-      pending = {
-        provider: err.provider,
-        taskId: err.taskId,
-        lastStatus: err.lastStatus,
-        ...ctx.resume,
-        ...(err.pollUrl === undefined ? {} : { pollUrl: err.pollUrl }),
-      };
-      ctx.calls = err.calls;
-      ctx.response = err.response ?? ctx.response;
-    } else {
-    thrown = err;
-    error = err instanceof Error ? err.message : String(err);
-    if (err instanceof TransportError) {
-      ctx.calls = err.calls;
-      ctx.response = err.response ?? ctx.response;
-    }
-    }
-  }
-
-  const outputs: string[] = [];
-  if (thrown === undefined && pending === undefined && mode === "execute") {
-    for (const file of ctx.files) {
-      await mkdir(path.dirname(file.path), { recursive: true });
-      if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
-      else if (file.text !== undefined) await writeFile(file.path, file.text);
-      outputs.push(file.path);
-    }
-  }
-
-  const record: RunRecord = {
-    id,
-    time: date.toISOString(),
-    command,
-    modelId,
-    mode,
-    status,
-    binding: publicBinding(ctx),
-    params: ctx.params,
-    calls: ctx.calls,
-    response: ctx.response,
-    outputs,
-    ...(error === undefined ? {} : { error }),
-    ...(pending === undefined ? {} : { pending }),
+  let accepted: PendingTask | undefined;
+  const previousNote = io.noteRemoteTask;
+  const secrets = (): string[] => (ctx.secret === undefined ? [] : [ctx.secret]);
+  io.noteRemoteTask = async (note: RemoteTaskNote) => {
+    if (note.taskId.length === 0) return;
+    const task: PendingTask = {
+      provider: note.provider,
+      taskId: note.taskId,
+      lastStatus: note.lastStatus,
+      videoFile: ctx.resume?.videoFile ?? "",
+      receipt: ctx.resume?.receipt ?? "",
+      ...(note.pollUrl === undefined ? {} : { pollUrl: note.pollUrl }),
+    };
+    accepted = task;
+    if (Array.isArray(note.calls)) ctx.calls = note.calls as HttpCall[];
+    ctx.response = note.response;
+    await writeRun(
+      project,
+      {
+        id,
+        time: date.toISOString(),
+        command,
+        modelId,
+        mode,
+        status: "running",
+        binding: publicBinding(ctx),
+        params: ctx.params,
+        calls: ctx.calls,
+        response: ctx.response,
+        outputs: [],
+        pending: task,
+      },
+      secrets(),
+    );
   };
-  await writeRun(project, record, ctx.secret === undefined ? [] : [ctx.secret]);
+  try {
+    try {
+      await work(id, ctx);
+      status = mode === "dry-run" ? "dry-run" : mode === "mock" ? "mock" : "ok";
+    } catch (err) {
+      if (err instanceof CliError && err.exitCode === 2) throw err;
+      if (err instanceof PendingTaskError && ctx.resume !== undefined && mode === "execute") {
+        status = "running";
+        pending = {
+          provider: err.provider,
+          taskId: err.taskId,
+          lastStatus: err.lastStatus,
+          ...ctx.resume,
+          ...(err.pollUrl === undefined ? {} : { pollUrl: err.pollUrl }),
+        };
+        ctx.calls = err.calls;
+        ctx.response = err.response ?? ctx.response;
+      } else {
+        thrown = err;
+        error = err instanceof Error ? err.message : String(err);
+        if (err instanceof TransportError) {
+          ctx.calls = err.calls;
+          ctx.response = err.response ?? ctx.response;
+        }
+        // A later failure must not wipe the id that submit already flushed.
+        if (accepted !== undefined) pending = accepted;
+      }
+    }
 
-  if (thrown !== undefined) {
-    const message = error ?? "failed";
-    const withRun = message.includes(`run: ${id}`) ? message : `${message}\nrun: ${id}`;
-    const code = thrown instanceof CliError ? thrown.exitCode : 1;
-    throw new CliError(withRun, code);
-  }
+    const outputs: string[] = [];
+    if (thrown === undefined && pending === undefined && mode === "execute") {
+      for (const file of ctx.files) {
+        await mkdir(path.dirname(file.path), { recursive: true });
+        if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
+        else if (file.text !== undefined) await writeFile(file.path, file.text);
+        outputs.push(file.path);
+      }
+    }
 
-  line(io, `${status} ${modelId}`);
-  line(io, `run: ${id}`);
-  if (pending !== undefined) {
-    line(io, `task: ${pending.provider} ${pending.taskId} (${pending.lastStatus})`);
-    if (pending.pollUrl !== undefined) line(io, `poll: ${redactUrl(pending.pollUrl)}`);
-    line(io, resumeHint(id));
+    const record: RunRecord = {
+      id,
+      time: date.toISOString(),
+      command,
+      modelId,
+      mode,
+      status,
+      binding: publicBinding(ctx),
+      params: ctx.params,
+      calls: ctx.calls,
+      response: ctx.response,
+      outputs,
+      ...(error === undefined ? {} : { error }),
+      ...(pending === undefined ? {} : { pending }),
+    };
+    await writeRun(project, record, secrets());
+
+    if (thrown !== undefined) {
+      const message = error ?? "failed";
+      const withRun = message.includes(`run: ${id}`) ? message : `${message}\nrun: ${id}`;
+      const code = thrown instanceof CliError ? thrown.exitCode : 1;
+      throw new CliError(withRun, code);
+    }
+
+    line(io, `${status} ${modelId}`);
+    line(io, `run: ${id}`);
+    if (pending !== undefined) {
+      line(io, `task: ${pending.provider} ${pending.taskId} (${pending.lastStatus})`);
+      if (pending.pollUrl !== undefined) line(io, `poll: ${redactUrl(pending.pollUrl)}`);
+      line(io, resumeHint(id));
+    }
+    for (const call of ctx.calls) line(io, `${call.method} ${redactUrl(call.url)}`);
+    for (const output of outputs) line(io, `wrote: ${output}`);
+    line(io, `audit: ${path.join(runDir(project, id), "record.json")}`);
+    return 0;
+  } finally {
+    if (previousNote === undefined) delete io.noteRemoteTask;
+    else io.noteRemoteTask = previousNote;
   }
-  for (const call of ctx.calls) line(io, `${call.method} ${redactUrl(call.url)}`);
-  for (const output of outputs) line(io, `wrote: ${output}`);
-  line(io, `audit: ${path.join(runDir(project, id), "record.json")}`);
-  return 0;
 }
 
 export async function listRunRecords(project: string): Promise<RunRecord[]> {

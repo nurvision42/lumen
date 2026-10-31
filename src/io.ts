@@ -1,3 +1,13 @@
+/** Remote id from a provider submit, flushed to the run record before the long poll. */
+export interface RemoteTaskNote {
+  provider: string;
+  taskId: string;
+  lastStatus: string;
+  pollUrl?: string;
+  calls: unknown;
+  response: unknown;
+}
+
 export interface IO {
   stdout: (chunk: string) => void;
   stderr: (chunk: string) => void;
@@ -9,6 +19,11 @@ export interface IO {
   now?: () => Date;
   /** One line from the user. Tests inject this. Defaults to stdin. */
   readLine?: () => Promise<string>;
+  /**
+   * Installed by the run recorder for the duration of a command.
+   * Video submit calls this once a remote task id exists, before polling.
+   */
+  noteRemoteTask?: (note: RemoteTaskNote) => Promise<void>;
 }
 
 export function defaultIO(): IO {
