@@ -52,6 +52,7 @@ test("postinstall is wired and documented next to runtime autoinstall", async ()
   const skill = await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8");
   assert.match(skill, /postinstall 也按这个规则/);
   assert.match(skill, /LUMEN_NO_SKILL_AUTOINSTALL=1/);
+  assert.match(helpText(version), /提示词用中文写/);
   assert.match(helpText(version), /npm postinstall installs that directory/);
   assert.match(helpText(version), /LUMEN_NO_SKILL_AUTOINSTALL=1 skips the postinstall and that check/);
   assert.match(skillHelp(), /npm postinstall uses the same detection/);

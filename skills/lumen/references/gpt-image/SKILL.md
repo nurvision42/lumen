@@ -5,7 +5,7 @@ description: 用 gpt-image-2、gpt-image-2.5-flare 或 gpt-image-2.5-sunburst �
 
 # GPT Image 使用说明
 
-本文件只管怎么用 `lumen` 调用 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`。三支参数相同，差别只在下面这一节。提示词写法读 `gpt-image-提示词写法/SKILL.md`，那份只写正文，不提交，三支共用。要写设备、镜头、视场、光圈、光、色或运镜时，再读 `skills/lumen/references/拍摄设定/SKILL.md`。
+本文件只管怎么用 `lumen` 调用 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`。三支参数相同，差别只在下面这一节。提示词用中文写。提示词写法读 `gpt-image-提示词写法/SKILL.md`，那份只写正文，不提交，三支共用。不要把提示词翻译成英文。要写设备、镜头、视场、光圈、光、色或运镜时，再读 `skills/lumen/references/拍摄设定/SKILL.md`。
 
 比例、分辨率、质量、背景和参考图用旗标。不要写进提示词，也不要自己拼请求。接口路径不在这里写。
 

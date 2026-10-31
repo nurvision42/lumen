@@ -5,7 +5,7 @@ description: 用 seedance-2.5 调用 lumen 之前先读。只管形态、omni_re
 
 # Seedance 2.5 使用说明
 
-本文件只管怎么用 `lumen` 调用 `seedance-2.5`（别名 `2.5`）。模型可绑 `haomao` 或 `ycyapi`。这不是 MediaKit，也不是 Seedance 2.0。2.0 的时长、分辨率和首帧比例不能拿来用。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。
+本文件只管怎么用 `lumen` 调用 `seedance-2.5`（别名 `2.5`）。模型可绑 `haomao` 或 `ycyapi`。这不是 MediaKit，也不是 Seedance 2.0。2.0 的时长、分辨率和首帧比例不能拿来用。提示词用中文写。提示词写法读 `seedance-提示词写法/SKILL.md`，那份只写提示词，不提交。不要把提示词翻译成英文。
 
 ## 三种形态
 

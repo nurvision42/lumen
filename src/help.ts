@@ -25,6 +25,7 @@ Usage:
 
 Default mode is --dry-run: the audit records the request and nothing is sent.
 --execute calls the bound provider. --mock uses a built-in fake transport and writes no media.
+Image and video prompts: 提示词用中文写. Do not translate a prompt into English.
 
 Backends, one binding per model (no family fallback):
   image    yunqiao (OpenAI-compatible) or grsai
