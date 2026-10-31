@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import { run } from "../src/run.js";
 import { capture, withDir } from "./helpers.js";
+
+const exec = promisify(execFile);
 
 /**
  * Submit returns a remote id, then the first poll read of record.json must already
@@ -57,7 +62,24 @@ async function bind(dir: string, env: NodeJS.ProcessEnv, model: string, provider
 
 const VIDEO = new Uint8Array([4, 5, 6]);
 
-test("video providers persist the remote task id before the first poll", async () => {
+async function tinyMp4(): Promise<Uint8Array> {
+  const dir = await mkdtemp(path.join(tmpdir(), "lumen-persist-"));
+  try {
+    const file = path.join(dir, "clip.mp4");
+    await exec("/usr/bin/ffmpeg", [
+      "-y", "-hide_banner", "-loglevel", "error",
+      "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=0.2",
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an",
+      file,
+    ]);
+    return await readFile(file);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test("video providers persist the remote task id before the first poll", { timeout: 120_000 }, async () => {
+  const grainSource = await tinyMp4();
   const cases: Array<{
     name: string;
     model: string;
@@ -134,19 +156,19 @@ test("video providers persist the remote task id before the first poll", async (
     },
     {
       name: "mediakit",
-      model: "enhance-video",
+      model: "enhance-video-generative",
       provider: "mediakit",
       base: "https://m.example",
       keyEnv: "MK",
       taskId: "task_mk",
       args: (dir) => ["enhance", "--video", "https://cdn.example/in.mp4", "--out", "out/v.mp4", "--execute", "--project", dir],
-      submit: (url, method) => method === "POST" && url.endsWith("/api/v1/tools/enhance-video"),
+      submit: (url, method) => method === "POST" && url.endsWith("/api/v1/tools/enhance-video-generative"),
       poll: (url, method) => method === "GET" && url.endsWith("/api/v1/tasks/task_mk"),
       resume: (url, method) => {
         if (method === "GET" && url.endsWith("/api/v1/tasks/task_mk")) {
           return Response.json({ success: true, status: "completed", result: { video_url: "https://cdn.example/out.mp4" } });
         }
-        if (url === "https://cdn.example/out.mp4") return new Response(VIDEO, { headers: { "content-type": "video/mp4" } });
+        if (url === "https://cdn.example/out.mp4") return new Response(grainSource, { headers: { "content-type": "video/mp4" } });
         throw new Error(`unexpected resume ${method} ${url}`);
       },
     },
@@ -205,7 +227,16 @@ test("video providers persist the remote task id before the first poll", async (
       assert.equal(await run(["runs", "resume", snap.id, "--project", dir], resumed.io), 0, `${item.name}\n${resumed.err()}`);
       const video = snap.record.pending?.videoFile;
       assert.ok(video, item.name);
-      assert.deepEqual([...(await readFile(video))], [...VIDEO], item.name);
+      if (item.name === "mediakit") {
+        const saved = await readFile(video);
+        assert.equal(saved.equals(Buffer.from(grainSource)), false, item.name);
+        const { stdout } = await exec("/usr/bin/ffprobe", [
+          "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "csv=p=0", video,
+        ]);
+        assert.match(stdout, /h264/, item.name);
+      } else {
+        assert.deepEqual([...(await readFile(video))], [...VIDEO], item.name);
+      }
     });
   }
 });

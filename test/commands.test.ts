@@ -59,6 +59,18 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(skill, /lumen cuts --video <file>/);
   assert.match(skill, /lumen setup ffmpeg/);
   assert.match(skill, /不要因为出现了视频就自动出雪碧图/);
+  assert.match(skill, /references\/增强\/SKILL\.md/);
+  assert.match(skill, /enhance-video-generative/);
+  assert.match(skill, /10 元\/分钟/);
+  assert.match(skill, /不要在增强之后再加颗粒/);
+  assert.match(skill, /不要自己调用 ffmpeg/);
+  const enhanceSkill = await readFile(path.join(root, "skills", "lumen", "references", "增强", "SKILL.md"), "utf8");
+  assert.match(enhanceSkill, /2k/);
+  assert.match(enhanceSkill, /30/);
+  assert.match(enhanceSkill, /0\.55/);
+  assert.match(enhanceSkill, /没有单独的颗粒命令/);
+  assert.match(enhanceSkill, /不要自己调用 ffmpeg/);
+  assert.equal(/lumen grain/.test(skill + enhanceSkill), false);
   const spriteSkill = await readFile(path.join(root, "skills", "lumen", "references", "雪碧图", "SKILL.md"), "utf8");
   assert.match(spriteSkill, /每镜抽头、中、尾/);
   assert.match(spriteSkill, /切点/);
