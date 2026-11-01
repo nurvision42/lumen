@@ -118,4 +118,4 @@ lumen gen image --model seedream-5-flash \
   --ref refs/product.png --project <dir>
 ```
 
-默认 `--dry-run`。用户明确要成图、并且已经确认比例时才加 `--execute`。比例、分辨率、背景和参考图用旗标，不要只写进提示词。不要自己拼请求。
+默认 `--dry-run`。用户明确要成图、并且已经确认比例时才加 `--execute --detach`，然后用 `lumen runs wait <id> --timeout 60` 取结果。不要前台一直等到命令结束，也不要重新提交。比例、分辨率、背景和参考图用旗标，不要只写进提示词。不要自己拼请求。

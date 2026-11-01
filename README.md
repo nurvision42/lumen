@@ -77,7 +77,7 @@ npx tsx src/cli.ts doctor --project ./demo
 
 默认是 `--dry-run`：把将要发出的请求写入审计，不访问网络，也不写媒体文件。`--execute` 才真正调用。`--mock` 使用内置假传输，只留审计，不写 mp4。
 
-退出码：`0` 成功或 dry-run，`1` 项目、校验、缺密钥或上游失败，`2` 用法错误。用法错误（例如缺少 `--model`、未知参数）不写审计。
+退出码：`0` 成功或 dry-run，`1` 项目、校验、缺密钥或上游失败，`2` 用法错误，`3` 是 `lumen runs wait` 超时但生成还在跑。用法错误（例如缺少 `--model`、未知参数）不写审计。
 
 ## 命令
 
@@ -97,7 +97,7 @@ lumen cuts --video <file>
 lumen captions transcribe --video <file>
 lumen captions burn --video <file> --subs <file> --to <mp4>
 lumen enhance [--video file] [--shot N] [--out file]
-lumen runs list|show <id>|resume <id> [--task <taskId>] [--out <file>]
+lumen runs list [--pending]|show <id>|wait <id> [--timeout 秒]|resume <id> [--task <taskId>] [--out <file>] [--execute --detach]
 lumen concat
 lumen skill install [--target grokbot|agents|<path>] [--clean]
 lumen doctor
@@ -291,9 +291,25 @@ lumen providers set seedance-2 \
 
 ```bash
 lumen runs list
+lumen runs list --pending
 lumen runs show 20261024T164700Z-ab12
-lumen runs resume 20261024T164700Z-ab12   # 继续等仍在跑的 seedance 或 mediakit 任务，完成后下载或写入结果
+lumen runs wait 20261024T164700Z-ab12 --timeout 60
+lumen runs resume 20261024T164700Z-ab12 --execute --detach   # 继续等仍在跑的 seedance 或 mediakit 任务，完成后下载或写入结果
 ```
+
+助手跑出图、出视频或增强时，用 `--detach --execute`，不要在前台一直等。命令做完本地校验、打印预估、写好 run 后，会派生一个新会话的子进程去提交、轮询、下载和后处理（增强加颗粒）。父进程打印 run id 和 `下一步: lumen runs wait <id>`，退出码 0。子进程不随父进程或终端退出。日志在 `.lumen/runs/<id>/worker.log`，pid 在 run 记录里。
+
+然后在同一轮里循环 `lumen runs wait <id> --timeout 60`（默认 60 秒）。`wait` 只读记录，不提交、不扣费；杀掉 `wait` 不影响生成。
+
+| 退出码 | 含义 |
+| --- | --- |
+| 0 | 完成。打印 `wrote:` 路径，和前台跑完一样 |
+| 3 | 仍在生成。可以先回用户一句进度，再 wait |
+| 1 | 失败。原因在 stderr |
+
+用户中途发消息打断后，先回复，再 `lumen runs list --pending`。它列出还没完成，或已经完成但还没被 `wait` / `show` 取走的 run（状态、模型、开始时间、id）。成功读到结果后记「已取走」。有未取走的就继续 wait，把结果发给用户。不要重新提交。不要用 `nohup`、`&` 或 `pkill -f`。要停任务用记录里的 pid。
+
+pid 已不在、状态仍是 `pending` 或 `running` 时，`runs show` 标成已中断，并说明有没有出图。有服务端任务 id 就 `runs resume` 续同一个任务。出图如果只拿到结果 URL，`resume` 只下载那个 URL，不重新提交。没有任务 id 也没有结果 URL，就不能 resume。`--mock --detach` 只给本地测试，不访问供应商。
 
 结构见 `schemas/run.schema.json`。
 
@@ -323,7 +339,9 @@ The script puts the program in `~/.local/share/lumen` and the command in `~/.loc
 
 For a checkout: `npm install`, `npm test`, `npm run build`, then `node dist/cli.js --help`. `npx tsx src/cli.ts` works without a build.
 
-The default is `--dry-run` (audit only, no network, no media). `--execute` calls the provider. `--mock` uses a built-in fake transport and writes no media. Exit `0` on success, `1` on a bad request or missing key, `2` on usage. Usage errors do not create a run.
+The default is `--dry-run` (audit only, no network, no media). `--execute` calls the provider. `--mock` uses a built-in fake transport and writes no media. Exit `0` on success, `1` on a bad request or missing key, `2` on usage, `3` when `lumen runs wait` times out while generation is still running. Usage errors do not create a run.
+
+Assistants should generate with `--detach --execute` (`gen image`, `gen video`, `enhance`, and `runs resume`), then poll `lumen runs wait <id> --timeout 60` in the same turn. Detach validates locally, prints the estimate, writes the run, and leaves submit, poll, download, and post-processing (enhance grain) to a child in a new session. The parent prints the run id and exits 0. Wait is read-only: exit 0 prints `wrote:` paths, exit 3 means still running, exit 1 is a failure. After the user interrupts a turn, run `lumen runs list --pending` and keep waiting; do not submit again. Stop a job with the pid stored on the run, not `pkill`. A dead pid with status `pending` or `running` is interrupted. `runs show` says whether an image exists. Resume reuses a provider task id, or downloads a saved image URL, and never resubmits.
 
 ## Routing
 
@@ -358,7 +376,7 @@ Omitting `--prompt` sends the built-in 拉片 prompt printed in the Chinese sect
 
 Enhance writes `--out`, or `shots/NN/clip/enhance-<id>.mp4`, or `out/enhance-<id>.mp4`. An https result is the grained mp4. A `vod` / `tos` / `mediakit` result is stored as a URL, not a fake file.
 
-Every generation writes `.lumen/runs/<id>/record.json` and `record.md` with the prompt, binding, and wire calls. Authorization headers, long secrets, URL userinfo and query strings (including presigned `auth_key`), and base64 payloads are redacted. `lumen runs list` and `runs show <id>` read them.
+Every generation writes `.lumen/runs/<id>/record.json` and `record.md` with the prompt, binding, and wire calls. Authorization headers, long secrets, URL userinfo and query strings (including presigned `auth_key`), and base64 payloads are redacted. A raw image result URL is kept in `image-url.txt` (mode 0600) so resume can download it without submitting again; the audit copy is redacted. `lumen runs list`, `runs list --pending`, `runs show <id>`, and `runs wait <id>` read the record. `wait` and `show` mark a finished run claimed.
 
 `lumen captions transcribe` calls MediaKit `asr-subtitles` (its own binding, not another model's key). It defaults to `--dry-run`; `--execute` uploads and recognizes. Local cue ends are clamped to the ffprobe duration. A shot-list voice-over or a finished voice-synthesis / voice-clone run is aligned when the text matches (`fit` ≥ 0.55) and the JSON is then `confirmed`. Without that copy, `confirmed` stays false. `lumen captions burn` hard-subs with local ffmpeg immediately (pass `--dry-run` to preview). It refuses an unconfirmed `lumen.captions` JSON unless `--confirm` is set. The default look is white `#FFFFFF` on a rounded `rgba(70,70,70,0.51)` box, optically centered on the glyph ink, short side × 0.039, portrait top (`317/2560` of height) and landscape bottom (`225/1440` of height). See `skills/lumen/references/转字幕/SKILL.md` and `skills/lumen/references/加字幕/SKILL.md`.
 

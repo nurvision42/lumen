@@ -11,7 +11,7 @@
     "command": { "type": "array", "items": { "type": "string" } },
     "modelId": { "type": "string" },
     "mode": { "enum": ["dry-run", "execute", "mock"] },
-    "status": { "enum": ["dry-run", "mock", "ok", "error", "running"] },
+    "status": { "enum": ["dry-run", "mock", "ok", "error", "running", "pending"] },
     "binding": {
       "oneOf": [
         { "type": "null" },
@@ -49,6 +49,31 @@
         "pollUrl": { "type": "string" }
       }
     },
-    "resumedAt": { "type": "array", "items": { "type": "string" } }
+    "resumedAt": { "type": "array", "items": { "type": "string" } },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid"],
+      "properties": {
+        "pid": { "type": "integer" },
+        "log": { "type": "string" },
+        "exited": { "enum": ["clean"] }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "outFile"],
+      "properties": {
+        "provider": { "type": "string" },
+        "outFile": { "type": "string" },
+        "url": { "type": "string" },
+        "taskId": { "type": "string" },
+        "received": { "type": "boolean" }
+      }
+    },
+    "claimed": { "type": "boolean" },
+    "claimedAt": { "type": "string" },
+    "claimedBy": { "enum": ["wait", "show"] }
   }
 }

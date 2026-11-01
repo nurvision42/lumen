@@ -29,6 +29,11 @@ import { runYcyapiVideo } from "../clients/ycyapi.js";
 import { adoptBinding } from "./session.js";
 
 const MODES: Record<string, FlagKind> = { "dry-run": "boolean", execute: "boolean", mock: "boolean" };
+const DETACH: Record<string, FlagKind> = { ...MODES, detach: "boolean" };
+
+function rejectBareDetach(detach: boolean, mode: ReturnType<typeof runMode>): void {
+  if (detach && mode !== "execute" && mode !== "mock") throw new CliError("--detach 需要 --execute", 2);
+}
 
 function shotNumber(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
@@ -63,7 +68,7 @@ export async function genCommand(args: string[], project: string, io: IO, comman
 
 export async function genImage(args: string[], project: string, io: IO, command: string[]): Promise<number> {
   const { values, rest } = parseFlags(args, {
-    ...MODES,
+    ...DETACH,
     model: "string",
     shot: "string",
     prompt: "string",
@@ -80,6 +85,7 @@ export async function genImage(args: string[], project: string, io: IO, command:
   if (requested === undefined) throw new CliError("gen image needs --model", 2);
   const modelId = canonicalModel(requested);
   const mode = runMode(values);
+  rejectBareDetach(values.detach === true, mode);
   const shot = shotNumber(flagString(values, "shot"));
   return settle(io, project, command, modelId, mode, async (runId, ctx) => {
     const promptFile = flagString(values, "prompt-file");
@@ -119,16 +125,18 @@ export async function genImage(args: string[], project: string, io: IO, command:
       throw binding.provider === "volcark" ? missingVolcarkKey(binding.apiKeyEnv) : missingKey(binding);
     }
     const out = outputPath(project, { shot, folder: "frame", filename: `${runId}.png`, out: flagString(values, "out") });
+    if (mode === "execute") ctx.image = { provider: binding.provider, outFile: out };
+    if (ctx.afterLocal) await ctx.afterLocal();
     const outcome = await runImage(request, binding, mode, io, ctx.secret, out);
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     ctx.files = outcome.files;
-  });
+  }, { detach: values.detach === true });
 }
 
 export async function genVideo(args: string[], project: string, io: IO, command: string[]): Promise<number> {
   const { values, rest } = parseFlags(args, {
-    ...MODES,
+    ...DETACH,
     model: "string",
     shot: "string",
     prompt: "string",
@@ -152,6 +160,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
   if (requested === undefined) throw new CliError("gen video needs --model", 2);
   const modelId = canonicalModel(requested);
   const mode = runMode(values);
+  rejectBareDetach(values.detach === true, mode);
   const shot = shotNumber(flagString(values, "shot"));
   return settle(io, project, command, modelId, mode, async (runId, ctx) => {
     let prompt = flagString(values, "prompt");
@@ -193,6 +202,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
     });
     const receipt = `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`;
     ctx.resume = { videoFile, receipt };
+    if (ctx.afterLocal) await ctx.afterLocal();
     let outcome;
     if (binding.provider === "beeftv") {
       outcome = await runBeeftvVideo(request, binding, mode, io, ctx.secret, videoFile, receipt);
@@ -204,7 +214,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     ctx.files = outcome.files;
-  });
+  }, { detach: values.detach === true });
 }
 
 export async function genVoice(
