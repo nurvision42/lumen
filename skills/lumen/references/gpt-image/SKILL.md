@@ -29,7 +29,7 @@ Sunburst 已经够用之后，再用同一条提示词、同一组参考、同�
 lumen providers set gpt-image-2.5-flare --provider yunqiao --api-key-env YUNQIAO_API_KEY
 ```
 
-可加 `--group <id>`、`--model-alias <id>`、`--global`。`yunqiao` 的 group 会带上。`grsai` 不发送 group。`model-alias` 只替换上游模型字符串，不换 lumen 的模型 id。`haomao`、`kitta`、`mediakit` 不能绑这三支。
+可加 `--group <id>`、`--model-alias <id>`、`--global`。`yunqiao` 的 group 会带上。`grsai` 不发送 group。`model-alias` 只替换上游模型字符串，不换 lumen 的模型 id。`haomao`、`kitta`、`mediakit`、`volcark` 不能绑这三支。
 
 ## 生成还是改图
 

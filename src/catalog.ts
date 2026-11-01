@@ -1,6 +1,11 @@
 import { CliError } from "./errors.js";
 
-export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
+export const GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
+/** Official Ark Model IDs. Short aliases: seedream-5-pro, seedream-5-flash. */
+export const SEEDREAM_PRO_MODEL = "doubao-seedream-5-0-pro-260628";
+export const SEEDREAM_FLASH_MODEL = "doubao-seedream-5-0-flash-260915";
+export const SEEDREAM_MODELS = [SEEDREAM_PRO_MODEL, SEEDREAM_FLASH_MODEL] as const;
+export const IMAGE_MODELS = [...GPT_IMAGE_MODELS, ...SEEDREAM_MODELS] as const;
 export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2.5"] as const;
 export const FISH_MODELS = ["voice-clone", "voice-design-1", "voice-synthesis"] as const;
 export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video", "enhance-video-generative", "asr-subtitles"] as const;
@@ -9,7 +14,10 @@ export const IMAGE_ASPECTS = [
   "auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16",
   "2:1", "1:2", "3:1", "1:3", "21:9", "9:21", "5:4", "4:5",
 ] as const;
-export const IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+export const GPT_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+/** Seedream 5.0 Pro / Flash tiers. 4K is not a tier. 1.5K is the same price as 1K. */
+export const SEEDREAM_RESOLUTIONS = ["1K", "1.5K", "2K"] as const;
+export const IMAGE_RESOLUTIONS = ["1K", "1.5K", "2K", "4K"] as const;
 export const IMAGE_BACKGROUNDS = ["transparent", "opaque", "auto"] as const;
 export const IMAGE_QUALITIES_2 = ["auto", "low", "medium", "high"] as const;
 export const IMAGE_QUALITIES_25 = ["auto", "low", "medium", "high", "xhigh", "max"] as const;
@@ -20,7 +28,7 @@ export const VIDEO_SHAPES = ["text", "frame", "reference"] as const;
 /** Official Seedance 2.5 omni-reference subtasks. `auto` is the default when `--task-type` is omitted. */
 export const OMNI_TASK_TYPES = ["auto", "reference", "edit", "extend"] as const;
 
-export const PROVIDERS = ["yunqiao", "grsai", "haomao", "kitta", "mediakit", "beeftv", "ycyapi"] as const;
+export const PROVIDERS = ["yunqiao", "grsai", "volcark", "haomao", "kitta", "mediakit", "beeftv", "ycyapi"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /**
@@ -30,6 +38,7 @@ export type ProviderId = (typeof PROVIDERS)[number];
 export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
   yunqiao: "https://api.yunqiao.me/v1",
   grsai: "https://grsaiapi.com",
+  volcark: "https://ark.cn-beijing.volces.com/api/v3",
   haomao: "https://haomaotoken.com/api/v3",
   kitta: "https://fishaudio.org",
   mediakit: "https://mediakit.cn-beijing.volces.com",
@@ -44,6 +53,7 @@ export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
 export const IMAGE_PROVIDER_RESOLUTIONS: Partial<Record<ProviderId, readonly (typeof IMAGE_RESOLUTIONS)[number][]>> = {
   yunqiao: ["1K", "2K"],
   grsai: ["1K", "2K", "4K"],
+  volcark: SEEDREAM_RESOLUTIONS,
 };
 
 export const BREAKDOWN_PROMPT_PLACEHOLDER =
@@ -101,12 +111,24 @@ export interface ModelInfo {
 }
 
 export const MODELS: readonly ModelInfo[] = [
-  ...IMAGE_MODELS.map((id) => ({
+  ...GPT_IMAGE_MODELS.map((id) => ({
     id,
     kind: "image" as const,
     summary: "GPT Image generate, or edit when reference images are attached",
     providers: ["yunqiao", "grsai"] as const,
   })),
+  {
+    id: SEEDREAM_PRO_MODEL,
+    kind: "image",
+    summary: "Seedream 5.0 Pro on volcark. Sizes 1K, 1.5K, 2K. Estimate 0.30 yuan/image at ≤1.5K and 0.60 at 2K",
+    providers: ["volcark"],
+  },
+  {
+    id: SEEDREAM_FLASH_MODEL,
+    kind: "image",
+    summary: "Seedream 5.0 Flash on volcark. Sizes 1K, 1.5K, 2K. Estimate 0.12 yuan/image",
+    providers: ["volcark"],
+  },
   ...SEEDANCE_MODELS.map((id) => ({
     id,
     kind: "video" as const,
@@ -169,12 +191,14 @@ const MODEL_ALIASES: Record<string, ModelId> = {
   standard: "seedance-2",
   fast: "seedance-2-fast",
   "2.5": "seedance-2.5",
+  "seedream-5-pro": SEEDREAM_PRO_MODEL,
+  "seedream-5-flash": SEEDREAM_FLASH_MODEL,
 };
 
 /** Model ids and aliases that lumen no longer ships. Using one is an explicit error. */
 const REMOVED_MODELS = new Set(["seedance-2-mini", "mini"]);
 
-/** Aliases `standard`, `fast`, and `2.5` map to lumen model ids. */
+/** Aliases `standard`, `fast`, `2.5`, `seedream-5-pro`, and `seedream-5-flash` map to lumen model ids. */
 export function canonicalModel(id: string): string {
   const key = id.trim().toLowerCase();
   if (REMOVED_MODELS.has(key)) {
@@ -208,6 +232,10 @@ export function providersFor(id: string): readonly ProviderId[] {
   return modelInfo(id)?.providers ?? [];
 }
 
+export function isSeedreamModel(id: string): id is (typeof SEEDREAM_MODELS)[number] {
+  return (SEEDREAM_MODELS as readonly string[]).includes(canonicalModel(id));
+}
+
 export function assertProviderServes(provider: string, modelId: string): void {
   const info = modelInfo(modelId);
   if (info === undefined) throw new CliError(`unknown model ${modelId}`);
@@ -224,8 +252,8 @@ export interface ImageRequest {
   aspectRatio: (typeof IMAGE_ASPECTS)[number];
   resolution: (typeof IMAGE_RESOLUTIONS)[number];
   background?: (typeof IMAGE_BACKGROUNDS)[number];
-  /** Always set. `gpt-image-2` defaults to `high`; both 2.5 models default to `max`. */
-  quality: (typeof IMAGE_QUALITIES_2)[number] | (typeof IMAGE_QUALITIES_25)[number];
+  /** Set for GPT Image. `gpt-image-2` defaults to `high`; both 2.5 models default to `max`. Seedream omits it. */
+  quality?: (typeof IMAGE_QUALITIES_2)[number] | (typeof IMAGE_QUALITIES_25)[number];
   references: string[];
 }
 
@@ -278,27 +306,37 @@ export function validateImage(input: {
   quality: string | undefined;
   references: string[];
 }): ImageRequest {
-  if (!(IMAGE_MODELS as readonly string[]).includes(input.modelId)) {
+  const modelId = canonicalModel(input.modelId);
+  if (!(IMAGE_MODELS as readonly string[]).includes(modelId)) {
     throw new CliError(`unknown image model ${input.modelId}`);
   }
   const prompt = input.prompt.trim();
   if (prompt.length === 0) throw new CliError("image prompt is empty");
   if (prompt.length > 20_000) throw new CliError("prompt is longer than 20000 characters");
+  const seedream = isSeedreamModel(modelId);
   const aspectRatio = oneOf(input.aspectRatio, IMAGE_ASPECTS, "aspect-ratio");
-  const resolution = oneOf(input.resolution, IMAGE_RESOLUTIONS, "resolution");
+  const resolution = oneOf(input.resolution, seedream ? SEEDREAM_RESOLUTIONS : GPT_IMAGE_RESOLUTIONS, "resolution");
   const background = input.background === undefined ? undefined : oneOf(input.background, IMAGE_BACKGROUNDS, "background");
-  const classic = input.modelId === "gpt-image-2";
-  const quality = input.quality === undefined
-    ? (classic ? "high" : "max")
-    : oneOf(input.quality, classic ? IMAGE_QUALITIES_2 : IMAGE_QUALITIES_25, "quality");
-  if (input.references.length > 16) throw new CliError("image references are limited to 16");
+  if (seedream && input.quality !== undefined) throw new CliError("seedream does not take --quality");
+  if (seedream && background === "auto") throw new CliError("seedream background must be transparent or opaque");
+  if (seedream && background === "transparent" && input.references.length !== 1) {
+    throw new CliError("seedream transparent background needs exactly one reference image");
+  }
+  const classic = modelId === "gpt-image-2";
+  const quality = seedream
+    ? undefined
+    : input.quality === undefined
+      ? (classic ? "high" : "max")
+      : oneOf(input.quality, classic ? IMAGE_QUALITIES_2 : IMAGE_QUALITIES_25, "quality");
+  if (seedream && input.references.length > 10) throw new CliError("seedream references are limited to 10");
+  if (!seedream && input.references.length > 16) throw new CliError("image references are limited to 16");
   return {
-    modelId: input.modelId as ImageModel,
+    modelId: modelId as ImageModel,
     prompt,
     aspectRatio,
     resolution,
     ...(background === undefined ? {} : { background }),
-    quality,
+    ...(quality === undefined ? {} : { quality }),
     references: input.references,
   };
 }

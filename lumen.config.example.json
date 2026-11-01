@@ -16,6 +16,14 @@
       "baseUrl": "https://grsai.example",
       "apiKeyEnv": "GRSAI_SUNBURST_KEY"
     },
+    "doubao-seedream-5-0-pro-260628": {
+      "provider": "volcark",
+      "apiKeyEnv": "ARK_API_KEY"
+    },
+    "doubao-seedream-5-0-flash-260915": {
+      "provider": "volcark",
+      "apiKeyEnv": "ARK_API_KEY"
+    },
     "seedance-2": {
       "provider": "haomao",
       "baseUrl": "https://haomao.example/api/v3",
