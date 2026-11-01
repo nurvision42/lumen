@@ -13,7 +13,7 @@ description: 用 lumen enhance 做大模型画质增强。固定 2K、30fps，�
 lumen enhance [--video <file>] [--shot N] [--out <file>]
 ```
 
-默认 `--dry-run`。用户明确要提交时才加 `--execute`。
+默认 `--dry-run`。用户明确要提交时才加 `--execute --detach`，再用 `lumen runs wait <id> --timeout 60` 取结果。不要前台一直等。
 
 固定是大模型版 `enhance-video-generative`，分辨率 `2k`，帧率 `30`。没有 `--model`、`--resolution`、`--fps`、`--tool-version`、`--scene`、`--bitrate-level`、`--enhance-style`。不要问用户选哪一档。绑定的模型 id 是 `enhance-video-generative`，供应商只有 `mediakit`。
 
@@ -31,4 +31,4 @@ https 结果下载完之后，同一条命令会加上黑白胶片颗粒，强�
 
 ## 输出
 
-`--out` 优先。否则有 `--shot` 时写到 `shots/NN/clip/enhance-<id>.mp4`，没有就写 `out/enhance-<id>.mp4`。等满仍未完成时用 `lumen runs resume <id>`，取回结果时同样会加颗粒。
+`--out` 优先。否则有 `--shot` 时写到 `shots/NN/clip/enhance-<id>.mp4`，没有就写 `out/enhance-<id>.mp4`。等满仍未完成时用 `lumen runs resume <id> --execute --detach`，取回结果时同样会加颗粒。不要重新提交。

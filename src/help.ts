@@ -7,7 +7,7 @@ Usage:
   lumen validate [--project dir]
   lumen models [model]
   lumen providers list|set|doctor
-  lumen gen <image|video|voice> --model <id> [--shot N] [--dry-run|--execute|--mock]
+  lumen gen <image|video|voice> --model <id> [--shot N] [--dry-run|--execute|--mock] [--detach]
   lumen fish <design|clone|synth> [--shot N]
   lumen breakdown [--video file]
   lumen download <douyin-url> --to <path> [--region <code>] [--json]
@@ -17,8 +17,8 @@ Usage:
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
   lumen captions transcribe --video <file> [--script <file>|--no-script] [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
   lumen captions burn --video <file> --subs <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
-  lumen enhance [--video file] [--shot N] [--out file] [--dry-run|--execute|--mock]
-  lumen runs list|show <id>|resume <id>
+  lumen enhance [--video file] [--shot N] [--out file] [--dry-run|--execute|--mock] [--detach]
+  lumen runs list [--pending]|show <id>|wait <id> [--timeout 秒]|resume <id> [--task <id>] [--out file] [--execute --detach]
   lumen concat [--project dir]
   lumen skill install [--target grokbot|agents|<path>] [--clean]
   lumen doctor
@@ -103,5 +103,26 @@ Config:
   lumen.config.json in the project, merged over ~/.config/lumen/providers.json
   models.<id>.{ provider, apiKeyEnv, baseUrl?, group?, modelAlias? }  (baseUrl defaults to the provider's official API)
 
-Exit 0 on success, 1 on a bad project or request, 2 on usage.`;
+Exit 0 on success, 1 on a bad project or request, 2 on usage, 3 when \`lumen runs wait\` times out and the run is still going.
+
+后台生成（助手照这个跑，不要前台死等 --execute）:
+  出图、出视频、增强，以及续跑，一律加 --detach --execute。
+  例如 lumen gen image --model <id> --prompt <中文> --execute --detach
+       lumen gen video --model <id> ... --execute --detach
+       lumen enhance --video <file> --execute --detach
+       lumen runs resume <id> --execute --detach
+  --detach 先做本地校验、打印预估、写好 run，再派生脱离终端的子进程去提交、轮询、下载、后处理（增强会加颗粒）。
+  父进程马上打印 run id 和「下一步: lumen runs wait <id>」，退出码 0。子进程不跟父进程一起退出，终端关掉也不停。
+  日志在 run 目录的 worker.log。pid 写在 run 记录里。
+  接着在同一轮里循环 lumen runs wait <id> --timeout 60。两次之间可以先回用户一句进度。
+  wait 只读记录，不提交、不扣费。杀掉 wait 不影响生成。
+  wait 退出码：0 完成，打印 wrote: 路径（和前台一样）；3 仍在生成；1 失败，stderr 是原因。
+  用户发来新消息把这一轮打断后：先回用户，再 lumen runs list --pending。
+  有未取走的就继续 wait，把结果发给用户。不要重新提交。
+  不要用 nohup、& 或 pkill -f 自己管后台。要停任务，用记录里的 pid。
+  list --pending 列出未完成，或已完成但还没被 wait/show 取走的 run（状态、模型、开始时间、id）。取走后标「已取走」。
+  pid 已不在、状态仍是 pending 或 running：已中断。runs show 会说明有没有出图。
+  有服务端任务 id 就 lumen runs resume <id>（同一个任务，不重新提交）。
+  出图若只拿到结果 URL，resume 只下载该 URL。没有任务 id 也没有结果 URL，就不能 resume，不要重提。
+  --mock --detach 只走内置假传输，给本地测试用，不访问供应商。`;
 }

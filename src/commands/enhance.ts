@@ -107,9 +107,11 @@ export async function enhanceCommand(args: string[], project: string, io: IO, co
     "dry-run": "boolean",
     execute: "boolean",
     mock: "boolean",
+    detach: "boolean",
   });
   requireRestEmpty(rest);
   const mode = runMode(values);
+  if (values.detach === true && mode !== "execute" && mode !== "mock") throw new CliError("--detach 需要 --execute", 2);
   const shot = shotNumber(flagString(values, "shot"));
   const enhance = resolveEnhance(undefined, MODEL);
   return settle(io, project, command, MODEL, mode, async (runId, ctx) => {
@@ -137,10 +139,11 @@ export async function enhanceCommand(args: string[], project: string, io: IO, co
     });
     const receipt = path.join(project, LAYOUT.refs, `${runId}.enhance.json`);
     ctx.resume = { videoFile, receipt };
+    if (ctx.afterLocal) await ctx.afterLocal();
     const outcome = await runMediakit(MODEL, binding, video, runId, mode, io, ctx.secret, undefined, enhance);
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     if (mode !== "execute" || outcome.videoUrl === undefined) return;
     ctx.files.push(...(await materializeEnhance(outcome.videoUrl, ctx.calls, io, project, { videoFile, receipt })));
-  });
+  }, { detach: values.detach === true });
 }

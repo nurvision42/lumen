@@ -80,4 +80,4 @@ lumen gen video --model seedance-2.5 --shape reference --task-type edit \
   --ref "video|https://cdn.example/src.mp4|false"
 ```
 
-默认 `--dry-run`。用户明确要成片时才加 `--execute`，命令会自己提交并等到成片。`reference` 会带上 `omni_reference_task_type`。比例、时长、分辨率和声音用旗标，不要只写进提示词。不要加 `--web-search`。不要自己拼请求。lumen 不发送 `output_format`。
+默认 `--dry-run`。用户明确要成片时才加 `--execute --detach`，再在同一轮里用 `lumen runs wait <id> --timeout 60` 取结果。不要前台一直等到成片。`reference` 会带上 `omni_reference_task_type`。比例、时长、分辨率和声音用旗标，不要只写进提示词。不要加 `--web-search`。不要自己拼请求。lumen 不发送 `output_format`。

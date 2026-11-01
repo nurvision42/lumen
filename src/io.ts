@@ -8,6 +8,24 @@ export interface RemoteTaskNote {
   response: unknown;
 }
 
+/** Image submit returned something worth keeping before the file is on disk. */
+export interface ImageResultNote {
+  provider: string;
+  outFile: string;
+  url?: string;
+  taskId?: string;
+  received?: boolean;
+  response?: unknown;
+}
+
+/** Args are lumen arguments, without the node binary or the cli script. */
+export interface DetachSpawnSpec {
+  args: string[];
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  logFile: string;
+}
+
 export interface IO {
   stdout: (chunk: string) => void;
   stderr: (chunk: string) => void;
@@ -24,6 +42,13 @@ export interface IO {
    * Video submit calls this once a remote task id exists, before polling.
    */
   noteRemoteTask?: (note: RemoteTaskNote) => Promise<void>;
+  /**
+   * Installed by the run recorder. Image execute calls this once a provider
+   * response (URL or task id) exists, before the file is written.
+   */
+  noteImageResult?: (note: ImageResultNote) => Promise<void>;
+  /** Tests inject this. The default spawns a detached process. */
+  spawnDetached?: (spec: DetachSpawnSpec) => { pid: number };
 }
 
 export function defaultIO(): IO {

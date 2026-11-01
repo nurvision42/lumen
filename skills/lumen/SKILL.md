@@ -18,6 +18,15 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 - 只跑 `lumen` 命令，不要自己拼 HTTP。
 - 出图和出视频的提示词用中文写。不要把提示词翻译成英文。
 
+## 助手怎么跑生成
+
+出图、出视频、增强不要在前台一直占着 `--execute`。用户一发新消息，这一轮会被打断，前台进程被杀掉，生成中断；再提交一次会重新扣费。不要依赖子任务，也不要用 `nohup`、`&` 或 `pkill -f` 自己管后台。
+
+1. 生成一律加上 `--detach --execute`：`lumen gen image`、`lumen gen video`、`lumen enhance`。续跑是 `lumen runs resume <id> --execute --detach`。命令做完本地校验、打出预估、写好 run 后，把提交、轮询、下载和后处理（增强的颗粒）交给脱离终端的子进程，自己打印 run id，退出码 0。
+2. 同一轮里接着循环 `lumen runs wait <id> --timeout 60`。退出码 0：把 `wrote:` 路径发给用户。退出码 3：仍在生成，可以先回一句进度再 wait。退出码 1：把失败原因告诉用户。`wait` 只读记录，不提交。杀掉 `wait` 不影响生成。
+3. 用户中途发消息后，先回用户，再 `lumen runs list --pending`。有未取走的就继续 wait，把结果发回去。不要重新提交。
+4. 要停任务只用 run 记录里的 pid。`runs show <id>` 能看状态。生图若已中断：有结果 URL 就 `runs resume`（只下载，不重提）；有服务端任务就 resume 同一个任务；什么都没有就说明不能 resume，不要重提。
+
 ## 工具
 
 需要指定项目时加 `--project <dir>`。`--shot N` 且省略提示词时，图像和视频用该镜头的 `frame`，语音用 `vo`。绑定只写供应商、地址和环境变量名。
@@ -43,7 +52,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **加字幕。** 只把已经确认的字幕压进画面，不负责识别。用本机 ffmpeg 硬压，不调用云端加字幕。默认白字、半透明灰圆角底；竖屏在顶部居中，横屏在底部居中。`lumen captions burn --video <file> --subs <file> --to <mp4>`。这条命令会立刻压制。先读 `skills/lumen/references/加字幕/SKILL.md`。
 
-**记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs show <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id>` 接着等并取回结果，不要重新提交。
+**记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs list --pending` · `lumen runs show <id>` · `lumen runs wait <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id> --execute --detach` 接着等并取回结果，不要重新提交。助手跑生成的标准步骤见上面「助手怎么跑生成」。
 
 **拼接。** `lumen concat` 把镜头接成一条成片。它仍是占位，不调用外部程序。
 

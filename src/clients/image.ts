@@ -8,6 +8,7 @@ import type { RunMode } from "../flags.js";
 import type { OutputFile } from "../runs.js";
 import { assertBeeftvImageRef, isLocalMedia, mapLocalMediaViaBeeftv, planBeeftvImage } from "./beeftv.js";
 import { planVolcarkImage, seedreamSize, volcarkImageRef } from "./volcark.js";
+import { findString } from "../walk.js";
 import { assertHttps, bytesFromResult, httpUrlFromResult, imageSize, jsonCall, wireModel } from "./wire.js";
 
 export function planImage(request: ImageRequest, binding: ModelBinding): HttpCall[] {
@@ -94,6 +95,7 @@ export async function runImage(
   const result = await perform(sent, first, opts);
   const files: OutputFile[] = [];
   if (mode === "execute") {
+    await rememberImage(io, binding.provider, outFile, result);
     const saved = await saveImage(result, outFile, sent, opts);
     files.push(saved);
   }
@@ -117,7 +119,10 @@ async function runVolcarkImage(
   if (first === undefined) throw new CliError("image request has no call");
   const result = await perform(calls, first, opts);
   const files: OutputFile[] = [];
-  if (mode === "execute") files.push(await saveImage(result, outFile, calls, opts));
+  if (mode === "execute") {
+    await rememberImage(io, binding.provider, outFile, result);
+    files.push(await saveImage(result, outFile, calls, opts));
+  }
   return { calls, response: publicResult(result), files };
 }
 
@@ -159,8 +164,25 @@ async function runBeeftvImage(
   if (first === undefined) throw new CliError("image request has no call");
   const result = await perform(calls, first, opts);
   const files: OutputFile[] = [];
-  if (mode === "execute") files.push(await saveImage(result, outFile, calls, opts));
+  if (mode === "execute") {
+    await rememberImage(io, binding.provider, outFile, result);
+    files.push(await saveImage(result, outFile, calls, opts));
+  }
   return { calls, response: publicResult(result), files };
+}
+
+async function rememberImage(io: IO, provider: string, outFile: string, result: HttpResult): Promise<void> {
+  if (io.noteImageResult === undefined) return;
+  const url = httpUrlFromResult(result);
+  const taskId = findString(result.json, "task_id") ?? findString(result.json, "taskId");
+  await io.noteImageResult({
+    provider,
+    outFile,
+    received: true,
+    response: publicResult(result),
+    ...(url === undefined ? {} : { url }),
+    ...(taskId === undefined ? {} : { taskId }),
+  });
 }
 
 async function saveImage(
