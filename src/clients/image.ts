@@ -6,10 +6,21 @@ import { fetchOf, groupHeaders, joinUrl, perform, publicResult, type HttpCall, t
 import type { IO } from "../io.js";
 import type { RunMode } from "../flags.js";
 import type { OutputFile } from "../runs.js";
+import { assertBeeftvImageRef, isLocalMedia, mapLocalMediaViaBeeftv, planBeeftvImage } from "./beeftv.js";
+import { planVolcarkImage, seedreamSize, volcarkImageRef } from "./volcark.js";
 import { assertHttps, bytesFromResult, httpUrlFromResult, imageSize, jsonCall, wireModel } from "./wire.js";
 
 export function planImage(request: ImageRequest, binding: ModelBinding): HttpCall[] {
+  if (binding.provider === "volcark") {
+    throw new CliError("volcark image calls are built by planVolcarkImage");
+  }
+  if (binding.provider === "beeftv") {
+    throw new CliError("beeftv image calls are built by planBeeftvImage");
+  }
   const model = wireModel(request.modelId, binding.modelAlias);
+  if (request.resolution === "1.5K") {
+    throw new CliError("resolution 1.5K is only available on seedream");
+  }
   const size = imageSize(request.aspectRatio, request.resolution);
   assertImageProviderRules(request, binding.provider);
   const editing = request.references.length > 0;
@@ -71,6 +82,8 @@ export async function runImage(
   apiKey: string | undefined,
   outFile: string,
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
+  if (binding.provider === "volcark") return runVolcarkImage(request, binding, mode, io, apiKey, outFile);
+  if (binding.provider === "beeftv") return runBeeftvImage(request, binding, mode, io, apiKey, outFile);
   const calls = planImage(request, binding);
   if (mode === "dry-run") return { calls, response: null, files: [] };
   if (mode === "execute") checkExecute(request, binding);
@@ -85,6 +98,69 @@ export async function runImage(
     files.push(saved);
   }
   return { calls: sent, response: publicResult(result), files };
+}
+
+async function runVolcarkImage(
+  request: ImageRequest,
+  binding: ModelBinding,
+  mode: RunMode,
+  io: IO,
+  apiKey: string | undefined,
+  outFile: string,
+): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
+  const references = await Promise.all(request.references.map((ref) => volcarkImageRef(ref, io.cwd)));
+  const planned = planVolcarkImage({ ...request, references }, binding);
+  const calls: HttpCall[] = [];
+  if (mode === "dry-run") return { calls: planned, response: null, files: [] };
+  const opts = { mode, fetchImpl: fetchOf(io), ...(apiKey === undefined ? {} : { apiKey }) };
+  const first = planned[0];
+  if (first === undefined) throw new CliError("image request has no call");
+  const result = await perform(calls, first, opts);
+  const files: OutputFile[] = [];
+  if (mode === "execute") files.push(await saveImage(result, outFile, calls, opts));
+  return { calls, response: publicResult(result), files };
+}
+
+async function runBeeftvImage(
+  request: ImageRequest,
+  binding: ModelBinding,
+  mode: RunMode,
+  io: IO,
+  apiKey: string | undefined,
+  outFile: string,
+): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
+  for (const ref of request.references) assertBeeftvImageRef(ref);
+  const calls: HttpCall[] = [];
+  let references = request.references;
+  let plannedUploads: unknown[] = [];
+  const locals = request.references.filter((ref) => isLocalMedia(ref));
+  if (locals.length > 0) {
+    const mapped = await mapLocalMediaViaBeeftv(
+      locals.map((source) => ({ source, kind: "image" as const })),
+      binding.baseUrl,
+      mode,
+      io,
+      apiKey,
+      calls,
+    );
+    references = request.references.map((ref) => mapped.urls.get(ref) ?? ref);
+    plannedUploads = mapped.plannedUploads;
+  }
+  const planned = planBeeftvImage({ ...request, references }, binding, seedreamSize(request.aspectRatio, request.resolution));
+  if (mode === "dry-run") {
+    return {
+      calls: [...calls, ...planned],
+      response: plannedUploads.length > 0 ? { plannedUploads } : null,
+      files: [],
+    };
+  }
+  const opts = { mode, fetchImpl: fetchOf(io), ...(apiKey === undefined ? {} : { apiKey }) };
+  const first = planned[0];
+  if (first === undefined) throw new CliError("image request has no call");
+  const result = await perform(calls, first, opts);
+  const files: OutputFile[] = [];
+  if (mode === "execute") files.push(await saveImage(result, outFile, calls, opts));
+  return { calls, response: publicResult(result), files };
 }
 
 async function saveImage(

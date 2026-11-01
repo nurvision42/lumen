@@ -28,7 +28,21 @@ Default mode is --dry-run: the audit records the request and nothing is sent.
 Image and video prompts: 提示词用中文写. Do not translate a prompt into English.
 
 Backends, one binding per model (no family fallback):
-  image    yunqiao (OpenAI-compatible) or grsai
+  image    yunqiao (OpenAI-compatible), grsai, volcark (火山方舟 Ark), or beeftv
+           Seedream 5.0 Pro doubao-seedream-5-0-pro-260628 (alias seedream-5-pro)
+           and Flash doubao-seedream-5-0-flash-260915 (alias seedream-5-flash).
+           Default provider beeftv, also volcark. Default resolution 2K.
+           beeftv: POST /v1/images/generations. Wire ids dola-seedream-5-0-pro-260628
+           and dola-seedream-5-0-flash-260915 unless --model-alias is set.
+           Reference field is images (https or data URI). Local files use the BeefTV upload.
+           Estimate: Flash 0.04 yuan/image, refs free. Pro ≤2.61M px 0.09, above (2K) 0.18.
+           Pro refs: first free, each later one under 0.01 yuan. No layer estimate.
+           volcark: POST /images/generations, Authorization: Bearer ARK_API_KEY.
+           A missing key fails in Chinese and names ARK_API_KEY.
+           Local files are read and sent as data:image/...;base64,... . Volcark does not upload them.
+           volcark estimate: Pro ≤1.5K 0.30 yuan/image, Pro 2K 0.60, Flash 0.12.
+           Sizes 1K, 1.5K, 2K. watermark is sent false. response_format url, output_format png.
+           One image. No sequential_image_generation (Pro and Flash do not support group images).
   video    haomao; beeftv (seedance-2-fast); ycyapi (seedance-2.5) — Seedance. Polls the task, then saves the mp4. Not MediaKit.
            seedance-2.5 on haomao: --task-type auto|reference|edit|extend (omni_reference_task_type).
            ycyapi: HTTPS or local refs (local files require a tos block and VOLC_ACCESSKEY / VOLC_SECRETKEY); no first/last frame, Auto/task-type, adaptive, or 4K.

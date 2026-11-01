@@ -5,7 +5,7 @@ description: 用 gpt-image-2、gpt-image-2.5-flare 或 gpt-image-2.5-sunburst �
 
 # GPT Image 使用说明
 
-本文件只管怎么用 `lumen` 调用 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`。三支参数相同，差别只在下面这一节。提示词用中文写。提示词写法读 `gpt-image-提示词写法/SKILL.md`，那份只写正文，不提交，三支共用。不要把提示词翻译成英文。要写设备、镜头、视场、光圈、光、色或运镜时，再读 `skills/lumen/references/拍摄设定/SKILL.md`。
+本文件只管怎么用 `lumen` 调用 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`。三支参数相同，差别只在下面这一节。提示词用中文写。提示词写法读 `生图-提示词写法/SKILL.md`，那份只写正文，不提交，所有出图模型共用。不要把提示词翻译成英文。要写设备、镜头、视场、光圈、光、色或运镜时，再读 `skills/lumen/references/拍摄设定/SKILL.md`。
 
 比例、分辨率、质量、背景和参考图用旗标。不要写进提示词，也不要自己拼请求。接口路径不在这里写。
 
@@ -29,7 +29,7 @@ Sunburst 已经够用之后，再用同一条提示词、同一组参考、同�
 lumen providers set gpt-image-2.5-flare --provider yunqiao --api-key-env YUNQIAO_API_KEY
 ```
 
-可加 `--group <id>`、`--model-alias <id>`、`--global`。`yunqiao` 的 group 会带上。`grsai` 不发送 group。`model-alias` 只替换上游模型字符串，不换 lumen 的模型 id。`haomao`、`kitta`、`mediakit` 不能绑这三支。
+可加 `--group <id>`、`--model-alias <id>`、`--global`。`yunqiao` 的 group 会带上。`grsai` 不发送 group。`model-alias` 只替换上游模型字符串，不换 lumen 的模型 id。`haomao`、`kitta`、`mediakit`、`volcark` 不能绑这三支。
 
 ## 生成还是改图
 
@@ -86,7 +86,7 @@ lumen gen image --model gpt-image-2.5-flare --prompt "…" --ref refs/person.png
 
 透明用 `--background transparent`。实底用 `--background opaque`。`--background auto` 是把选择交给上游。不传则请求里没有背景字段。
 
-提示词里仍要写隔离主体、不要实底、不要棋盘格。画出来的棋盘格不是透明。后续改图要在正文里保留透明。这些句子见 `gpt-image-提示词写法/SKILL.md`。
+提示词里仍要写隔离主体、不要实底、不要棋盘格。画出来的棋盘格不是透明。后续改图要在正文里保留透明。这些句子见 `生图-提示词写法/SKILL.md`。
 
 lumen 不发送 `output_format`，也没有这个旗标，也不转码。返回的字节原样写入文件；返回 URL 就下载后再存；两者都没有就在旁边写一份 `.json` 回执，不造假图。
 

@@ -24,7 +24,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **目录、检查、模型、绑定。** 建多镜头文件夹、检查镜头表、看缺绑定或密钥、列出模型、查看或写入供应商。只出一张图或一条视频时不必先 init。`lumen init <dir>` · `lumen validate` · `lumen doctor` · `lumen models` · `lumen providers list`。写入：`lumen providers set <model> --provider <id> --api-key-env <NAME> [--base-url <url>] [--group <id>] [--model-alias <id>]`。每个内置供应商都有官方默认地址，`--base-url` 只在换线路时用。
 
-**出图。** 按提示词生成一张图，或按参考图改图。单张即可。`lumen gen image --model <id>`。模型 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`，供应商 `yunqiao` 或 `grsai`。出图先读 `skills/lumen/references/gpt-image/SKILL.md`，再读 `skills/lumen/references/gpt-image-提示词写法/SKILL.md`。提示词写法只写正文，不提交。要写设备、镜头、视场、光圈、光、色或运镜时，图像和视频都读 `skills/lumen/references/拍摄设定/SKILL.md`。
+**出图。** 按提示词生成一张图，或按参考图改图。单张即可。`lumen gen image --model <id>`。GPT Image 模型 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`，供应商 `yunqiao` 或 `grsai`。出图先读 `skills/lumen/references/gpt-image/SKILL.md`。Seedream 5.0 是 `doubao-seedream-5-0-pro-260628`（别名 `seedream-5-pro`）和 `doubao-seedream-5-0-flash-260915`（别名 `seedream-5-flash`）。默认供应商是 `beeftv`，也可以绑 `volcark`。省略分辨率时是 `2K`。这两支先读 `skills/lumen/references/seedream/SKILL.md`。所有出图再读 `skills/lumen/references/生图-提示词写法/SKILL.md`。提示词用中文写。提示词写法只写正文，不提交。要写设备、镜头、视场、光圈、光、色或运镜时，图像和视频都读 `skills/lumen/references/拍摄设定/SKILL.md`。
 
 **出视频。** 用 Seedance 出一条视频。单条即可。`lumen gen video --model <id>`。供应商是 `haomao`；`seedance-2-fast` 还可以绑 `beeftv`；`seedance-2.5` 还可以绑 `ycyapi`。出视频先读对应的使用说明（形态、时长、比例、素材、提交），再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。提示词写法只优化提示词，不代替 lumen 提交任务。
 
@@ -54,7 +54,11 @@ haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fas
 
 ## beeftv
 
-`beeftv` 只提供 `seedance-2-fast`，上游模型名 `seedance-2.0-fast`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2-fast --provider beeftv --api-key-env <你的变量名>`。本地的首帧、尾帧、参考图、视频、音频都会自动上传，直接传文件路径即可。模型名不对时用 `--model-alias` 覆盖。
+`beeftv` 提供 `seedance-2-fast`（上游 `seedance-2.0-fast`），也是 Seedream 5.0 Pro / Flash 的默认出图供应商。视频绑定：`lumen providers set seedance-2-fast --provider beeftv --api-key-env <你的变量名>`。出图绑定：`lumen providers set doubao-seedream-5-0-pro-260628 --provider beeftv --api-key-env BEEFAPI_KEY`。上游默认是 `dola-seedream-5-0-pro-260628` 和 `dola-seedream-5-0-flash-260915`，`--model-alias` 可覆盖。本地参考图走 beeftv 上传。省略分辨率时是 `2K`。细则见 `skills/lumen/references/seedream/SKILL.md`。视频的本地首帧、尾帧、参考图、视频、音频也会自动上传。
+
+## volcark
+
+`volcark` 是火山方舟官方图片接口，也能绑这两支 Seedream，但不是默认。绑定：`lumen providers set doubao-seedream-5-0-pro-260628 --provider volcark --api-key-env ARK_API_KEY`。估价：Pro ≤1.5K 0.30 元/张，2K 0.60 元/张，Flash 0.12 元/张。水印关闭。一次一张，不组图。本地参考图读成 data URI 放进请求。公网 HTTPS 或已经是 base64 的原样传入，不上传。缺 `ARK_API_KEY` 时错误是中文。提示词用中文写。
 
 ## ycyapi
 

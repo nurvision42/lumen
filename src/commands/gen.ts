@@ -2,18 +2,22 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   assertVideoProviderRules,
+  SEEDREAM_DEFAULT_RESOLUTION,
   canonicalModel,
+  isSeedreamModel,
   parseMediaRef,
   validateFish,
   validateImage,
   validateVideo,
   type FishModel,
 } from "../catalog.js";
+import { missingVolcarkKey } from "../clients/volcark.js";
 import { missingKey } from "../config.js";
 import { CliError } from "../errors.js";
 import { fileExists } from "../fsutil.js";
 import { flagList, flagString, parseFlags, requireRestEmpty, runMode, type FlagKind } from "../flags.js";
-import type { IO } from "../io.js";
+import { line, type IO } from "../io.js";
+import { seedreamCost } from "../seedream/cost.js";
 import { outputPath } from "../project.js";
 import { settle } from "../runs.js";
 import { loadShotlist } from "../shotlist.js";
@@ -72,8 +76,9 @@ export async function genImage(args: string[], project: string, io: IO, command:
     out: "string",
   });
   requireRestEmpty(rest);
-  const modelId = flagString(values, "model");
-  if (modelId === undefined) throw new CliError("gen image needs --model", 2);
+  const requested = flagString(values, "model");
+  if (requested === undefined) throw new CliError("gen image needs --model", 2);
+  const modelId = canonicalModel(requested);
   const mode = runMode(values);
   const shot = shotNumber(flagString(values, "shot"));
   return settle(io, project, command, modelId, mode, async (runId, ctx) => {
@@ -81,24 +86,38 @@ export async function genImage(args: string[], project: string, io: IO, command:
     let prompt = flagString(values, "prompt");
     if (prompt === undefined && promptFile !== undefined) prompt = await readTextFile(project, promptFile);
     if ((prompt === undefined || prompt.trim().length === 0) && shot !== undefined) prompt = await textFromShot(project, shot, "frame");
+    const resolution = flagString(values, "resolution") ?? (isSeedreamModel(modelId) ? SEEDREAM_DEFAULT_RESOLUTION : "1K");
     ctx.params = {
       prompt: prompt ?? "",
       aspectRatio: flagString(values, "aspect-ratio") ?? "auto",
-      resolution: flagString(values, "resolution") ?? "1K",
+      resolution,
       references: flagList(values, "ref"),
     };
     const request = validateImage({
       modelId,
       prompt: prompt ?? "",
       aspectRatio: flagString(values, "aspect-ratio") ?? "auto",
-      resolution: flagString(values, "resolution") ?? "1K",
+      resolution,
       background: flagString(values, "background"),
       quality: flagString(values, "quality"),
       references: flagList(values, "ref"),
     });
     ctx.params = request;
     const { binding } = await adoptBinding(ctx, project, io.env, modelId);
-    if (mode === "execute" && !ctx.keyPresent) throw missingKey(binding);
+    if (isSeedreamModel(request.modelId)) {
+      const cost = seedreamCost({
+        modelId: request.modelId,
+        resolution: request.resolution,
+        aspectRatio: request.aspectRatio,
+        provider: binding.provider,
+        references: request.references.length,
+      });
+      line(io, cost.text);
+      ctx.params = { ...request, yuan: cost.yuan };
+    }
+    if (mode === "execute" && !ctx.keyPresent) {
+      throw binding.provider === "volcark" ? missingVolcarkKey(binding.apiKeyEnv) : missingKey(binding);
+    }
     const out = outputPath(project, { shot, folder: "frame", filename: `${runId}.png`, out: flagString(values, "out") });
     const outcome = await runImage(request, binding, mode, io, ctx.secret, out);
     ctx.calls = outcome.calls;
