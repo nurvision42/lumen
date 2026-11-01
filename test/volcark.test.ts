@@ -110,12 +110,13 @@ test("seedream sizes use the official pixel table, and auto sends the tier", () 
 });
 
 test("seedream price table: Pro ≤1.5K 0.30, Pro 2K 0.60, Flash 0.12", () => {
-  assert.equal(seedreamCost(SEEDREAM_PRO_MODEL, "1K").text, `estimate: 0.30 yuan (${SEEDREAM_PRO_MODEL} ≤1.5K, 1 image)`);
-  assert.equal(seedreamCost(SEEDREAM_PRO_MODEL, "1.5K").text, `estimate: 0.30 yuan (${SEEDREAM_PRO_MODEL} ≤1.5K, 1 image)`);
-  assert.equal(seedreamCost(SEEDREAM_PRO_MODEL, "2K").text, `estimate: 0.60 yuan (${SEEDREAM_PRO_MODEL} 2K, 1 image)`);
-  assert.equal(seedreamCost(SEEDREAM_PRO_MODEL, "2K").yuan, 0.6);
-  assert.equal(seedreamCost(SEEDREAM_FLASH_MODEL, "1K").text, `estimate: 0.12 yuan (${SEEDREAM_FLASH_MODEL}, 1 image)`);
-  assert.equal(seedreamCost(SEEDREAM_FLASH_MODEL, "2K").yuan, 0.12);
+  const volc = (modelId: string, resolution: string) => seedreamCost({ modelId, resolution, provider: "volcark" });
+  assert.equal(volc(SEEDREAM_PRO_MODEL, "1K").text, `estimate: 0.30 yuan (${SEEDREAM_PRO_MODEL} ≤1.5K, 1 image)`);
+  assert.equal(volc(SEEDREAM_PRO_MODEL, "1.5K").text, `estimate: 0.30 yuan (${SEEDREAM_PRO_MODEL} ≤1.5K, 1 image)`);
+  assert.equal(volc(SEEDREAM_PRO_MODEL, "2K").text, `estimate: 0.60 yuan (${SEEDREAM_PRO_MODEL} 2K, 1 image)`);
+  assert.equal(volc(SEEDREAM_PRO_MODEL, "2K").yuan, 0.6);
+  assert.equal(volc(SEEDREAM_FLASH_MODEL, "1K").text, `estimate: 0.12 yuan (${SEEDREAM_FLASH_MODEL}, 1 image)`);
+  assert.equal(volc(SEEDREAM_FLASH_MODEL, "2K").yuan, 0.12);
 });
 
 function jsonBody(call: ReturnType<typeof planVolcarkImage>[number] | undefined): Record<string, unknown> {
@@ -193,13 +194,13 @@ test("seedream rejects 4K, quality, auto background, too many refs, and gpt-imag
 test("models list names both Seedream ids on volcark, and aliases resolve", async () => {
   const listed = capture();
   assert.equal(await run(["models"], listed.io), 0, listed.err());
-  assert.match(listed.out(), new RegExp(`${SEEDREAM_PRO_MODEL}  image  volcark`));
-  assert.match(listed.out(), new RegExp(`${SEEDREAM_FLASH_MODEL}  image  volcark`));
+  assert.match(listed.out(), new RegExp(`${SEEDREAM_PRO_MODEL}  image  beeftv,volcark`));
+  assert.match(listed.out(), new RegExp(`${SEEDREAM_FLASH_MODEL}  image  beeftv,volcark`));
   assert.match(listed.out(), /0\.30 yuan/);
   assert.match(listed.out(), /0\.12 yuan/);
   const alias = capture();
   assert.equal(await run(["models", "seedream-5-pro"], alias.io), 0, alias.err());
-  assert.match(alias.out(), new RegExp(`^${SEEDREAM_PRO_MODEL}  image  volcark`, "m"));
+  assert.match(alias.out(), new RegExp(`^${SEEDREAM_PRO_MODEL}  image  beeftv,volcark`, "m"));
   assert.equal(alias.out().includes(SEEDREAM_FLASH_MODEL), false);
 });
 
@@ -480,10 +481,10 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   });
   const skill = await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8");
   assert.match(skill, /references\/seedream\/SKILL\.md/);
-  assert.match(skill, /references\/seedream-提示词写法\/SKILL\.md/);
+  assert.match(skill, /references\/生图-提示词写法\/SKILL\.md/);
   assert.match(skill, /提示词用中文写/);
   const usage = await readFile(path.join(root, "skills", "lumen", "references", "seedream", "SKILL.md"), "utf8");
-  const pe = await readFile(path.join(root, "skills", "lumen", "references", "seedream-提示词写法", "SKILL.md"), "utf8");
+  const pe = await readFile(path.join(root, "skills", "lumen", "references", "生图-提示词写法", "SKILL.md"), "utf8");
   assert.match(usage, /name:\s*seedream/);
   assert.match(usage, /提示词用中文写/);
   assert.match(usage, /不要把提示词翻译成英文/);
@@ -496,7 +497,10 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   assert.equal(/lumen42|VOLC_ACCESSKEY|VOLC_SECRETKEY/.test(usage), false);
   assert.match(usage, /watermark|水印/);
   assert.equal(/images\/generations/.test(usage), false);
+  assert.match(skill, /默认供应商是 `beeftv`/);
   assert.match(skill, /本地参考图读成 data URI/);
+  assert.match(usage, /默认供应商是 `beeftv`/);
+  assert.match(usage, /省略时是 `2K`/);
   assert.equal(skill.includes("本地参考图上传到火山引擎 TOS"), false);
   assert.match(pe, /提示词用中文写/);
   assert.match(pe, /不要把中文提示词再翻译成英文/);
@@ -510,5 +514,6 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   const help = await readFile(path.join(root, "src", "help.ts"), "utf8");
   assert.match(help, /Local files are read and sent/);
   assert.match(help, /data:image\/\.\.\.;base64/);
-  assert.equal(/volcark[\s\S]{0,600}lumen42|volcark[\s\S]{0,600}VOLC_ACCESSKEY/.test(help), false);
+  assert.match(help, /Volcark does not upload them/);
+  assert.equal(help.includes("volcark local") && help.includes("lumen42"), false);
 });

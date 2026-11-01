@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   assertVideoProviderRules,
+  SEEDREAM_DEFAULT_RESOLUTION,
   canonicalModel,
   isSeedreamModel,
   parseMediaRef,
@@ -85,28 +86,35 @@ export async function genImage(args: string[], project: string, io: IO, command:
     let prompt = flagString(values, "prompt");
     if (prompt === undefined && promptFile !== undefined) prompt = await readTextFile(project, promptFile);
     if ((prompt === undefined || prompt.trim().length === 0) && shot !== undefined) prompt = await textFromShot(project, shot, "frame");
+    const resolution = flagString(values, "resolution") ?? (isSeedreamModel(modelId) ? SEEDREAM_DEFAULT_RESOLUTION : "1K");
     ctx.params = {
       prompt: prompt ?? "",
       aspectRatio: flagString(values, "aspect-ratio") ?? "auto",
-      resolution: flagString(values, "resolution") ?? "1K",
+      resolution,
       references: flagList(values, "ref"),
     };
     const request = validateImage({
       modelId,
       prompt: prompt ?? "",
       aspectRatio: flagString(values, "aspect-ratio") ?? "auto",
-      resolution: flagString(values, "resolution") ?? "1K",
+      resolution,
       background: flagString(values, "background"),
       quality: flagString(values, "quality"),
       references: flagList(values, "ref"),
     });
     ctx.params = request;
+    const { binding } = await adoptBinding(ctx, project, io.env, modelId);
     if (isSeedreamModel(request.modelId)) {
-      const cost = seedreamCost(request.modelId, request.resolution);
+      const cost = seedreamCost({
+        modelId: request.modelId,
+        resolution: request.resolution,
+        aspectRatio: request.aspectRatio,
+        provider: binding.provider,
+        references: request.references.length,
+      });
       line(io, cost.text);
       ctx.params = { ...request, yuan: cost.yuan };
     }
-    const { binding } = await adoptBinding(ctx, project, io.env, modelId);
     if (mode === "execute" && !ctx.keyPresent) {
       throw binding.provider === "volcark" ? missingVolcarkKey(binding.apiKeyEnv) : missingKey(binding);
     }

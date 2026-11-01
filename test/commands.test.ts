@@ -213,9 +213,11 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   await assert.rejects(access(path.join(root, "skills", "lumen", "references", "cinematic", "SKILL.md")));
   await assert.rejects(access(path.join(root, "skills", "lumen", "references", "拍摄设定", "presets.yaml")));
 
-  const imagePe = await readFile(path.join(root, "skills", "lumen", "references", "gpt-image-提示词写法", "SKILL.md"), "utf8");
+  const imagePe = await readFile(path.join(root, "skills", "lumen", "references", "生图-提示词写法", "SKILL.md"), "utf8");
   assert.match(skill, /出图先读 `skills\/lumen\/references\/gpt-image\/SKILL\.md`/);
-  assert.match(skill, /再读 `skills\/lumen\/references\/gpt-image-提示词写法\/SKILL\.md`/);
+  assert.match(skill, /再读 `skills\/lumen\/references\/生图-提示词写法\/SKILL\.md`/);
+  await assert.rejects(access(path.join(root, "skills", "lumen", "references", "gpt-image-提示词写法", "SKILL.md")));
+  await assert.rejects(access(path.join(root, "skills", "lumen", "references", "seedream-提示词写法", "SKILL.md")));
   const imageUsage = await readFile(path.join(root, "skills", "lumen", "references", "gpt-image", "SKILL.md"), "utf8");
   assert.match(imageUsage, /name:\s*gpt-image/);
   assert.match(imageUsage, /gpt-image-2\.5-flare/);
@@ -223,7 +225,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(imageUsage, /更快的日常出图/);
   assert.match(imageUsage, /质量优先/);
   assert.match(imageUsage, /基线/);
-  assert.match(imageUsage, /gpt-image-提示词写法\/SKILL\.md/);
+  assert.match(imageUsage, /生图-提示词写法\/SKILL\.md/);
   assert.match(imageUsage, /--aspect-ratio/);
   assert.match(imageUsage, /--resolution/);
   assert.match(imageUsage, /--background/);
@@ -242,7 +244,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(imageUsage, /providers set/);
   assert.match(imageUsage, /最多 16/);
   assert.equal(/\/v1\/|images\/generations|images\/edits/.test(imageUsage), false);
-  assert.match(imagePe, /name:\s*"GPT Image 提示词写法"/);
+  assert.match(imagePe, /name:\s*生图-提示词写法/);
   assert.ok(Buffer.byteLength(imagePe, "utf8") >= 12000);
   assert.match(imagePe, /提示词用中文写/);
   assert.match(imagePe, /场景、主体、细节、约束/);

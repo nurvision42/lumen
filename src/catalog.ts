@@ -1,7 +1,8 @@
 import { CliError } from "./errors.js";
 
 export const GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
-/** Official Ark Model IDs. Short aliases: seedream-5-pro, seedream-5-flash. */
+/** Shared Seedream ids. Default provider is beeftv; volcark is the other binding. Aliases: seedream-5-pro, seedream-5-flash. */
+export const SEEDREAM_DEFAULT_RESOLUTION = "2K";
 export const SEEDREAM_PRO_MODEL = "doubao-seedream-5-0-pro-260628";
 export const SEEDREAM_FLASH_MODEL = "doubao-seedream-5-0-flash-260915";
 export const SEEDREAM_MODELS = [SEEDREAM_PRO_MODEL, SEEDREAM_FLASH_MODEL] as const;
@@ -54,6 +55,7 @@ export const IMAGE_PROVIDER_RESOLUTIONS: Partial<Record<ProviderId, readonly (ty
   yunqiao: ["1K", "2K"],
   grsai: ["1K", "2K", "4K"],
   volcark: SEEDREAM_RESOLUTIONS,
+  beeftv: SEEDREAM_RESOLUTIONS,
 };
 
 export const BREAKDOWN_PROMPT_PLACEHOLDER =
@@ -120,14 +122,14 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: SEEDREAM_PRO_MODEL,
     kind: "image",
-    summary: "Seedream 5.0 Pro on volcark. Sizes 1K, 1.5K, 2K. Estimate 0.30 yuan/image at ≤1.5K and 0.60 at 2K",
-    providers: ["volcark"],
+    summary: "Seedream 5.0 Pro. Default provider beeftv (wire dola-seedream-5-0-pro-260628), also volcark. Default resolution 2K. beeftv 0.09 yuan ≤2.61M px, 0.18 above. volcark 0.30 yuan ≤1.5K, 0.60 at 2K",
+    providers: ["beeftv", "volcark"],
   },
   {
     id: SEEDREAM_FLASH_MODEL,
     kind: "image",
-    summary: "Seedream 5.0 Flash on volcark. Sizes 1K, 1.5K, 2K. Estimate 0.12 yuan/image",
-    providers: ["volcark"],
+    summary: "Seedream 5.0 Flash. Default provider beeftv (wire dola-seedream-5-0-flash-260915), also volcark. Default resolution 2K. beeftv 0.04 yuan/image. volcark 0.12 yuan/image",
+    providers: ["beeftv", "volcark"],
   },
   ...SEEDANCE_MODELS.map((id) => ({
     id,

@@ -1,5 +1,5 @@
 import type { ModelBinding } from "../config.js";
-import type { MediaRef, VideoRequest } from "../catalog.js";
+import { SEEDREAM_FLASH_MODEL, SEEDREAM_PRO_MODEL, assertImageProviderRules, type ImageRequest, type MediaRef, type VideoRequest } from "../catalog.js";
 import { CliError } from "../errors.js";
 import type { RunMode } from "../flags.js";
 import { fetchOf, joinUrl, pause, perform, publicResult, TransportError, type HttpCall, type HttpResult, type SendOptions } from "../http.js";
@@ -24,6 +24,47 @@ export const BEEFTV_SEEDANCE_MODELS: Record<string, string> = {
 
 export function beeftvWireModel(modelId: string, alias: string | undefined): string {
   return alias ?? BEEFTV_SEEDANCE_MODELS[modelId] ?? modelId;
+}
+
+/** BeefTV image route. Docs: https://docs.enterprise.beefapi.com/docs/images */
+export const BEEFTV_IMAGE_PATH = "/v1/images/generations";
+
+/** Default upstream ids seen on BeefTV /v1/models. modelAlias replaces these. */
+export const BEEFTV_SEEDREAM_WIRE: Record<string, string> = {
+  [SEEDREAM_PRO_MODEL]: "dola-seedream-5-0-pro-260628",
+  [SEEDREAM_FLASH_MODEL]: "dola-seedream-5-0-flash-260915",
+};
+
+export function beeftvImageWireModel(modelId: string, alias: string | undefined): string {
+  return alias ?? BEEFTV_SEEDREAM_WIRE[modelId] ?? modelId;
+}
+
+export function assertBeeftvImageRef(source: string): void {
+  if (/^https:\/\//i.test(source)) return;
+  if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(source)) return;
+  if (isLocalMedia(source)) return;
+  throw new CliError(`beeftv image reference must be https://, a data URI, or a local file: ${source}`);
+}
+
+/**
+ * POST /v1/images/generations. BeefTV names reference inputs `images` (URL or Base64).
+ * `size` is the Seedream tier or 宽x高. n is 1. watermark is off.
+ * Local files are uploaded first; this body receives the resulting https or data URI.
+ */
+export function planBeeftvImage(request: ImageRequest, binding: ModelBinding, size: string): HttpCall[] {
+  assertImageProviderRules(request, binding.provider);
+  const body: Record<string, unknown> = {
+    model: beeftvImageWireModel(request.modelId, binding.modelAlias),
+    prompt: request.prompt,
+    size,
+    n: 1,
+    response_format: "url",
+    output_format: "png",
+    watermark: false,
+  };
+  if (request.background !== undefined) body.background = request.background;
+  if (request.references.length > 0) body.images = request.references;
+  return [jsonCall("POST", joinUrl(binding.baseUrl, BEEFTV_IMAGE_PATH), {}, body)];
 }
 
 const OK = new Set(["completed"]);
