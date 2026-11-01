@@ -26,7 +26,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **出图。** 按提示词生成一张图，或按参考图改图。单张即可。`lumen gen image --model <id>`。GPT Image 模型 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`，供应商 `yunqiao` 或 `grsai`。出图先读 `skills/lumen/references/gpt-image/SKILL.md`。Seedream 5.0 是 `doubao-seedream-5-0-pro-260628`（别名 `seedream-5-pro`）和 `doubao-seedream-5-0-flash-260915`（别名 `seedream-5-flash`）。默认供应商是 `beeftv`，也可以绑 `volcark`。省略分辨率时是 `2K`。这两支先读 `skills/lumen/references/seedream/SKILL.md`。所有出图再读 `skills/lumen/references/生图-提示词写法/SKILL.md`。提示词用中文写。提示词写法只写正文，不提交。要写设备、镜头、视场、光圈、光、色或运镜时，图像和视频都读 `skills/lumen/references/拍摄设定/SKILL.md`。
 
-**出视频。** 用 Seedance 出一条视频。单条即可。`lumen gen video --model <id>`。供应商是 `haomao`；`seedance-2-fast` 还可以绑 `beeftv`；`seedance-2.5` 还可以绑 `ycyapi`。出视频先读对应的使用说明（形态、时长、比例、素材、提交），再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。提示词写法只优化提示词，不代替 lumen 提交任务。
+**出视频。** 用 Seedance 出一条视频。单条即可。`lumen gen video --model <id>`。供应商是 `haomao`；`seedance-2-fast` 还可以绑 `beeftv`；`seedance-2.5` 还可以绑 `ycyapi`。出视频先读对应的使用说明（形态、时长、比例、素材、提交），再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。提示词写法只优化提示词，不代替 lumen 提交任务。复杂商业片或信息流，写提示词前先读 `skills/lumen/references/开场钩子/SKILL.md`。要脚本、分镜或多镜时，先读 `skills/lumen/references/分镜脚本/SKILL.md`，再按提示词写法的路径 B 写正文。片种可选读 `skills/lumen/references/视频类型/SKILL.md`。
 
 - `seedance-2`、`seedance-2-fast`（别名 `standard`、`fast`）先读 `skills/lumen/references/seedance-2/SKILL.md`，然后读上面的提示词写法。
 - `seedance-2.5`（别名 `2.5`）先读 `skills/lumen/references/seedance-2.5/SKILL.md`，然后读同一份提示词写法。`--task-type` 只在这份使用说明里。
