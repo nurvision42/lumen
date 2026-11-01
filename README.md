@@ -160,7 +160,7 @@ lumen doctor
 
 ### Seedance
 
-形态是 `text`、`frame`、`reference`。提示词上限 20000，`seedance-2.5` 是 30000。生成前先读使用说明：`seedance-2`、`seedance-2-fast` 读 `skills/lumen/references/seedance-2/SKILL.md`，`seedance-2.5` 读 `skills/lumen/references/seedance-2.5/SKILL.md`。写提示词再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。图像和视频要写设备、镜头、光、色或运镜时读 `skills/lumen/references/拍摄设定/SKILL.md`。提交只带提示词正文里点到的素材。提示词用中文写，不要翻译成英文。
+形态是 `text`、`frame`、`reference`。提示词上限 20000，`seedance-2.5` 是 30000。生成前先读使用说明：`seedance-2`、`seedance-2-fast` 读 `skills/lumen/references/seedance-2/SKILL.md`，`seedance-2.5` 读 `skills/lumen/references/seedance-2.5/SKILL.md`。写提示词再读 `skills/lumen/references/seedance-提示词写法/SKILL.md`。复杂商业片或信息流先读 `skills/lumen/references/开场钩子/SKILL.md`；要脚本或多镜时读 `skills/lumen/references/分镜脚本/SKILL.md`，再按路径 B 写；片种可选读 `skills/lumen/references/视频类型/SKILL.md`。图像和视频要写设备、镜头、光、色或运镜时读 `skills/lumen/references/拍摄设定/SKILL.md`。提交只带提示词正文里点到的素材。提示词用中文写，不要翻译成英文。
 
 参考上限：图像 9/30、视频 3/10、音频 3/10（斜线后是 2.5）。每张图和每段视频都要 `person-reference`（`image|url|true`），音频不写。拒绝 `.m4a` 和音频 `.mp4`。非 2.5 的音频必须同时有图像或视频，并且参考总数不超过 12。不能混用首尾帧和参考。尾帧必须有首帧。`web-search` 只在 `text`，而且 haomao 不接受它。时长 4–15；2.5 是 `-1` 或 4–30。分辨率：`seedance-2` 为 480p/720p/1080p/4k，2.5 为 480p/720p/1080p，fast 为 480p/720p。比例 `1:1`、`4:3`、`3:4`、`16:9`、`9:16`、`21:9`、`adaptive`。默认 720p、`9:16`、`generateAudio false`。haomao 上的 `seedance-2.5` 帧模式只能用 `adaptive`。
 
