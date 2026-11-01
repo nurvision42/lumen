@@ -46,6 +46,8 @@ Backends, one binding per model (no family fallback):
   video    haomao; beeftv (seedance-2-fast); ycyapi (seedance-2.5) — Seedance. Polls the task, then saves the mp4. Not MediaKit.
            seedance-2.5 on haomao: --task-type auto|reference|edit|extend (omni_reference_task_type).
            ycyapi: HTTPS or local refs (local files require a tos block and VOLC_ACCESSKEY / VOLC_SECRETKEY); no first/last frame, Auto/task-type, adaptive, or 4K.
+           ycyapi estimate (https://ycyapi.cn/api/pricing, 2026-11-01): seedance2.5-A output seconds only,
+           480p 0.36 / 720p 0.62 / 1080p 0.95 yuan/s in group 22-SD-2.5视频. Reference video seconds are not added.
   voice    kitta at fishaudio.org
   download    douyin.com only. Saves a file for breakdown. No key on the command line.
               lumen setup --key tikhub stores it in the machine credential store, or set TIKHUB_API_KEY.

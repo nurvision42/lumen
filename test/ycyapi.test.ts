@@ -162,6 +162,7 @@ test("ycyapi execute: submits /v1/videos with seedance2.5-A, polls, downloads /c
       resolution: "720p",
       aspect_ratio: "16:9",
     });
+    assert.match(cap.out(), /estimate: 2\.48 yuan \(seedance2\.5-A 720p, 4 output s × 0\.62 yuan\/s, group 22-SD-2\.5视频\)/);
   });
 });
 
@@ -493,5 +494,184 @@ test("ycyapi TOS accepts VOLCENGINE_ACCESS_KEY aliases and a custom bucket", asy
     const submit = f.seen.find((c) => c.url === `${BASE}/v1/videos`)!;
     const source = (submit.body as { references: Array<{ source: string }> }).references[0]!.source;
     assert.equal(source.startsWith(`https://other-bucket.tos-cn-beijing.volces.com/lumen-${sha("AAA")}.png?`), true);
+  });
+});
+
+/** Pricing tests must not consult Volcengine credentials. */
+function envNoVolc(dir: string): NodeJS.ProcessEnv {
+  const env = isolatedEnv(dir);
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("VOLC")) delete env[key];
+  }
+  return env;
+}
+
+const OUTPUT_720 = "estimate: 2.48 yuan (seedance2.5-A 720p, 4 output s × 0.62 yuan/s, group 22-SD-2.5视频)";
+
+async function recordedYuan(dir: string, out: string): Promise<number | undefined> {
+  const id = /run: (\S+)/.exec(out)?.[1];
+  assert.ok(id);
+  const rec = JSON.parse(await readFile(path.join(dir, ".lumen/runs", id, "record.json"), "utf8")) as { params: { yuan?: number } };
+  return rec.params.yuan;
+}
+
+test("ycyapi dry-run estimate matches a run that includes a reference video", async () => {
+  await withDir(async (dir) => {
+    await bindYcy(dir);
+    const env = envNoVolc(dir);
+    const plain = capture(env, { cwd: dir });
+    assert.equal(await run(args(dir), plain.io), 0, plain.err());
+    const withVideo = capture(env, { cwd: dir });
+    assert.equal(
+      await run(
+        [
+          "gen",
+          "video",
+          "--model",
+          "seedance-2.5",
+          "--shape",
+          "reference",
+          "--prompt",
+          "p",
+          "--aspect-ratio",
+          "16:9",
+          "--resolution",
+          "720p",
+          "--duration",
+          "4",
+          "--ref",
+          "video|https://e.example/ref.mp4|false",
+          "--ref",
+          "image|https://e.example/a.png|false",
+          "--out",
+          "out/v.mp4",
+          "--project",
+          dir,
+        ],
+        withVideo.io,
+      ),
+      0,
+      withVideo.err(),
+    );
+    assert.equal(plain.out().includes(OUTPUT_720), true);
+    assert.equal(withVideo.out().includes(OUTPUT_720), true);
+    assert.equal(await recordedYuan(dir, plain.out()), 2.48);
+    assert.equal(await recordedYuan(dir, withVideo.out()), 2.48);
+    assert.equal(plain.out().includes("VOLC_"), false);
+  });
+});
+
+test("ycyapi per-call aliases keep one price with or without a reference video", async () => {
+  await withDir(async (dir) => {
+    await bindYcy(dir, ["--model-alias", "ya-sd25-30s"]);
+    const env = envNoVolc(dir);
+    const short = capture(env, { cwd: dir });
+    assert.equal(await run(args(dir), short.io), 0, short.err());
+    const long = capture(env, { cwd: dir });
+    assert.equal(
+      await run(
+        [
+          "gen",
+          "video",
+          "--model",
+          "seedance-2.5",
+          "--shape",
+          "reference",
+          "--prompt",
+          "p",
+          "--aspect-ratio",
+          "16:9",
+          "--resolution",
+          "1080p",
+          "--duration",
+          "30",
+          "--ref",
+          "video|https://e.example/long.mp4|false",
+          "--out",
+          "out/v.mp4",
+          "--project",
+          dir,
+        ],
+        long.io,
+      ),
+      0,
+      long.err(),
+    );
+    const line = "estimate: 2.00 yuan (ya-sd25-30s, 1 call, group 22-SD-2.5视频)";
+    assert.equal(short.out().includes(line), true);
+    assert.equal(long.out().includes(line), true);
+    assert.equal(await recordedYuan(dir, short.out()), 2);
+    assert.equal(await recordedYuan(dir, long.out()), 2);
+  });
+});
+
+test("ycyapi image aliases print the published per-image price and ignore reference video", async () => {
+  await withDir(async (dir) => {
+    await bindYcy(dir, ["--model-alias", "gpt-image-2.5-flare"]);
+    const env = envNoVolc(dir);
+    const cap = capture(env, { cwd: dir });
+    assert.equal(
+      await run(
+        [
+          "gen",
+          "video",
+          "--model",
+          "seedance-2.5",
+          "--shape",
+          "reference",
+          "--prompt",
+          "p",
+          "--duration",
+          "8",
+          "--aspect-ratio",
+          "16:9",
+          "--resolution",
+          "1080p",
+          "--ref",
+          "video|https://e.example/ref.mp4|false",
+          "--out",
+          "out/v.mp4",
+          "--project",
+          dir,
+        ],
+        cap.io,
+      ),
+      0,
+      cap.err(),
+    );
+    assert.match(cap.out(), /estimate: 0\.01 yuan \(gpt-image-2\.5-flare, 1 image, group 20-GPT-特价生图\)/);
+    assert.equal(await recordedYuan(dir, cap.out()), 0.01);
+  });
+});
+
+test("ycyapi gpt-image-4K and grouped gpt-image-2 use the captured group prices", async () => {
+  await withDir(async (dir) => {
+    await bindYcy(dir, ["--model-alias", "gpt-image-4K"]);
+    const four = capture(envNoVolc(dir), { cwd: dir });
+    assert.equal(await run(args(dir), four.io), 0, four.err());
+    assert.match(four.out(), /estimate: 0\.03 yuan \(gpt-image-4K, 1 image, group 20-GPT-特价生图\)/);
+
+    await bindYcy(dir, ["--model-alias", "gpt-image-2"]);
+    const missing = capture(envNoVolc(dir), { cwd: dir });
+    assert.equal(await run(args(dir), missing.io), 1);
+    assert.match(missing.err(), /needs --group/);
+    assert.match(missing.err(), /0\.01 yuan/);
+    assert.match(missing.err(), /0\.04 yuan/);
+    assert.equal(missing.out().includes("estimate:"), false);
+
+    await bindYcy(dir, ["--model-alias", "gpt-image-2", "--group", "20-GPT-图片"]);
+    const listed = capture(envNoVolc(dir), { cwd: dir });
+    assert.equal(await run(args(dir), listed.io), 0, listed.err());
+    assert.match(listed.out(), /estimate: 0\.04 yuan \(gpt-image-2, 1 image, group 20-GPT-图片\)/);
+  });
+});
+
+test("ycyapi refuses a group that does not publish seedance2.5-A", async () => {
+  await withDir(async (dir) => {
+    await bindYcy(dir, ["--group", "20-GPT-特价生图"]);
+    const cap = capture(envNoVolc(dir), { cwd: dir });
+    assert.equal(await run(args(dir), cap.io), 1);
+    assert.match(cap.err(), /not priced in group 20-GPT-特价生图/);
+    assert.equal(cap.out().includes("estimate:"), false);
   });
 });

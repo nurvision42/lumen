@@ -25,7 +25,8 @@ import { runFish } from "../clients/fish.js";
 import { runImage } from "../clients/image.js";
 import { runVideo } from "../clients/seedance.js";
 import { runBeeftvVideo } from "../clients/beeftv.js";
-import { runYcyapiVideo } from "../clients/ycyapi.js";
+import { runYcyapiVideo, ycyapiWireModel } from "../clients/ycyapi.js";
+import { ycyapiCost } from "../ycyapi/cost.js";
 import { adoptBinding } from "./session.js";
 
 const MODES: Record<string, FlagKind> = { "dry-run": "boolean", execute: "boolean", mock: "boolean" };
@@ -193,6 +194,17 @@ export async function genVideo(args: string[], project: string, io: IO, command:
     ctx.params = request;
     const { binding, config } = await adoptBinding(ctx, project, io.env, modelId);
     assertVideoProviderRules(request, binding.provider);
+    if (binding.provider === "ycyapi") {
+      const cost = ycyapiCost({
+        wireModel: ycyapiWireModel(request.modelId, binding.modelAlias),
+        resolution: request.resolution,
+        seconds: request.duration,
+        ...(binding.group === undefined ? {} : { group: binding.group }),
+        referenceVideos: request.references.filter((ref) => ref.kind === "video").length,
+      });
+      line(io, cost.text);
+      if (cost.yuan !== undefined) ctx.params = { ...request, yuan: cost.yuan };
+    }
     if (mode === "execute" && !ctx.keyPresent) throw missingKey(binding);
     const videoFile = outputPath(project, {
       shot,

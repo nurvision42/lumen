@@ -71,6 +71,16 @@ lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY
 lumen gen video --model seedance-2.5 --shape text --prompt "海边日落" --duration 4 --aspect-ratio 16:9 --resolution 720p
 ```
 
+### 估价
+
+提交前会打印一行估价，dry-run 也会打。这是估算。价表是 2026-11-01 从 https://ycyapi.cn/api/pricing 抓的公开数据，模型广场页面是 https://ycyapi.cn/pricing 。
+
+缺省上游 `seedance2.5-A` 在分组 `22-SD-2.5视频` 按输出秒数计费。公开价已经是该组的人民币单价：480p 0.36 元/秒，720p 0.62 元/秒，1080p 0.95 元/秒。720p、4 秒是 2.48 元。有没有参考视频、参考视频多长，这一行都相同。
+
+按次的上游 id 用 `model_price × 分组倍率`，只取该模型公开启用的分组。未写 `--group`、且只有一个分组时，用那个分组。`ya-sd25-30s` 2.00 元/次，上游名 `seedance-2.5` 0.32 元/次，`seedance2.5` 0.40 元/次（都在 `22-SD-2.5视频`，倍率 0.1）。`seedance2.0-B` 3.10 元/次，`seedance2.0-933-V` 0.20 元/次，`seedance-2.0:i2v` 2.59998 元/次（`22-SD-2.0视频`，倍率 0.1）。
+
+生图上游：`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`、`gpt-image-2.5` 在 `20-GPT-特价生图`（倍率 0.025）为 0.01 元/张；`gpt-image-4K` 为 0.03 元/张。`gpt-image-2` 在 `20-GPT-图片` 为 0.04 元/张，在 `20-GPT-特价生图` 为 0.01 元/张，要写 `--group`。lumen 的图像模型仍绑 `yunqiao` 或 `grsai`。把 `seedance-2.5` 的 `--model-alias` 设成上表里的 id 时，按该 id 估价。价表里没有的 id 会打印没有公开价格。
+
 ## 提交
 
 ```bash

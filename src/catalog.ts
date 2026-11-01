@@ -134,7 +134,10 @@ export const MODELS: readonly ModelInfo[] = [
   ...SEEDANCE_MODELS.map((id) => ({
     id,
     kind: "video" as const,
-    summary: "Seedance TextVideo, FrameVideo, and ReferenceVideo",
+    summary:
+      id === "seedance-2.5"
+        ? "Seedance TextVideo, FrameVideo, and ReferenceVideo. ycyapi seedance2.5-A bills output seconds only: 480p 0.36, 720p 0.62, 1080p 0.95 yuan/s in group 22-SD-2.5视频. Reference video seconds are not billed"
+        : "Seedance TextVideo, FrameVideo, and ReferenceVideo",
     providers: (
       id === "seedance-2-fast"
         ? ["haomao", "beeftv"]
