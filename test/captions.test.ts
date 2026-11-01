@@ -27,11 +27,13 @@ import {
   pillTop,
 } from "../src/captions/style.js";
 import { run } from "../src/run.js";
+import { findCjkFont } from "../src/sprite/layout.js";
 import { capture, withDir } from "./helpers.js";
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL("..", import.meta.url));
-const FONT = "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc";
+// 用本机实际存在的中文字体，避免写死某台机器的字体路径
+const FONT = (await findCjkFont()) ?? "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc";
 
 test("default caption layout follows the short side and the safe-area ratios", () => {
   assert.equal(fontSizeFor(1440, 2560), 56);

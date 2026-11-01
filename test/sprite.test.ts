@@ -175,7 +175,7 @@ async function liveSheet(): Promise<void> {
       "-r", "25",
     ], cut);
     await makeVideo(["-f", "lavfi", "-i", "color=c=gray:s=160x90:d=2", "-r", "25"], solid);
-    await makeVideo(["-f", "lavfi", "-i", "color=c=green:s=80x45:r=25", "-frames:v", "4"], tiny);
+    await makeVideo(["-f", "lavfi", "-i", "color=c=green:s=80x46:r=25", "-frames:v", "4"], tiny);
     await withPathBinaries(cut, solid, tiny);
     await withoutPathBinaries(cut);
     await assert.rejects(access(path.join(root, "node_modules", "sharp")));
