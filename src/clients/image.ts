@@ -1,4 +1,4 @@
-import type { LumenConfig, ModelBinding } from "../config.js";
+import type { ModelBinding } from "../config.js";
 import { assertImageProviderRules, type ImageRequest } from "../catalog.js";
 import { CliError } from "../errors.js";
 import { contentTypeFor } from "../media.js";
@@ -6,9 +6,7 @@ import { fetchOf, groupHeaders, joinUrl, perform, publicResult, type HttpCall, t
 import type { IO } from "../io.js";
 import type { RunMode } from "../flags.js";
 import type { OutputFile } from "../runs.js";
-import { isLocalMedia } from "./beeftv.js";
-import { mapLocalMediaViaTos, requireTosCredentials } from "./tos.js";
-import { assertVolcarkReference, missingVolcarkTos, planVolcarkImage } from "./volcark.js";
+import { planVolcarkImage, volcarkImageRef } from "./volcark.js";
 import { assertHttps, bytesFromResult, httpUrlFromResult, imageSize, jsonCall, wireModel } from "./wire.js";
 
 export function planImage(request: ImageRequest, binding: ModelBinding): HttpCall[] {
@@ -79,9 +77,8 @@ export async function runImage(
   io: IO,
   apiKey: string | undefined,
   outFile: string,
-  config?: LumenConfig,
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
-  if (binding.provider === "volcark") return runVolcarkImage(request, binding, mode, io, apiKey, outFile, config);
+  if (binding.provider === "volcark") return runVolcarkImage(request, binding, mode, io, apiKey, outFile);
   const calls = planImage(request, binding);
   if (mode === "dry-run") return { calls, response: null, files: [] };
   if (mode === "execute") checkExecute(request, binding);
@@ -105,41 +102,11 @@ async function runVolcarkImage(
   io: IO,
   apiKey: string | undefined,
   outFile: string,
-  config: LumenConfig | undefined,
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
-  for (const ref of request.references) assertVolcarkReference(ref);
+  const references = await Promise.all(request.references.map((ref) => volcarkImageRef(ref, io.cwd)));
+  const planned = planVolcarkImage({ ...request, references }, binding);
   const calls: HttpCall[] = [];
-  let wired = request;
-  let plannedUploads: unknown[] = [];
-  const locals = request.references.filter((ref) => isLocalMedia(ref));
-  if (locals.length > 0) {
-    if (config?.tos === undefined) throw missingVolcarkTos();
-    try {
-      requireTosCredentials(config.tos, io.env);
-    } catch {
-      throw missingVolcarkTos();
-    }
-    const mapped = await mapLocalMediaViaTos(
-      locals.map((source) => ({ source, kind: "image" as const })),
-      config.tos,
-      mode,
-      io,
-      calls,
-    );
-    wired = {
-      ...request,
-      references: request.references.map((ref) => mapped.urls.get(ref) ?? ref),
-    };
-    plannedUploads = mapped.plannedUploads;
-  }
-  const planned = planVolcarkImage(wired, binding);
-  if (mode === "dry-run") {
-    return {
-      calls: [...calls, ...planned],
-      response: plannedUploads.length > 0 ? { plannedUploads } : null,
-      files: [],
-    };
-  }
+  if (mode === "dry-run") return { calls: planned, response: null, files: [] };
   const opts = { mode, fetchImpl: fetchOf(io), ...(apiKey === undefined ? {} : { apiKey }) };
   const first = planned[0];
   if (first === undefined) throw new CliError("image request has no call");

@@ -48,9 +48,9 @@ lumen gen image --model doubao-seedream-5-0-pro-260628 --prompt "…" --ref refs
 
 - 公网 `https://` 原样交给上游。
 - `data:image/<小写格式>;base64,...` 原样交给上游。
-- 本地文件上传到火山引擎 TOS，默认私有桶 `lumen42`，上游拿到预签名链接。配置里要有 `"tos": {}`，并设置 `VOLC_ACCESSKEY` 和 `VOLC_SECRETKEY`。没配会直接失败，错误是中文。
+- 本地文件读入后变成 `data:image/<格式>;base64,...` 放进请求。格式按扩展名，可用 jpeg、png、webp、bmp、tiff、gif、heic、heif。`.jpg` 写成 `jpeg`。不上传，也不要配对象存储。
 
-`http://` 和其他协议会失败。
+`http://` 和其他协议会失败。文件不存在或扩展名不支持也会失败。
 
 ## 旗标
 

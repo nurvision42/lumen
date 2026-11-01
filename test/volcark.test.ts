@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { planVolcarkImage, seedreamSize } from "../src/clients/volcark.js";
+import { planVolcarkImage, seedreamSize, volcarkImageRef } from "../src/clients/volcark.js";
 import {
   IMAGE_ASPECTS,
   PROVIDER_DEFAULT_BASE_URLS,
@@ -20,7 +19,6 @@ import { capture, withDir } from "./helpers.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const BASE = "https://ark.example/api/v3";
-const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 const OFFICIAL: Record<string, Record<string, string>> = {
   "1K": {
@@ -371,100 +369,67 @@ test("execute downloads the url and sends Bearer ARK_API_KEY", async () => {
   });
 });
 
-test("local reference uploads to lumen42 and the presigned url is the image field", async () => {
+test("a local reference is a data URI and nothing is uploaded", async () => {
   await withDir(async (dir) => {
     await writeFile(path.join(dir, "a.png"), "AAA");
+    await writeFile(path.join(dir, "b.jpg"), "BBB");
     await bind(dir, SEEDREAM_PRO_MODEL, ["--base-url", BASE]);
-    const file = path.join(dir, "lumen.config.json");
-    const current = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
-    current.tos = {};
-    await writeFile(file, `${JSON.stringify(current, null, 2)}\n`);
-    const seen: Array<{ method: string; url: string; auth: string | null; body?: Record<string, unknown> }> = [];
-    const cap = capture(
-      isolatedEnv(dir, { ARK_API_KEY: "ark-secret", VOLC_ACCESSKEY: "AKIDlumen42test", VOLC_SECRETKEY: "tos-secret-key-value" }),
-      {
-        fetch: (async (url: string, init?: RequestInit) => {
-          const headers = new Headers(init?.headers);
-          const method = init?.method ?? "GET";
-          seen.push({
-            method,
-            url,
-            auth: headers.get("authorization"),
-            ...(typeof init?.body === "string" ? { body: JSON.parse(init.body) as Record<string, unknown> } : {}),
-          });
-          if (method === "PUT" && url.includes(".tos-cn-beijing.volces.com/")) return new Response(null, { status: 200 });
-          if (url === `${BASE}/images/generations`) return Response.json({ data: [{ b64_json: Buffer.from("png").toString("base64") }] });
-          throw new Error(`unexpected ${method} ${url}`);
-        }) as never,
-        cwd: dir,
-      },
-    );
+    const seen: Array<{ method: string; url: string; body?: Record<string, unknown> }> = [];
+    const cap = capture(isolatedEnv(dir, { ARK_API_KEY: "ark-secret" }), {
+      fetch: (async (url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        seen.push({
+          method,
+          url,
+          ...(typeof init?.body === "string" ? { body: JSON.parse(init.body) as Record<string, unknown> } : {}),
+        });
+        if (url === `${BASE}/images/generations`) return Response.json({ data: [{ b64_json: Buffer.from("png").toString("base64") }] });
+        throw new Error(`unexpected ${method} ${url}`);
+      }) as never,
+      cwd: dir,
+    });
+    const png = `data:image/png;base64,${Buffer.from("AAA").toString("base64")}`;
+    const jpeg = `data:image/jpeg;base64,${Buffer.from("BBB").toString("base64")}`;
+    assert.equal(await volcarkImageRef("a.png", dir), png);
+    assert.equal(await volcarkImageRef("b.jpg", dir), jpeg);
+    assert.equal(await volcarkImageRef("https://cdn.example/a.png", dir), "https://cdn.example/a.png");
+    assert.equal(await volcarkImageRef(png, dir), png);
+    await assert.rejects(volcarkImageRef("missing.png", dir), /本地参考图不存在/);
+    await writeFile(path.join(dir, "c.txt"), "nope");
+    await assert.rejects(volcarkImageRef("c.txt", dir), /格式不支持/);
     assert.equal(
       await run(
-        ["gen", "image", "--model", SEEDREAM_PRO_MODEL, "--prompt", "保留图 1", "--ref", "a.png", "--aspect-ratio", "1:1", "--resolution", "1.5K", "--out", "out/edit.png", "--execute", "--project", dir],
+        [
+          "gen", "image", "--model", SEEDREAM_PRO_MODEL, "--prompt", "保留图 1",
+          "--ref", "a.png", "--ref", "b.jpg", "--ref", "https://cdn.example/c.png",
+          "--aspect-ratio", "1:1", "--resolution", "1.5K", "--out", "out/edit.png",
+          "--execute", "--project", dir,
+        ],
         cap.io,
       ),
       0,
       cap.err(),
     );
-    const put = seen.find((item) => item.method === "PUT");
-    assert.equal(put?.url, `https://lumen42.tos-cn-beijing.volces.com/lumen-${sha("AAA")}.png`);
-    assert.match(put?.auth ?? "", /TOS4-HMAC-SHA256/);
-    assert.equal((put?.auth ?? "").includes("ark-secret"), false);
-    const post = seen.find((item) => item.url === `${BASE}/images/generations`);
-    assert.equal(post?.auth, "Bearer ark-secret");
-    assert.equal(post?.body?.size, "1536x1536");
-    assert.equal(typeof post?.body?.image, "string");
-    assert.match(String(post?.body?.image), new RegExp(`^https://lumen42\\.tos-cn-beijing\\.volces\\.com/lumen-${sha("AAA")}\\.png\\?`));
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]?.method, "POST");
+    assert.equal(seen[0]?.url, `${BASE}/images/generations`);
+    assert.deepEqual(seen[0]?.body?.image, [png, jpeg, "https://cdn.example/c.png"]);
     assert.deepEqual(await readFile(path.join(dir, "out/edit.png")), Buffer.from("png"));
   });
 });
 
-test("local reference without tos fails in Chinese and does not send", async () => {
+test("dry-run encodes a local reference and does not send", async () => {
   await withDir(async (dir) => {
     await writeFile(path.join(dir, "a.png"), "AAA");
-    await bind(dir);
+    await bind(dir, SEEDREAM_PRO_MODEL, ["--base-url", BASE]);
     const seen: string[] = [];
-    const cap = capture(isolatedEnv(dir, { ARK_API_KEY: "ark-secret" }), {
+    const cap = capture(isolatedEnv(dir), {
       fetch: (async (url: string) => {
         seen.push(url);
         throw new Error("should not send");
       }) as never,
       cwd: dir,
     });
-    assert.equal(
-      await run(
-        ["gen", "image", "--model", SEEDREAM_PRO_MODEL, "--prompt", "一只柴犬", "--ref", "a.png", "--execute", "--project", dir],
-        cap.io,
-      ),
-      1,
-    );
-    assert.match(cap.err(), /lumen42/);
-    assert.match(cap.err(), /VOLC_ACCESSKEY/);
-    assert.match(cap.err(), /"tos": \{\}/);
-    assert.equal(seen.length, 0);
-  });
-});
-
-test("dry-run plans the TOS put and does not send", async () => {
-  await withDir(async (dir) => {
-    await writeFile(path.join(dir, "a.png"), "AAA");
-    await bind(dir, SEEDREAM_PRO_MODEL, ["--base-url", BASE]);
-    const file = path.join(dir, "lumen.config.json");
-    const current = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
-    current.tos = {};
-    await writeFile(file, `${JSON.stringify(current, null, 2)}\n`);
-    const seen: string[] = [];
-    const cap = capture(
-      isolatedEnv(dir, { VOLC_ACCESSKEY: "AKIDlumen42test", VOLC_SECRETKEY: "tos-secret-key-value" }),
-      {
-        fetch: (async (url: string) => {
-          seen.push(url);
-          throw new Error("should not send");
-        }) as never,
-        cwd: dir,
-      },
-    );
     assert.equal(
       await run(
         ["gen", "image", "--model", SEEDREAM_PRO_MODEL, "--prompt", "一只柴犬", "--ref", "a.png", "--dry-run", "--project", dir],
@@ -479,9 +444,10 @@ test("dry-run plans the TOS put and does not send", async () => {
     const record = JSON.parse(await readFile(path.join(dir, ".lumen/runs", id, "record.json"), "utf8")) as {
       calls: Array<{ method: string; url: string; body: { value?: { image?: string } } }>;
     };
-    assert.equal(record.calls[0]?.method, "PUT");
-    assert.equal(record.calls[0]?.url, `https://lumen42.tos-cn-beijing.volces.com/lumen-${sha("AAA")}.png`);
-    assert.equal(record.calls[1]?.body.value?.image, `{{upload:${sha("AAA")}}}`);
+    assert.equal(record.calls.length, 1);
+    assert.equal(record.calls[0]?.method, "POST");
+    assert.equal(record.calls[0]?.url, `${BASE}/images/generations`);
+    assert.equal(record.calls[0]?.body.value?.image, `data:image/png;base64,${Buffer.from("AAA").toString("base64")}`);
   });
 });
 
@@ -526,9 +492,12 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   assert.match(usage, /0\.60/);
   assert.match(usage, /0\.12/);
   assert.match(usage, /1\.5K/);
-  assert.match(usage, /lumen42/);
+  assert.match(usage, /data:image/);
+  assert.equal(/lumen42|VOLC_ACCESSKEY|VOLC_SECRETKEY/.test(usage), false);
   assert.match(usage, /watermark|水印/);
   assert.equal(/images\/generations/.test(usage), false);
+  assert.match(skill, /本地参考图读成 data URI/);
+  assert.equal(skill.includes("本地参考图上传到火山引擎 TOS"), false);
   assert.match(pe, /提示词用中文写/);
   assert.match(pe, /不要把中文提示词再翻译成英文/);
   assert.match(pe, /图 1/);
@@ -536,4 +505,10 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   assert.match(readme, /volcark/);
   assert.match(readme, new RegExp(SEEDREAM_PRO_MODEL));
   assert.match(readme, /watermark: false/);
+  assert.match(readme, /不上传 TOS/);
+  assert.equal(readme.includes("本地文件走现有 TOS"), false);
+  const help = await readFile(path.join(root, "src", "help.ts"), "utf8");
+  assert.match(help, /Local files are read and sent/);
+  assert.match(help, /data:image\/\.\.\.;base64/);
+  assert.equal(/volcark[\s\S]{0,600}lumen42|volcark[\s\S]{0,600}VOLC_ACCESSKEY/.test(help), false);
 });

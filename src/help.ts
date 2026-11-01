@@ -36,8 +36,8 @@ Backends, one binding per model (no family fallback):
            Sizes 1K, 1.5K, 2K, or the official pixel table. watermark is sent false.
            response_format url, output_format png. One image. No sequential_image_generation
            (Pro and Flash do not support group images).
-           https and data:image base64 refs pass through. Local refs upload through TOS
-           bucket lumen42 (presigned GET). Needs "tos": {} and VOLC_ACCESSKEY / VOLC_SECRETKEY.
+           https and data:image base64 refs pass through. Local files are read and sent
+           as data:image/...;base64,... . Volcark does not upload them.
            Before submit, prints an estimate: Pro ≤1.5K 0.30 yuan/image, Pro 2K 0.60, Flash 0.12.
   video    haomao; beeftv (seedance-2-fast); ycyapi (seedance-2.5) — Seedance. Polls the task, then saves the mp4. Not MediaKit.
            seedance-2.5 on haomao: --task-type auto|reference|edit|extend (omni_reference_task_type).

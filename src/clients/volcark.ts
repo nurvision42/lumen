@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { ModelBinding } from "../config.js";
 import {
   SEEDREAM_RESOLUTIONS,
@@ -122,17 +124,48 @@ export function missingVolcarkKey(envName: string): CliError {
   return new CliError(`缺少火山方舟 API Key。${named}不要把密钥写进命令、配置或对话。`);
 }
 
-export function missingVolcarkTos(): CliError {
-  return new CliError(
-    '火山方舟的本地参考图要上传到火山引擎 TOS（默认私有桶 lumen42，预签名 GET）。请在配置里加上 "tos": {}，并设置 VOLC_ACCESSKEY 和 VOLC_SECRETKEY。公网 https:// 或 data:image/...;base64,... 不必上传。',
-  );
-}
+const DATA_URI = /^data:image\/[a-z0-9.+-]+;base64,/i;
+
+/** Official image subtypes. The data URI uses the lowercase name, so .jpg is jpeg. */
+const IMAGE_FORMATS: Record<string, string> = {
+  ".png": "png",
+  ".jpg": "jpeg",
+  ".jpeg": "jpeg",
+  ".webp": "webp",
+  ".bmp": "bmp",
+  ".tif": "tiff",
+  ".tiff": "tiff",
+  ".gif": "gif",
+  ".heic": "heic",
+  ".heif": "heif",
+};
 
 export function assertVolcarkReference(source: string): void {
   if (/^https:\/\//i.test(source)) return;
-  if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(source)) return;
+  if (DATA_URI.test(source)) return;
   if (isLocalMedia(source)) return;
   throw new CliError(`火山方舟参考图只接受 https://、data:image/...;base64,... 或本地文件：${source}`);
+}
+
+/**
+ * https and an existing data URI pass through. A local file is read and sent as
+ * data:image/<format>;base64,... . Volcark does not upload to TOS.
+ */
+export async function volcarkImageRef(source: string, cwd: string): Promise<string> {
+  assertVolcarkReference(source);
+  if (/^https:\/\//i.test(source) || DATA_URI.test(source)) return source;
+  const file = path.resolve(cwd, source);
+  const format = IMAGE_FORMATS[path.extname(file).toLowerCase()];
+  if (format === undefined) {
+    throw new CliError(`火山方舟参考图格式不支持：${file}。可用 jpeg、png、webp、bmp、tiff、gif、heic、heif。`);
+  }
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(file);
+  } catch {
+    throw new CliError(`本地参考图不存在：${file}`);
+  }
+  return `data:image/${format};base64,${bytes.toString("base64")}`;
 }
 
 /** JSON body for one image. References must already be https or data URIs. */

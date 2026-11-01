@@ -58,7 +58,7 @@ haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fas
 
 ## volcark
 
-`volcark` 是火山方舟官方图片接口，只提供 Seedream 5.0 Pro 和 Flash。绑定：`lumen providers set doubao-seedream-5-0-pro-260628 --provider volcark --api-key-env ARK_API_KEY`。分辨率 `1K`、`1.5K`、`2K`。提交前打印估价：Pro 在 ≤1.5K 是 0.30 元/张，2K 是 0.60 元/张；Flash 是 0.12 元/张。水印关闭。一次一张，不组图。本地参考图上传到火山引擎 TOS（默认桶 `lumen42`，预签名链接），需要 `"tos": {}` 以及 `VOLC_ACCESSKEY` / `VOLC_SECRETKEY`；公网 HTTPS 或 base64 不必上传。缺 `ARK_API_KEY` 时错误是中文。细则见 `skills/lumen/references/seedream/SKILL.md`。提示词用中文写。
+`volcark` 是火山方舟官方图片接口，只提供 Seedream 5.0 Pro 和 Flash。绑定：`lumen providers set doubao-seedream-5-0-pro-260628 --provider volcark --api-key-env ARK_API_KEY`。分辨率 `1K`、`1.5K`、`2K`。提交前打印估价：Pro 在 ≤1.5K 是 0.30 元/张，2K 是 0.60 元/张；Flash 是 0.12 元/张。水印关闭。一次一张，不组图。本地参考图读成 data URI 放进请求。公网 HTTPS 或已经是 base64 的原样传入，不上传。缺 `ARK_API_KEY` 时错误是中文。细则见 `skills/lumen/references/seedream/SKILL.md`。提示词用中文写。
 
 ## ycyapi
 

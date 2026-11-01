@@ -106,12 +106,12 @@ export async function genImage(args: string[], project: string, io: IO, command:
       line(io, cost.text);
       ctx.params = { ...request, yuan: cost.yuan };
     }
-    const { binding, config } = await adoptBinding(ctx, project, io.env, modelId);
+    const { binding } = await adoptBinding(ctx, project, io.env, modelId);
     if (mode === "execute" && !ctx.keyPresent) {
       throw binding.provider === "volcark" ? missingVolcarkKey(binding.apiKeyEnv) : missingKey(binding);
     }
     const out = outputPath(project, { shot, folder: "frame", filename: `${runId}.png`, out: flagString(values, "out") });
-    const outcome = await runImage(request, binding, mode, io, ctx.secret, out, config);
+    const outcome = await runImage(request, binding, mode, io, ctx.secret, out);
     ctx.calls = outcome.calls;
     ctx.response = outcome.response;
     ctx.files = outcome.files;
