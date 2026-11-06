@@ -77,3 +77,5 @@ haomao 的 seedance 上游模型名带 `.0`：`seedance-2.0`、`seedance-2.0-fas
 ## ycyapi
 
 `ycyapi` 只提供 `seedance-2.5`，上游模型名 `seedance2.5-A`，默认用官方域名，不用配。绑定：`lumen providers set seedance-2.5 --provider ycyapi --api-key-env YCYAPI_API_KEY`（`--model-alias` 可覆盖上游 id）。分辨率 `480p` / `720p` / `1080p`（lumen 默认 `720p`），时长 4–30 秒，比例不含 `adaptive`。参考素材接受公网 HTTPS，或本地文件。本地文件只上传到火山引擎 TOS（私有桶，预签名 GET，约 3 天）。在配置里加上 `"tos": {}`，并设置 `VOLC_ACCESSKEY` / `VOLC_SECRETKEY`。没配 `tos` 或没设密钥会直接失败，不会改走 beeftv。上限图 30 / 视频 10 / 音频 10。不支持首尾帧、`--task-type`（Auto / edit / extend）、remix、4K。配好之后 `--dry-run` 列出计划中的 TOS 上传且不发送。
+
+估价依据是 2026-11-01 的 ycyapi 公开价表，来源 URL 写在 `references/seedance-2.5/SKILL.md`。缺省上游 `seedance2.5-A` 只按输出秒数，分组 `22-SD-2.5视频`：480p 0.36 元/秒，720p 0.62 元/秒，1080p 0.95 元/秒。参考视频不另收费。`--model-alias ya-sd25-30s` 是 2.00 元/次。`gpt-image-2.5-flare` 和 `gpt-image-2.5-sunburst` 在 `20-GPT-特价生图` 为 0.01 元/张，`gpt-image-4K` 为 0.03 元/张。
