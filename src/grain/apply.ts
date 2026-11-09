@@ -3,7 +3,7 @@ import { CliError } from "../errors.js";
 import { execText } from "../tools/run.js";
 
 /** Fixed. Overlay opacity on luma only; chroma opacity stays 0. */
-export const GRAIN_STRENGTH = 0.55;
+export const GRAIN_STRENGTH = 0.4;
 
 export const BITRATE_FALLBACK_NOTE = "video stream bit_rate was missing; using format bit_rate";
 
@@ -34,7 +34,7 @@ export function grainGeometry(width: number, height: number): GrainGeometry {
 
 /**
  * Monochrome grain only. The proven graph for 2560×1440 is
- * split → scale to 1280×720 → gray mid-gray noise → slight blur → bicubic back → luma overlay at 0.55.
+ * split → scale to 1280×720 → gray mid-gray noise (c0s=40) → slight blur → bicubic back → luma overlay at 0.4.
  */
 export function grainFilter(width: number, height: number): string {
   const geometry = grainGeometry(width, height);
@@ -42,7 +42,7 @@ export function grainFilter(width: number, height: number): string {
     `scale=${geometry.grainWidth}:${geometry.grainHeight}`,
     "format=gray",
     "geq=lum=128",
-    "noise=c0s=60:c0f=t+u",
+    "noise=c0s=40:c0f=t+u",
     "gblur=sigma=0.6",
     `scale=${geometry.frameWidth}:${geometry.frameHeight}:flags=bicubic`,
     "format=yuv420p",

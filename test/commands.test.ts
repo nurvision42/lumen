@@ -73,7 +73,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   const enhanceSkill = await readFile(path.join(root, "skills", "lumen", "references", "增强", "SKILL.md"), "utf8");
   assert.match(enhanceSkill, /2k/);
   assert.match(enhanceSkill, /30/);
-  assert.match(enhanceSkill, /0\.55/);
+  assert.match(enhanceSkill, /强度固定 0\.4/);
   assert.match(enhanceSkill, /没有单独的颗粒命令/);
   assert.match(enhanceSkill, /不要自己调用 ffmpeg/);
   assert.equal(/lumen grain/.test(skill + enhanceSkill), false);

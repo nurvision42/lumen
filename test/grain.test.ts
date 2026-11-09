@@ -20,14 +20,14 @@ const exec = promisify(execFile);
 const FFMPEG = "/usr/bin/ffmpeg";
 const FFPROBE = "/usr/bin/ffprobe";
 
-const PROVEN = "[0:v]split[base][n];[n]scale=1280:720,format=gray,geq=lum=128,noise=c0s=60:c0f=t+u,gblur=sigma=0.6,scale=2560:1440:flags=bicubic,format=yuv420p[g];[base][g]blend=all_mode=overlay:c0_opacity=0.55:c1_opacity=0:c2_opacity=0";
+const PROVEN = "[0:v]split[base][n];[n]scale=1280:720,format=gray,geq=lum=128,noise=c0s=40:c0f=t+u,gblur=sigma=0.6,scale=2560:1440:flags=bicubic,format=yuv420p[g];[base][g]blend=all_mode=overlay:c0_opacity=0.4:c1_opacity=0:c2_opacity=0";
 
 test("grain matches the proven 2560x1440 graph and keeps sizes even", () => {
   assert.equal(grainFilter(2560, 1440), PROVEN);
   assert.deepEqual(grainGeometry(2560, 1440), { frameWidth: 2560, frameHeight: 1440, grainWidth: 1280, grainHeight: 720 });
   assert.equal(
     grainFilter(641, 361),
-    "[0:v]scale=640:360[src];[src]split[base][n];[n]scale=320:180,format=gray,geq=lum=128,noise=c0s=60:c0f=t+u,gblur=sigma=0.6,scale=640:360:flags=bicubic,format=yuv420p[g];[base][g]blend=all_mode=overlay:c0_opacity=0.55:c1_opacity=0:c2_opacity=0",
+    "[0:v]scale=640:360[src];[src]split[base][n];[n]scale=320:180,format=gray,geq=lum=128,noise=c0s=40:c0f=t+u,gblur=sigma=0.6,scale=640:360:flags=bicubic,format=yuv420p[g];[base][g]blend=all_mode=overlay:c0_opacity=0.4:c1_opacity=0:c2_opacity=0",
   );
   assert.deepEqual(grainGeometry(3, 5), { frameWidth: 2, frameHeight: 4, grainWidth: 2, grainHeight: 2 });
   assert.equal(grainFilter(2560, 1440).includes("c1_opacity=0:c2_opacity=0"), true);
@@ -82,7 +82,7 @@ test("film grain keeps audio and names a format-bitrate fallback", { timeout: 12
     ]);
     const plan = await applyFilmGrain({ ffmpeg: FFMPEG, ffprobe: FFPROBE, source, output: grained });
     assert.equal(plan.bitrate.source, "stream");
-    assert.equal(plan.filter.includes("c0_opacity=0.55"), true);
+    assert.equal(plan.filter.includes("c0_opacity=0.4"), true);
     const { stdout } = await exec(FFPROBE, [
       "-v", "error", "-show_entries", "stream=codec_type,codec_name,pix_fmt", "-of", "csv=p=0", grained,
     ]);
