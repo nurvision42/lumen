@@ -4,6 +4,8 @@ import { finishHaomaoVideo } from "../clients/seedance.js";
 import { finishBeeftvVideo } from "../clients/beeftv.js";
 import { finishYcyapiVideo } from "../clients/ycyapi.js";
 import { pollMediakitTask, publishedMediakit } from "../clients/mediakit.js";
+import { resumeSeedAsr } from "../clients/seedasr.js";
+import { asRecord } from "../walk.js";
 import { PendingTaskError } from "../clients/jobs.js";
 import { bytesFromResult } from "../clients/wire.js";
 import { CliError } from "../errors.js";
@@ -174,6 +176,42 @@ async function resumeMediakit(
   };
 }
 
+async function resumeOpenspeech(
+  record: RunRecord,
+  pending: PendingTask,
+  binding: NonNullable<RunRecord["binding"]>,
+  apiKey: string,
+  calls: HttpCall[],
+  io: IO,
+): Promise<{ response: unknown; files: OutputFile[] }> {
+  const params = asRecord(record.params);
+  const duration = typeof params?.duration === "number" ? params.duration : undefined;
+  const video = typeof params?.video === "string" ? params.video : pending.videoFile;
+  if (duration === undefined || !(duration > 0)) {
+    throw new CliError(`run ${record.id} has no probed duration. Refusing to invent cue times.`);
+  }
+  const draft = await resumeSeedAsr({
+    binding,
+    taskId: pending.taskId,
+    apiKey,
+    io,
+    calls,
+    duration,
+    video,
+  });
+  const jsonPath = pending.videoFile.length > 0 ? pending.videoFile : path.join(record.id, "captions.json");
+  const asrPath = pending.receipt.length > 0 ? pending.receipt : `${jsonPath}.asr.json`;
+  const txtPath = jsonPath.replace(/\.json$/i, ".txt");
+  return {
+    response: draft.captions,
+    files: [
+      { path: jsonPath, text: `${JSON.stringify(draft.captions, null, 2)}\n` },
+      { path: txtPath, text: draft.readable },
+      { path: asrPath, text: `${JSON.stringify(draft.asr, null, 2)}\n` },
+    ],
+  };
+}
+
 function imageRun(record: RunRecord): boolean {
   return record.image !== undefined || isImageModel(record.modelId);
 }
@@ -285,8 +323,8 @@ export async function resumeRun(
   }
   const pending = derivePending(record, project, overrides);
   if (pending === undefined) throw new CliError(`run ${id} has no remote task to resume (pass --task <id>)`, 2);
-  if (pending.provider !== "haomao" && pending.provider !== "beeftv" && pending.provider !== "ycyapi" && pending.provider !== "mediakit") {
-    throw new CliError(`resume supports haomao, beeftv, ycyapi, and mediakit tasks, not ${pending.provider}`, 2);
+  if (pending.provider !== "haomao" && pending.provider !== "beeftv" && pending.provider !== "ycyapi" && pending.provider !== "mediakit" && pending.provider !== "openspeech") {
+    throw new CliError(`resume supports haomao, beeftv, ycyapi, mediakit, and openspeech tasks, not ${pending.provider}`, 2);
   }
   if (pending.provider === "mediakit" && record.modelId !== "video-understand-router" && !ENHANCE_MODELS.has(record.modelId)) {
     throw new CliError(`resume does not know how to finish mediakit model ${record.modelId}`, 2);
@@ -319,8 +357,9 @@ export async function resumeRun(
   const now = (io.now?.() ?? new Date()).toISOString();
   const next: RunRecord = { ...record, resumedAt: [...(record.resumedAt ?? []), now] };
   try {
-    const outcome =
-      pending.provider === "mediakit"
+    const outcome = pending.provider === "openspeech"
+      ? await resumeOpenspeech(record, pending, binding, apiKey, calls, io)
+      : pending.provider === "mediakit"
         ? await resumeMediakit(project, record, pending, calls, opts, io)
         : await resumeSeedance(pending, binding.baseUrl, calls, opts, io);
     const outputs: string[] = [];

@@ -15,7 +15,7 @@ Usage:
   lumen setup ffmpeg
   lumen sprite --video <file> --to <image> [--every s|--frames n|--every-frame|--at t|--ranges json] [--columns n] [--rows n] [--cell px] [--transcript file] [--json]
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
-  lumen captions transcribe --video <file> [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
+  lumen captions transcribe --video <file> [--engine seed|mediakit] [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
   lumen captions burn --video <file> --subs <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
   lumen enhance [--video file] [--shot N] [--out file] [--dry-run|--execute|--mock] [--detach]
   lumen runs list [--pending]|show <id>|wait <id> [--timeout 秒]|resume <id> [--task <id>] [--out file] [--execute --detach]
@@ -66,11 +66,14 @@ Backends, one binding per model (no family fallback):
                          There is no separate grain command. Do not add grain again.
                          local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}
                          still running when polling ends stays running (exit 0); lumen runs resume <id> continues and saves the result
-  captions transcribe   MediaKit asr-subtitles. Default --dry-run; --execute recognizes speech.
-            Cue count, order, and start/end come from the recognizer. Each end is clamped
-            to the probed file duration. Project shot lists and voice runs are not read.
-            --script is rejected. --no-script is unnecessary. The JSON stays unconfirmed.
-            Bind asr-subtitles to mediakit.
+  captions transcribe   Default engine is seed-asr (Doubao Seed ASR 2.0, volc.seedasr.auc,
+            model_name bigmodel) on openspeech. Bind seed-asr with DOUBAO_SPEECH_API_KEY.
+            Local video audio is extracted and uploaded through the configured TOS bucket.
+            Word timings are the only clock. A gap over 0.2s starts a new cue; 40ms gaps
+            stay together. Cue text is the words, without commas or periods. Raw words
+            are kept. --engine mediakit uses asr-subtitles and does not run unless asked.
+            There is no silent fallback. --script is rejected. --no-script is unnecessary.
+            Project shot lists and voice runs are not read. Ends are clamped to the file.
   captions burn         Burns the supplied JSON, SRT, or ASS with ffmpeg. Runs immediately.
             Uses that file's text and times and does not compare or rewrite them.
             --speech and --speech-file are rejected. An unconfirmed lumen.captions JSON

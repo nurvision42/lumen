@@ -1,6 +1,6 @@
 ---
 name: 转字幕
-description: 用 lumen captions transcribe 把视频认成带原始时间的字幕。不读项目文案，不改条数和时间。口播文本交给加字幕。
+description: 用 lumen captions transcribe 调豆包录音文件识别 2.0，按逐字时间做初分段。校对交给助手，不自动改字。
 ---
 
 # 转字幕
@@ -21,35 +21,35 @@ description: 用 lumen captions transcribe 把视频认成带原始时间的字�
 lumen captions transcribe --video <file>
 ```
 
-默认 `--dry-run`：只把将要提交的请求写进审计，不上传，不写字幕文件。用户明确要识别时加 `--execute`。`--mock` 用内置假传输，不写字幕文件。
+默认引擎是豆包录音文件识别 2.0。`--dry-run` 只记请求，不抽音频，不上传，不访问识别服务。用户明确要识别时加 `--execute`。
 
-传了 `--script` 会直接失败。镜头表 `vo`、成功的 `fish synth` / `fish clone` 记录、出视频提示词，都不会被读进来，也不会变成字幕时间。这一步不改字。
+本地视频会抽出 16 kHz 单声道 wav，上传到已经配好的 TOS，把预签名地址交给识别。资源是 `volc.seedasr.auc`，`model_name` 是 `bigmodel`，`show_utterances` 打开。没有 `tos`，或没有 `VOLC_ACCESSKEY` / `VOLC_SECRETKEY`，就失败。不会改用别的上传。
 
-`--video` 可以是项目里的文件，也可以是一条已有的远程地址。本地文件的片长用 ffprobe 读。结束时间超过片长的会被裁短，整段落在片长之外的会丢掉。这是按成片时长做的边界检查，不是按镜头表分配时间。远程地址没有本地片长时，用识别服务返回的时长。
+时间只来自逐字 `words`。后一个字的 `start` 比前一个字的 `end` 晚超过 0.2 秒，才另起一条。两字相接、重叠，或空隙不超过 0.2 秒（包括 40 毫秒），留在同一条。字幕上的字由这些字拼出来，不采用带标点的整句 `text`，逗号和句号不会出现。这只说明听到了停顿，不能当成语义已经切对。
 
-输出默认在 `refs/<运行编号>.captions.json`，旁边有一份同名 `.txt`。`--to` 改 JSON 的位置，文本跟在旁边。需要交换文件时再加 `--srt` 或 `--ass`。这两份只是识别结果的副本，不能拿去压制。ASS 的圆角底不在这一步画。已有同名文件时命令拒绝覆盖。
+识别文件是初稿，`confirmed` 为 false。旁边的 `.asr.json` 留下原始返回和完整 words。`cues` 里的 `wordFrom`、`wordTo` 指向 words 里的下标。结束时间超过片长会被裁短；words 里的原始起止保留。没有逐字、或状态不明，命令失败，不编时间。
 
-JSON 里看这几项：
+命令不接受 `--script`。传了会直接失败。镜头表、语音合成记录、出视频提示词都不会被读。`--engine mediakit` 才走原来的 `asr-subtitles`，而且只有显式写下才走。识别失败不会悄悄退回那条路径。`--no-script` 不必再传。
 
-- `duration`：用来裁时间的片长，单位秒。
-- `clamped`：`true` 表示写出时有条目被裁短或丢掉。
-- `confirmed`：识别结果固定是 `false`。
-- `script`：固定是 `null`。
-- `cues`：每条 `start`、`end`、`text`。开了说话人时还有 `speaker`。条数、顺序和起止时间都是识别结果。
-- `asrDuration`：服务返回的时长，和 `duration` 不一样时才会出现。
-
-标准输出也会写片长、是否裁过、是否确认和条数。没有识别条目时命令失败，不会按文案编出时间。
+提交成功后任务 id 先写入 run。查询中断时用 `lumen runs resume <id> --execute`，它只查询这一次任务，不重新提交，也不重新上传。
 
 ## 绑定
 
-模型 `asr-subtitles`，供应商只有 `mediakit`。每个模型一条绑定，不会借用拆解或增强的密钥。
+```text
+lumen providers set seed-asr --provider openspeech --api-key-env DOUBAO_SPEECH_API_KEY
+```
+
+不写 `--base-url` 时用官方 openspeech 地址。密钥只放在 `DOUBAO_SPEECH_API_KEY`，不要写进命令、项目或对话。鉴权头是 `X-Api-Key`，不会留在 run 记录里。
+
+旧路径：
 
 ```text
 lumen providers set asr-subtitles --provider mediakit --api-key-env <你的变量名>
+lumen captions transcribe --video <file> --engine mediakit
 ```
-
-密钥放在这个环境变量里，不要写进命令、项目或对话。缺密钥就让 `--execute` 失败。`--language` 可传 `cmn-Hans-CN`、`eng-US`、`spa-ES`、`ind-ID`；不传则由服务自己判断。多人说话时加 `--speaker`。`speaker` 只留在字段里，不要写进口播文本。
 
 ## 接下来
 
-识别文件保持原样。校对不在这条命令里做。要改字时，另要到当前这条片子说出口的全部口播：不含说话人名字，不含画面上没被说出来的字。你自己对照识别结果，把改正写到另一份字幕文件。默认只改文字，条数、顺序、切分和起止时间不动。某一句对不上、或整段没有对应条目时，标给用户，不要编一条新时间。要改时间或重切，先单独问过并得到明确同意。校对完成后再读 `skills/lumen/references/加字幕/SKILL.md`。
+初稿先留着。向用户要到这条片子实际说出口的全部台词：不含说话人名字，不含画面上没说出来的字。你自己改错字，并看初分段要不要按语义合并或拆开。合并或拆开时，起点用第一个字的 `start`，终点用最后一个字的 `end`，在核对稿里记下 `wordFrom` 和 `wordTo`。不要猜一个新时间，不要按字数把一段时间摊开，不要用分镜表的时长，不要补上一句识别里没有的话。对不上的地方标出来。
+
+核对稿写到另一个文件，例如 `refs/<运行编号>.captions.review.json`。识别原文和 `.asr.json` 不要改。核对完再读 `skills/lumen/references/加字幕/SKILL.md`。

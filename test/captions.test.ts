@@ -162,7 +162,7 @@ test("transcribe dry-run plans asr-subtitles and writes no caption file", async 
         throw new Error("dry-run must not fetch");
       },
     });
-    assert.equal(await run(["captions", "transcribe", "--video", "refs/in.mp4", "--project", dir], cap.io), 0, cap.err());
+    assert.equal(await run(["captions", "transcribe", "--engine", "mediakit", "--video", "refs/in.mp4", "--project", dir], cap.io), 0, cap.err());
     assert.equal(called, false);
     assert.match(cap.out(), /dry-run asr-subtitles/);
     assert.equal(cap.out().includes("secret-value"), false);
@@ -200,7 +200,7 @@ test("execute clamps to the file duration and ignores a project script", async (
     const fetch = asrFetch([{ start_time: 0.2, end_time: 9, subtitle_text: "这不就瓶普通矿泉谁吗" }], 9);
     const loose = capture({ ...process.env, MEDIAKIT_ASR_KEY: "secret-value" }, { fetch });
     assert.equal(
-      await run(["captions", "transcribe", "--video", "clip.mp4", "--no-script", "--execute", "--to", "refs/loose.json", "--project", dir], loose.io),
+      await run(["captions", "transcribe", "--engine", "mediakit", "--video", "clip.mp4", "--no-script", "--execute", "--to", "refs/loose.json", "--project", dir], loose.io),
       0,
       loose.err(),
     );
@@ -221,7 +221,7 @@ test("execute clamps to the file duration and ignores a project script", async (
 
     const matched = capture({ ...process.env, MEDIAKIT_ASR_KEY: "secret-value" }, { fetch });
     assert.equal(
-      await run(["captions", "transcribe", "--video", "clip.mp4", "--execute", "--to", "refs/matched.json", "--project", dir], matched.io),
+      await run(["captions", "transcribe", "--engine", "mediakit", "--video", "clip.mp4", "--execute", "--to", "refs/matched.json", "--project", dir], matched.io),
       0,
       matched.err(),
     );
