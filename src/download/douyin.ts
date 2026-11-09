@@ -12,7 +12,7 @@ export type DouyinDownloadInfo = {
   readonly originalVideoUrl: string;
 };
 
-const API_URL = "https://api.tikhub.io/api/v1/douyin/web/fetch_video_high_quality_play_url";
+const API_URL = "https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_high_quality_play_url";
 
 export function isDouyinUrl(value: string): boolean {
   try {
@@ -22,6 +22,23 @@ export function isDouyinUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Work id from `/video/<id>`, `/note/<id>`, `/share/video/<id>`, `modal_id`, or `aweme_id`. */
+export function awemeIdFromUrl(value: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return undefined;
+  }
+  const fromPath = url.pathname.match(/\/(?:share\/video|video|note)\/(\d+)/u);
+  if (fromPath?.[1] !== undefined) return fromPath[1];
+  for (const key of ["modal_id", "aweme_id"]) {
+    const query = url.searchParams.get(key);
+    if (query !== null && /^\d+$/u.test(query)) return query;
+  }
+  return undefined;
 }
 
 function detail(value: unknown): string | undefined {
@@ -54,7 +71,9 @@ async function fetchInfo(
   fetchImpl: FetchImpl,
 ): Promise<DouyinDownloadInfo> {
   const endpoint = new URL(API_URL);
-  endpoint.searchParams.set("share_url", url);
+  const awemeId = awemeIdFromUrl(url);
+  if (awemeId === undefined) endpoint.searchParams.set("share_url", url);
+  else endpoint.searchParams.set("aweme_id", awemeId);
   if (region) endpoint.searchParams.set("region", region);
   const response = await fetchImpl(endpoint.toString(), {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
@@ -104,7 +123,10 @@ export async function downloadDouyinVideo(
   await mkdir(dirname(target), { recursive: true });
   const response = await fetchImpl(info.originalVideoUrl, {
     ...(options.signal === undefined ? {} : { signal: options.signal }),
-    headers: { "User-Agent": "lumen-douyin-downloader/1.0" },
+    headers: {
+      "User-Agent": "lumen-douyin-downloader/1.0",
+      Referer: "https://www.douyin.com/",
+    },
   });
   if (!response.ok || response.body === null) throw apiError(response.status, await response.text());
   const file = createWriteStream(target, { flags: "wx" });
