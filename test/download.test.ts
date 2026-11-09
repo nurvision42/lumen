@@ -10,6 +10,9 @@ import { capture, withDir } from "./helpers.js";
 
 const SHARE = "https://v.douyin.com/clip/";
 const CDN = "https://cdn.example/original.mp4";
+const WEB_CDN = "https://cdn.example/from-web.mp4";
+const APP_PATH = "/api/v1/douyin/app/v3/fetch_video_high_quality_play_url";
+const WEB_PATH = "/api/v1/douyin/web/fetch_video_high_quality_play_url";
 const BYTES = Buffer.from("mp4-bytes");
 
 function secret(): string {
@@ -44,6 +47,18 @@ function scriptedFetch(body: unknown, bytes: Uint8Array = BYTES, status = 200): 
         });
       }
       return new Response(bytes, { status: 200, headers: { "content-type": "video/mp4" } });
+    },
+  };
+}
+
+function webPayload(): { code: number; data: Record<string, unknown> } {
+  return {
+    code: 200,
+    data: {
+      original_video_url: WEB_CDN,
+      video_id: "vid-web",
+      content_type: "video/mp4",
+      file_size: BYTES.length,
     },
   };
 }
@@ -201,6 +216,9 @@ test("download uses the credential store, then the env var, and keeps the key ou
     assert.equal(calls[1]?.userAgent, "lumen-douyin-downloader/1.0");
     assert.equal(calls[1]?.referer, "https://www.douyin.com/");
     assert.equal(calls[1]?.authorization, undefined);
+    assert.match(saved.err(), /TikHub original-quality endpoint succeeded: app \/api\/v1\/douyin\/app\/v3\/fetch_video_high_quality_play_url/);
+    assert.equal(saved.err().includes("/douyin/web/"), false);
+    assert.equal(calls.some((call) => call.url.includes("/douyin/web/")), false);
 
     const xdg = path.join(dir, "xdg");
     const envOnly = scriptedFetch(payload(BYTES.length, true));
@@ -221,6 +239,9 @@ test("download uses the credential store, then the env var, and keeps the key ou
     assert.equal(json.out().includes(CDN), false);
     assert.equal(envOnly.seen()[0]?.authorization, `Bearer ${fromEnv}`);
     assert.match(envOnly.seen()[0]?.url ?? "", /region=US/);
+    assert.equal(envOnly.seen().filter((call) => call.url.includes("api.tikhub.io")).length, 1);
+    assert.match(json.err(), /TikHub original-quality endpoint succeeded: app \/api\/v1\/douyin\/app\/v3\/fetch_video_high_quality_play_url/);
+    assert.equal(json.out().includes("TikHub original-quality"), false);
     await assert.rejects(access(path.join(xdg, "lumen", "credentials", "tikhub.api")));
   });
 });
@@ -235,7 +256,18 @@ test("long video urls are sent as aweme_id and the original play url is saved", 
   await withDir(async (dir) => {
     const target = path.join(dir, "clip.mp4");
     const media = scriptedFetch(payload());
-    const info = await downloadDouyinVideo(long, target, { apiKey: secret(), region: "US", fetchImpl: media.fetch });
+    const logs: string[] = [];
+    const info = await downloadDouyinVideo(long, target, {
+      apiKey: secret(),
+      region: "US",
+      fetchImpl: media.fetch,
+      log: (message) => {
+        logs.push(message);
+      },
+    });
+    assert.deepEqual(logs, [
+      "TikHub original-quality endpoint succeeded: app /api/v1/douyin/app/v3/fetch_video_high_quality_play_url",
+    ]);
     assert.equal(info.videoId, "vid-1");
     assert.equal(info.originalVideoUrl, CDN);
     assert.equal(info.contentType, "video/mp4");
@@ -251,6 +283,134 @@ test("long video urls are sent as aweme_id and the original play url is saved", 
     assert.equal(calls[1]?.url, CDN);
     assert.equal(calls[1]?.userAgent, "lumen-douyin-downloader/1.0");
     assert.equal(calls[1]?.referer, "https://www.douyin.com/");
+  });
+});
+
+test("a failed app original-quality lookup retries the web endpoint", async () => {
+  const long = "https://www.douyin.com/video/7704966440873342331";
+  const appFailures: Array<{ label: string; share: string; region?: string; app: () => Promise<Response> | Response }> = [
+    {
+      label: "non-2xx",
+      share: long,
+      app: () => new Response(JSON.stringify({ detail: "bad gateway" }), { status: 502, headers: { "content-type": "application/json" } }),
+    },
+    {
+      label: "tikhub error",
+      share: SHARE,
+      region: "US",
+      app: () => new Response(JSON.stringify({
+        code: 400,
+        message: "fail",
+        message_zh: "失败",
+        data: { original_video_url: "https://cdn.example/ignore.mp4" },
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    },
+    {
+      label: "missing url",
+      share: long,
+      app: () => new Response(JSON.stringify({ code: 200, data: { video_id: "gone", original_video_url: "  " } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    },
+    {
+      label: "invalid json",
+      share: long,
+      app: () => new Response("not-json", { status: 200, headers: { "content-type": "application/json" } }),
+    },
+    {
+      label: "transport",
+      share: long,
+      app: () => {
+        throw new Error("socket hang up");
+      },
+    },
+  ];
+  for (const item of appFailures) {
+    await withDir(async (dir) => {
+      const target = path.join(dir, "clip.mp4");
+      const seen: Seen[] = [];
+      const logs: string[] = [];
+      let lookups = 0;
+      const apiKey = secret();
+      const info = await downloadDouyinVideo(item.share, target, {
+        apiKey,
+        ...(item.region === undefined ? {} : { region: item.region }),
+        log: (message) => {
+          logs.push(message);
+        },
+        fetchImpl: async (input, init) => {
+          const headers = new Headers(init?.headers);
+          seen.push({
+            url: input,
+            ...(headers.get("authorization") === null ? {} : { authorization: headers.get("authorization") ?? undefined }),
+            ...(headers.get("user-agent") === null ? {} : { userAgent: headers.get("user-agent") ?? undefined }),
+            ...(headers.get("referer") === null ? {} : { referer: headers.get("referer") ?? undefined }),
+          });
+          if (input.includes("api.tikhub.io")) {
+            lookups += 1;
+            if (lookups === 1) return item.app();
+            return new Response(JSON.stringify(webPayload()), { status: 200, headers: { "content-type": "application/json" } });
+          }
+          return new Response(BYTES, { status: 200, headers: { "content-type": "video/mp4" } });
+        },
+      });
+      assert.equal(info.originalVideoUrl, WEB_CDN, item.label);
+      assert.equal(info.videoId, "vid-web", item.label);
+      assert.equal(await readFile(target, "utf8"), BYTES.toString(), item.label);
+      assert.deepEqual(logs, [
+        "TikHub original-quality endpoint succeeded: web /api/v1/douyin/web/fetch_video_high_quality_play_url",
+      ], item.label);
+      const lookupsSeen = seen.filter((call) => call.url.includes("api.tikhub.io"));
+      assert.equal(lookupsSeen.length, 2, item.label);
+      const aweme = awemeIdFromUrl(item.share) ?? null;
+      for (const [index, call] of lookupsSeen.entries()) {
+        const lookup = new URL(call.url);
+        assert.equal(lookup.pathname, index === 0 ? APP_PATH : WEB_PATH, item.label);
+        assert.equal(lookup.searchParams.get("aweme_id"), aweme, item.label);
+        assert.equal(lookup.searchParams.get("share_url"), aweme === null ? item.share : null, item.label);
+        assert.equal(lookup.searchParams.get("region"), item.region ?? null, item.label);
+        assert.equal(call.authorization, `Bearer ${apiKey}`, item.label);
+        assert.equal(call.referer, undefined, item.label);
+      }
+      assert.equal(seen.at(-1)?.url, WEB_CDN, item.label);
+      assert.equal(seen.at(-1)?.authorization, undefined, item.label);
+      assert.equal(seen.some((call) => call.url.includes("cdn.example/ignore.mp4")), false, item.label);
+    });
+  }
+});
+
+test("both original-quality endpoints failing leaves no file", async () => {
+  await withDir(async (dir) => {
+    const target = path.join(dir, "clip.mp4");
+    const logs: string[] = [];
+    const seen: string[] = [];
+    await assert.rejects(
+      downloadDouyinVideo(SHARE, target, {
+        apiKey: secret(),
+        log: (message) => {
+          logs.push(message);
+        },
+        fetchImpl: async (input) => {
+          seen.push(input);
+          if (input.includes("/douyin/app/")) {
+            return new Response(JSON.stringify({ detail: "missing" }), { status: 404, headers: { "content-type": "application/json" } });
+          }
+          return new Response(JSON.stringify({ code: 200, data: { video_id: "none" } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        },
+      }),
+      /TikHub original-quality lookup failed\. app: TikHub API returned HTTP 404:.*web: TikHub did not return an original video URL/,
+    );
+    assert.deepEqual(logs, []);
+    assert.equal(seen.length, 2);
+    assert.equal(new URL(seen[0] ?? "").pathname, APP_PATH);
+    assert.equal(new URL(seen[1] ?? "").pathname, WEB_PATH);
+    assert.equal(new URL(seen[0] ?? "").searchParams.has("region"), false);
+    assert.equal(new URL(seen[1] ?? "").searchParams.has("region"), false);
+    await assert.rejects(access(target));
   });
 });
 
