@@ -55,7 +55,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **转字幕。** 把一条视频里的话认成带时间的字幕。条数、顺序、切分和起止时间都来自识别；本地文件的结束时间仍会裁到片长以内。不读镜头表，不读语音合成或克隆记录，不接受 `--script`。`lumen captions transcribe --video <file>`。默认 `--dry-run`，真正识别加 `--execute`。写出的 JSON `confirmed` 为 false。模型 `asr-subtitles`，供应商只有 `mediakit`。先读 `skills/lumen/references/转字幕/SKILL.md`。
 
-**加字幕。** 压制前必须另交当前这条片子的完整口播，不含说话人名字，按说出口的顺序，不含画面上没说出来的字。`lumen captions burn --video <file> --subs <file> --speech-file <file> --to <mp4>`。只改识别条目里的字。口播覆盖达到 0.85、识别覆盖达到 0.75，且没有落空的句子、也不会把一条改空，才压制；否则停，不写视频。`--confirm` 不能代替口播。用本机 ffmpeg 硬压。默认白字、半透明灰圆角底；竖屏顶部、横屏底部。先读 `skills/lumen/references/加字幕/SKILL.md`。
+**加字幕。** 只压你交来的字幕文件，按文件里的文字和时间画，不对照、不改字。校对由助手在压制前完成：先拿到当前这条片子说出口的全部口播，不含说话人名字，不含没说出来的画面字；对照识别结果，只在另一份文件里改错字、多字、漏字。条数、顺序、切分和起止时间默认不动。整段对不上就标出来，不要编时间。用户明确同意之后才能改时间或重切。`lumen captions burn --video <file> --subs <file> --to <mp4>`。不接受 `--speech`。用本机 ffmpeg 硬压。默认白字、半透明灰圆角底；竖屏顶部、横屏底部。先读 `skills/lumen/references/加字幕/SKILL.md`。
 
 **记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs list --pending` · `lumen runs show <id>` · `lumen runs wait <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id> --execute --detach` 接着等并取回结果，不要重新提交。助手跑生成的标准步骤见上面「助手怎么跑生成」。
 

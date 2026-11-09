@@ -23,7 +23,7 @@ lumen captions transcribe --video <file>
 
 默认 `--dry-run`：只把将要提交的请求写进审计，不上传，不写字幕文件。用户明确要识别时加 `--execute`。`--mock` 用内置假传输，不写字幕文件。
 
-传了 `--script` 会直接失败，并提示把口播交给 `lumen captions burn --speech` 或 `--speech-file`。镜头表 `vo`、成功的 `fish synth` / `fish clone` 记录、出视频提示词，都不会被读进来，也不会变成字幕时间。
+传了 `--script` 会直接失败。镜头表 `vo`、成功的 `fish synth` / `fish clone` 记录、出视频提示词，都不会被读进来，也不会变成字幕时间。这一步不改字。
 
 `--video` 可以是项目里的文件，也可以是一条已有的远程地址。本地文件的片长用 ffprobe 读。结束时间超过片长的会被裁短，整段落在片长之外的会丢掉。这是按成片时长做的边界检查，不是按镜头表分配时间。远程地址没有本地片长时，用识别服务返回的时长。
 
@@ -52,4 +52,4 @@ lumen providers set asr-subtitles --provider mediakit --api-key-env <你的变�
 
 ## 接下来
 
-识别文件保持原样。要压画面时，另交当前这条片子实际说出口的全部口播，读 `skills/lumen/references/加字幕/SKILL.md`。
+识别文件保持原样。校对不在这条命令里做。要改字时，另要到当前这条片子说出口的全部口播：不含说话人名字，不含画面上没被说出来的字。你自己对照识别结果，把改正写到另一份字幕文件。默认只改文字，条数、顺序、切分和起止时间不动。某一句对不上、或整段没有对应条目时，标给用户，不要编一条新时间。要改时间或重切，先单独问过并得到明确同意。校对完成后再读 `skills/lumen/references/加字幕/SKILL.md`。
