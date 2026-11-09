@@ -16,7 +16,7 @@ Usage:
   lumen sprite --video <file> --to <image> [--every s|--frames n|--every-frame|--at t|--ranges json] [--columns n] [--rows n] [--cell px] [--transcript file] [--json]
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
   lumen captions transcribe --video <file> [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
-  lumen captions burn --video <file> --subs <json> --speech <text>|--speech-file <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
+  lumen captions burn --video <file> --subs <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
   lumen enhance [--video file] [--shot N] [--out file] [--dry-run|--execute|--mock] [--detach]
   lumen runs list [--pending]|show <id>|wait <id> [--timeout 秒]|resume <id> [--task <id>] [--out file] [--execute --detach]
   lumen concat [--project dir]
@@ -71,14 +71,12 @@ Backends, one binding per model (no family fallback):
             to the probed file duration. Project shot lists and voice runs are not read.
             --script is rejected. --no-script is unnecessary. The JSON stays unconfirmed.
             Bind asr-subtitles to mediakit.
-  captions burn         Burns a lumen.captions JSON with ffmpeg. Runs immediately after a
-            confident text correction. Requires --speech or --speech-file: the spoken words
-            for this video, in order, without speaker names. Only cue text changes. A low
-            match, a passage with no cue, an edit that would empty a cue, or no recognition
-            stops before any video is written. --confirm does not replace the spoken text.
-            SRT and ASS are not accepted. The recognition JSON is kept; a .speech.json and
-            .speech.txt are written beside it. --dry-run prints the plan and does not write.
-            Rounded translucent boxes are overlays, not ASS BorderStyle. Default: white on
+  captions burn         Burns the supplied JSON, SRT, or ASS with ffmpeg. Runs immediately.
+            Uses that file's text and times and does not compare or rewrite them.
+            --speech and --speech-file are rejected. An unconfirmed lumen.captions JSON
+            needs --confirm. SRT and ASS are treated as already confirmed.
+            --dry-run prints position, font size, and margin and does not write. Rounded
+            translucent boxes are overlays, not ASS BorderStyle. Default: white on
             rgba(70,70,70,0.51); portrait top, landscape bottom; font size is the short side × 0.039.
   sprite    Contact sheet. ffmpeg extracts real frame times; sharp lays them out.
             Resolution is config (LUMEN_FFMPEG / LUMEN_FFPROBE or tools.ffmpeg / tools.ffprobe), then PATH, then the cache, then a hashed download.
