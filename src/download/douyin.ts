@@ -67,14 +67,15 @@ type FetchImpl = (input: string, init?: RequestInit) => Promise<Response>;
 async function fetchInfo(
   url: string,
   apiKey: string,
-  region: string,
+  region: string | undefined,
   fetchImpl: FetchImpl,
 ): Promise<DouyinDownloadInfo> {
   const endpoint = new URL(API_URL);
   const awemeId = awemeIdFromUrl(url);
   if (awemeId === undefined) endpoint.searchParams.set("share_url", url);
   else endpoint.searchParams.set("aweme_id", awemeId);
-  if (region) endpoint.searchParams.set("region", region);
+  const regionCode = region?.trim();
+  if (regionCode !== undefined && regionCode.length > 0) endpoint.searchParams.set("region", regionCode);
   const response = await fetchImpl(endpoint.toString(), {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
   });
@@ -119,7 +120,7 @@ export async function downloadDouyinVideo(
   if (!isDouyinUrl(url)) throw new CliError("only douyin.com links are supported");
   if (options.apiKey.trim() === "") throw new CliError("TikHub API key is required");
   const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
-  const info = await fetchInfo(url, options.apiKey.trim(), options.region ?? "CN", fetchImpl);
+  const info = await fetchInfo(url, options.apiKey.trim(), options.region, fetchImpl);
   await mkdir(dirname(target), { recursive: true });
   const response = await fetchImpl(info.originalVideoUrl, {
     ...(options.signal === undefined ? {} : { signal: options.signal }),

@@ -195,7 +195,7 @@ test("download uses the credential store, then the env var, and keeps the key ou
     assert.equal(lookup.pathname, "/api/v1/douyin/app/v3/fetch_video_high_quality_play_url");
     assert.equal(lookup.searchParams.get("share_url"), SHARE);
     assert.equal(lookup.searchParams.get("aweme_id"), null);
-    assert.equal(lookup.searchParams.get("region"), "CN");
+    assert.equal(lookup.searchParams.has("region"), false);
     assert.equal(calls[0]?.authorization, `Bearer ${stored}`);
     assert.equal(calls[1]?.url, CDN);
     assert.equal(calls[1]?.userAgent, "lumen-douyin-downloader/1.0");
@@ -263,6 +263,7 @@ test("a size mismatch deletes the file and an existing file is not overwritten",
       downloadDouyinVideo(SHARE, target, { apiKey: value, fetchImpl: mismatch.fetch }),
       /download size mismatch/,
     );
+    assert.equal(new URL(mismatch.seen()[0]?.url ?? "").searchParams.has("region"), false);
     await assert.rejects(access(target));
     assert.equal(JSON.stringify(mismatch.seen()).includes(value), true);
     const again = scriptedFetch(payload());
