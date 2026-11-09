@@ -15,8 +15,8 @@ Usage:
   lumen setup ffmpeg
   lumen sprite --video <file> --to <image> [--every s|--frames n|--every-frame|--at t|--ranges json] [--columns n] [--rows n] [--cell px] [--transcript file] [--json]
   lumen cuts --video <file> [--sample-rate fps] [--threshold n] [--json]
-  lumen captions transcribe --video <file> [--script <file>|--no-script] [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
-  lumen captions burn --video <file> --subs <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
+  lumen captions transcribe --video <file> [--to <json>] [--srt <file>] [--ass <file>] [--language <code>] [--speaker] [--dry-run|--execute|--mock]
+  lumen captions burn --video <file> --subs <json> --speech <text>|--speech-file <file> --to <mp4> [--position top_center|bottom_center|center] [--font-size n] [--margin ratio] [--font <file>] [--confirm] [--dry-run] [--json]
   lumen enhance [--video file] [--shot N] [--out file] [--dry-run|--execute|--mock] [--detach]
   lumen runs list [--pending]|show <id>|wait <id> [--timeout 秒]|resume <id> [--task <id>] [--out file] [--execute --detach]
   lumen concat [--project dir]
@@ -67,12 +67,18 @@ Backends, one binding per model (no family fallback):
                          local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}
                          still running when polling ends stays running (exit 0); lumen runs resume <id> continues and saves the result
   captions transcribe   MediaKit asr-subtitles. Default --dry-run; --execute recognizes speech.
-            Each cue end is clamped to the probed file duration. A shot-list voice-over or a
-            finished voice run is aligned automatically when it matches; otherwise the JSON
-            stays unconfirmed until burn --confirm. Bind asr-subtitles to mediakit.
-  captions burn         Burns a confirmed JSON, or an SRT/ASS file, with ffmpeg. Runs immediately.
-            --dry-run prints position, font size, and margin and does not write. Rounded
-            translucent boxes are overlays, not ASS BorderStyle. Default: white on
+            Cue count, order, and start/end come from the recognizer. Each end is clamped
+            to the probed file duration. Project shot lists and voice runs are not read.
+            --script is rejected. --no-script is unnecessary. The JSON stays unconfirmed.
+            Bind asr-subtitles to mediakit.
+  captions burn         Burns a lumen.captions JSON with ffmpeg. Runs immediately after a
+            confident text correction. Requires --speech or --speech-file: the spoken words
+            for this video, in order, without speaker names. Only cue text changes. A low
+            match, a passage with no cue, an edit that would empty a cue, or no recognition
+            stops before any video is written. --confirm does not replace the spoken text.
+            SRT and ASS are not accepted. The recognition JSON is kept; a .speech.json and
+            .speech.txt are written beside it. --dry-run prints the plan and does not write.
+            Rounded translucent boxes are overlays, not ASS BorderStyle. Default: white on
             rgba(70,70,70,0.51); portrait top, landscape bottom; font size is the short side × 0.039.
   sprite    Contact sheet. ffmpeg extracts real frame times; sharp lays them out.
             Resolution is config (LUMEN_FFMPEG / LUMEN_FFPROBE or tools.ffmpeg / tools.ffprobe), then PATH, then the cache, then a hashed download.
