@@ -32,6 +32,8 @@ export interface HttpResult {
   bytes: number;
   json?: unknown;
   body: Uint8Array;
+  /** Lowercase response headers we keep. Auth request headers are not copied here. */
+  headers?: Record<string, string>;
 }
 
 export function joinUrl(base: string, path: string): string {
@@ -63,6 +65,7 @@ export function publicResult(result: HttpResult): unknown {
     contentType: result.contentType,
     bytes: result.bytes,
     ...(result.json === undefined ? {} : { json: result.json }),
+    ...(result.headers === undefined ? {} : { headers: result.headers }),
   };
 }
 
@@ -129,11 +132,33 @@ function mockJson(call: HttpCall): unknown {
   }
   if (url.includes("/api/open/v1/voices")) return { voiceId: "mock-voice-id" };
   if (url.includes("/speech/tts")) return { id: "mock-audio" };
+  if (url.includes("/auc/bigmodel/submit")) return { task_id: "mock-seed-task" };
+  if (url.includes("/auc/bigmodel/query")) {
+    return {
+      audio_info: { duration: 400 },
+      result: { utterances: [{ start_time: 0, end_time: 400, text: "测", words: [{ text: "测", start_time: 0, end_time: 400 }] }] },
+    };
+  }
   return { ok: true };
 }
 
-function asResult(status: number, contentType: string, body: Uint8Array, json?: unknown): HttpResult {
-  return { status, contentType, bytes: body.byteLength, body, ...(json === undefined ? {} : { json }) };
+const KEPT_RESPONSE_HEADERS = new Set(["x-api-status-code", "x-api-message", "x-tt-logid"]);
+
+function asResult(
+  status: number,
+  contentType: string,
+  body: Uint8Array,
+  json?: unknown,
+  headers?: Record<string, string>,
+): HttpResult {
+  return {
+    status,
+    contentType,
+    bytes: body.byteLength,
+    body,
+    ...(json === undefined ? {} : { json }),
+    ...(headers === undefined || Object.keys(headers).length === 0 ? {} : { headers }),
+  };
 }
 
 async function encodeMultipart(parts: MultipartPart[], boundary: string): Promise<Uint8Array> {
@@ -181,7 +206,10 @@ export async function sendCall(call: HttpCall, opts: SendOptions): Promise<HttpR
   if (opts.mode === "mock") {
     const json = mockJson(call);
     const body = Buffer.from(JSON.stringify(json));
-    return asResult(200, "application/json", body, json);
+    const headers = call.url.includes("/auc/bigmodel/")
+      ? { "x-api-status-code": "20000000", "x-api-message": "OK" }
+      : undefined;
+    return asResult(200, "application/json", body, json, headers);
   }
   const auth = opts.auth === false ? undefined : opts.apiKey;
   let response: Response;
@@ -195,6 +223,11 @@ export async function sendCall(call: HttpCall, opts: SendOptions): Promise<HttpR
   }
   const body = new Uint8Array(await response.arrayBuffer());
   const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim() || "application/octet-stream";
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    const name = key.toLowerCase();
+    if (KEPT_RESPONSE_HEADERS.has(name)) headers[name] = value;
+  });
   let json: unknown;
   const text = Buffer.from(body).toString("utf8");
   if (contentType.includes("json") || text.startsWith("{") || text.startsWith("[")) {
@@ -204,7 +237,7 @@ export async function sendCall(call: HttpCall, opts: SendOptions): Promise<HttpR
       json = undefined;
     }
   }
-  return asResult(response.status, contentType, body, json);
+  return asResult(response.status, contentType, body, json, headers);
 }
 
 export async function perform(

@@ -1,0 +1,729 @@
+{
+  "full_text": "菠萝气泡水，先倒一点这个，加气泡水。搅一搅，一杯就做好了。再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。最后倒咖啡，你看这个颜色。一瓶菠萝浓缩汁，两种喝法。",
+  "utterance_count": 5,
+  "word_count": 68,
+  "words": [
+    {
+      "text": "菠",
+      "start_ms": 370,
+      "end_ms": 570,
+      "start_s": 0.37,
+      "end_s": 0.57,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "萝",
+      "start_ms": 570,
+      "end_ms": 690,
+      "start_s": 0.57,
+      "end_s": 0.69,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "气",
+      "start_ms": 810,
+      "end_ms": 970,
+      "start_s": 0.81,
+      "end_s": 0.97,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "泡",
+      "start_ms": 970,
+      "end_ms": 1130,
+      "start_s": 0.97,
+      "end_s": 1.13,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "水",
+      "start_ms": 1130,
+      "end_ms": 1410,
+      "start_s": 1.13,
+      "end_s": 1.41,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "先",
+      "start_ms": 1650,
+      "end_ms": 1890,
+      "start_s": 1.65,
+      "end_s": 1.89,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "倒",
+      "start_ms": 1890,
+      "end_ms": 2050,
+      "start_s": 1.89,
+      "end_s": 2.05,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "一",
+      "start_ms": 2050,
+      "end_ms": 2210,
+      "start_s": 2.05,
+      "end_s": 2.21,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "点",
+      "start_ms": 2210,
+      "end_ms": 2370,
+      "start_s": 2.21,
+      "end_s": 2.37,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "这",
+      "start_ms": 2370,
+      "end_ms": 2570,
+      "start_s": 2.37,
+      "end_s": 2.57,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "个",
+      "start_ms": 2570,
+      "end_ms": 2810,
+      "start_s": 2.57,
+      "end_s": 2.81,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "加",
+      "start_ms": 3690,
+      "end_ms": 4050,
+      "start_s": 3.69,
+      "end_s": 4.05,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "气",
+      "start_ms": 4090,
+      "end_ms": 4250,
+      "start_s": 4.09,
+      "end_s": 4.25,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "泡",
+      "start_ms": 4250,
+      "end_ms": 4450,
+      "start_s": 4.25,
+      "end_s": 4.45,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "水",
+      "start_ms": 4450,
+      "end_ms": 4730,
+      "start_s": 4.45,
+      "end_s": 4.73,
+      "utterance_text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "utt_start_ms": 370,
+      "utt_end_ms": 4730
+    },
+    {
+      "text": "搅",
+      "start_ms": 6720,
+      "end_ms": 6920,
+      "start_s": 6.72,
+      "end_s": 6.92,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "一",
+      "start_ms": 6920,
+      "end_ms": 7120,
+      "start_s": 6.92,
+      "end_s": 7.12,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "搅",
+      "start_ms": 7160,
+      "end_ms": 7280,
+      "start_s": 7.16,
+      "end_s": 7.28,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "一",
+      "start_ms": 7640,
+      "end_ms": 7880,
+      "start_s": 7.64,
+      "end_s": 7.88,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "杯",
+      "start_ms": 7880,
+      "end_ms": 8040,
+      "start_s": 7.88,
+      "end_s": 8.04,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "就",
+      "start_ms": 8040,
+      "end_ms": 8240,
+      "start_s": 8.04,
+      "end_s": 8.24,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "做",
+      "start_ms": 8240,
+      "end_ms": 8400,
+      "start_s": 8.24,
+      "end_s": 8.4,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "好",
+      "start_ms": 8400,
+      "end_ms": 8600,
+      "start_s": 8.4,
+      "end_s": 8.6,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "了",
+      "start_ms": 8600,
+      "end_ms": 8760,
+      "start_s": 8.6,
+      "end_s": 8.76,
+      "utterance_text": "搅一搅，一杯就做好了。",
+      "utt_start_ms": 6720,
+      "utt_end_ms": 8760
+    },
+    {
+      "text": "再",
+      "start_ms": 9200,
+      "end_ms": 9440,
+      "start_s": 9.2,
+      "end_s": 9.44,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "做",
+      "start_ms": 9440,
+      "end_ms": 9680,
+      "start_s": 9.44,
+      "end_s": 9.68,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "杯",
+      "start_ms": 9680,
+      "end_ms": 9880,
+      "start_s": 9.68,
+      "end_s": 9.88,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "菠",
+      "start_ms": 9920,
+      "end_ms": 10080,
+      "start_s": 9.92,
+      "end_s": 10.08,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "萝",
+      "start_ms": 10080,
+      "end_ms": 10200,
+      "start_s": 10.08,
+      "end_s": 10.2,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "美",
+      "start_ms": 10280,
+      "end_ms": 10520,
+      "start_s": 10.28,
+      "end_s": 10.52,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "式",
+      "start_ms": 10520,
+      "end_ms": 10600,
+      "start_s": 10.52,
+      "end_s": 10.6,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "也",
+      "start_ms": 10960,
+      "end_ms": 11240,
+      "start_s": 10.96,
+      "end_s": 11.24,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "只",
+      "start_ms": 11240,
+      "end_ms": 11440,
+      "start_s": 11.24,
+      "end_s": 11.44,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "放",
+      "start_ms": 11440,
+      "end_ms": 11600,
+      "start_s": 11.44,
+      "end_s": 11.6,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "一",
+      "start_ms": 11600,
+      "end_ms": 11760,
+      "start_s": 11.6,
+      "end_s": 11.76,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "点",
+      "start_ms": 11760,
+      "end_ms": 12000,
+      "start_s": 11.76,
+      "end_s": 12.0,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "先",
+      "start_ms": 12560,
+      "end_ms": 12800,
+      "start_s": 12.56,
+      "end_s": 12.8,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "加",
+      "start_ms": 12800,
+      "end_ms": 13080,
+      "start_s": 12.8,
+      "end_s": 13.08,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "水",
+      "start_ms": 13080,
+      "end_ms": 13400,
+      "start_s": 13.08,
+      "end_s": 13.4,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "别",
+      "start_ms": 13600,
+      "end_ms": 13880,
+      "start_s": 13.6,
+      "end_s": 13.88,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "倒",
+      "start_ms": 13880,
+      "end_ms": 14120,
+      "start_s": 13.88,
+      "end_s": 14.12,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "满",
+      "start_ms": 14120,
+      "end_ms": 14400,
+      "start_s": 14.12,
+      "end_s": 14.4,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "把",
+      "start_ms": 15200,
+      "end_ms": 15440,
+      "start_s": 15.2,
+      "end_s": 15.44,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "它",
+      "start_ms": 15440,
+      "end_ms": 15560,
+      "start_s": 15.44,
+      "end_s": 15.56,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "搅",
+      "start_ms": 15640,
+      "end_ms": 15800,
+      "start_s": 15.64,
+      "end_s": 15.8,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "开",
+      "start_ms": 15880,
+      "end_ms": 16200,
+      "start_s": 15.88,
+      "end_s": 16.2,
+      "utterance_text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "utt_start_ms": 9200,
+      "utt_end_ms": 16200
+    },
+    {
+      "text": "最",
+      "start_ms": 17670,
+      "end_ms": 17830,
+      "start_s": 17.67,
+      "end_s": 17.83,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "后",
+      "start_ms": 17830,
+      "end_ms": 17950,
+      "start_s": 17.83,
+      "end_s": 17.95,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "倒",
+      "start_ms": 18030,
+      "end_ms": 18190,
+      "start_s": 18.03,
+      "end_s": 18.19,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "咖",
+      "start_ms": 18230,
+      "end_ms": 18430,
+      "start_s": 18.23,
+      "end_s": 18.43,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "啡",
+      "start_ms": 18430,
+      "end_ms": 18670,
+      "start_s": 18.43,
+      "end_s": 18.67,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "你",
+      "start_ms": 19230,
+      "end_ms": 19510,
+      "start_s": 19.23,
+      "end_s": 19.51,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "看",
+      "start_ms": 19510,
+      "end_ms": 19670,
+      "start_s": 19.51,
+      "end_s": 19.67,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "这",
+      "start_ms": 19670,
+      "end_ms": 19830,
+      "start_s": 19.67,
+      "end_s": 19.83,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "个",
+      "start_ms": 19830,
+      "end_ms": 19950,
+      "start_s": 19.83,
+      "end_s": 19.95,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "颜",
+      "start_ms": 19950,
+      "end_ms": 20150,
+      "start_s": 19.95,
+      "end_s": 20.15,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "色",
+      "start_ms": 20150,
+      "end_ms": 20390,
+      "start_s": 20.15,
+      "end_s": 20.39,
+      "utterance_text": "最后倒咖啡，你看这个颜色。",
+      "utt_start_ms": 17670,
+      "utt_end_ms": 20390
+    },
+    {
+      "text": "一",
+      "start_ms": 22460,
+      "end_ms": 22660,
+      "start_s": 22.46,
+      "end_s": 22.66,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "瓶",
+      "start_ms": 22660,
+      "end_ms": 22820,
+      "start_s": 22.66,
+      "end_s": 22.82,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "菠",
+      "start_ms": 22860,
+      "end_ms": 23060,
+      "start_s": 22.86,
+      "end_s": 23.06,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "萝",
+      "start_ms": 23060,
+      "end_ms": 23140,
+      "start_s": 23.06,
+      "end_s": 23.14,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "浓",
+      "start_ms": 23260,
+      "end_ms": 23380,
+      "start_s": 23.26,
+      "end_s": 23.38,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "缩",
+      "start_ms": 23380,
+      "end_ms": 23500,
+      "start_s": 23.38,
+      "end_s": 23.5,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "汁",
+      "start_ms": 23620,
+      "end_ms": 23820,
+      "start_s": 23.62,
+      "end_s": 23.82,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "两",
+      "start_ms": 24060,
+      "end_ms": 24260,
+      "start_s": 24.06,
+      "end_s": 24.26,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "种",
+      "start_ms": 24260,
+      "end_ms": 24420,
+      "start_s": 24.26,
+      "end_s": 24.42,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "喝",
+      "start_ms": 24420,
+      "end_ms": 24660,
+      "start_s": 24.42,
+      "end_s": 24.66,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    },
+    {
+      "text": "法",
+      "start_ms": 24660,
+      "end_ms": 24860,
+      "start_s": 24.66,
+      "end_s": 24.86,
+      "utterance_text": "一瓶菠萝浓缩汁，两种喝法。",
+      "utt_start_ms": 22460,
+      "utt_end_ms": 24860
+    }
+  ],
+  "utterances": [
+    {
+      "text": "菠萝气泡水，先倒一点这个，加气泡水。",
+      "start_ms": 370,
+      "end_ms": 4730,
+      "start_s": 0.37,
+      "end_s": 4.73,
+      "word_count": 15
+    },
+    {
+      "text": "搅一搅，一杯就做好了。",
+      "start_ms": 6720,
+      "end_ms": 8760,
+      "start_s": 6.72,
+      "end_s": 8.76,
+      "word_count": 9
+    },
+    {
+      "text": "再做杯菠萝美式，也只放一点，先加水，别倒满，把它搅开。",
+      "start_ms": 9200,
+      "end_ms": 16200,
+      "start_s": 9.2,
+      "end_s": 16.2,
+      "word_count": 22
+    },
+    {
+      "text": "最后倒咖啡，你看这个颜色。",
+      "start_ms": 17670,
+      "end_ms": 20390,
+      "start_s": 17.67,
+      "end_s": 20.39,
+      "word_count": 11
+    },
+    {
+      "text": "一瓶菠萝浓缩汁，两种喝法。",
+      "start_ms": 22460,
+      "end_ms": 24860,
+      "start_s": 22.46,
+      "end_s": 24.86,
+      "word_count": 11
+    }
+  ]
+}

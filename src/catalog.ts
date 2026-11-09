@@ -10,6 +10,7 @@ export const IMAGE_MODELS = [...GPT_IMAGE_MODELS, ...SEEDREAM_MODELS] as const;
 export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2.5"] as const;
 export const FISH_MODELS = ["voice-clone", "voice-design-1", "voice-synthesis"] as const;
 export const MEDIAKIT_MODELS = ["video-understand-router", "enhance-video", "enhance-video-generative", "asr-subtitles"] as const;
+export const SPEECH_MODELS = ["seed-asr"] as const;
 
 export const IMAGE_ASPECTS = [
   "auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16",
@@ -29,7 +30,7 @@ export const VIDEO_SHAPES = ["text", "frame", "reference"] as const;
 /** Official Seedance 2.5 omni-reference subtasks. `auto` is the default when `--task-type` is omitted. */
 export const OMNI_TASK_TYPES = ["auto", "reference", "edit", "extend"] as const;
 
-export const PROVIDERS = ["yunqiao", "grsai", "volcark", "haomao", "kitta", "mediakit", "beeftv", "ycyapi"] as const;
+export const PROVIDERS = ["yunqiao", "grsai", "volcark", "haomao", "kitta", "mediakit", "beeftv", "ycyapi", "openspeech"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /**
@@ -45,6 +46,7 @@ export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
   mediakit: "https://mediakit.cn-beijing.volces.com",
   beeftv: "https://enterprise.beefapi.com",
   ycyapi: "https://ycyapi.cn",
+  openspeech: "https://openspeech.bytedance.com",
 };
 
 /**
@@ -105,13 +107,14 @@ export type ImageModel = (typeof IMAGE_MODELS)[number];
 export type SeedanceModel = (typeof SEEDANCE_MODELS)[number];
 export type FishModel = (typeof FISH_MODELS)[number];
 export type MediakitModel = (typeof MEDIAKIT_MODELS)[number];
-export type ModelId = ImageModel | SeedanceModel | FishModel | MediakitModel;
+export type SpeechModel = (typeof SPEECH_MODELS)[number];
+export type ModelId = ImageModel | SeedanceModel | FishModel | MediakitModel | SpeechModel;
 export type VideoShape = (typeof VIDEO_SHAPES)[number];
 export type OmniTaskType = (typeof OMNI_TASK_TYPES)[number];
 
 export interface ModelInfo {
   id: ModelId;
-  kind: "image" | "video" | "voice" | "mediakit";
+  kind: "image" | "video" | "voice" | "mediakit" | "speech";
   summary: string;
   providers: readonly ProviderId[];
 }
@@ -186,8 +189,14 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: "asr-subtitles",
     kind: "mediakit",
-    summary: "MediaKit asr-subtitles: speech to timed cues. lumen clamps each end to the file duration and can align a known script",
+    summary: "MediaKit asr-subtitles. Explicit captions transcribe --engine mediakit only. Sentence times, not the default.",
     providers: ["mediakit"],
+  },
+  {
+    id: "seed-asr",
+    kind: "speech",
+    summary: "Doubao Seed ASR 2.0 (volc.seedasr.auc, model_name bigmodel). Default for captions transcribe. Word timings, pause draft, no script rewrite.",
+    providers: ["openspeech"],
   },
 ];
 

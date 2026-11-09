@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { runAsr, assertAsrLanguage, type AsrOptions } from "../clients/asr.js";
+import { runSeedAsr, seedLanguage } from "../clients/seedasr.js";
+import { PAUSE_GAP_SEC } from "../captions/words.js";
 import { burnCaptions, parseBurnColor, probeVideo, resolveBurnPlan, type BurnStyle } from "../captions/burn.js";
 import {
   clampCues,
@@ -67,6 +69,7 @@ export async function transcribeCommand(args: string[], project: string, io: IO,
     ass: "string",
     language: "string",
     speaker: "boolean",
+    engine: "string",
     "dry-run": "boolean",
     execute: "boolean",
     mock: "boolean",
@@ -86,11 +89,25 @@ export async function transcribeCommand(args: string[], project: string, io: IO,
   if (values["no-script"] === true) {
     io.stderr("note: --no-script is unnecessary; transcribe does not read a project script\n");
   }
-  const language = assertAsrLanguage(flagString(values, "language"));
-  const options: AsrOptions = { speaker: values.speaker === true, ...(language === undefined ? {} : { language }) };
+  const engineFlag = flagString(values, "engine");
+  const engine = engineFlag === undefined || engineFlag === "seed" || engineFlag === "seed-asr" ? "seed" : engineFlag;
+  if (engine !== "seed" && engine !== "mediakit") {
+    throw new CliError("captions transcribe --engine must be seed or mediakit", 2);
+  }
+  const modelId = engine === "seed" ? "seed-asr" : MODEL;
+  const languageRaw = flagString(values, "language");
+  const mediakitLanguage = engine === "mediakit" ? assertAsrLanguage(languageRaw) : undefined;
+  if (engine === "seed") seedLanguage(languageRaw);
+  const options: AsrOptions = {
+    speaker: values.speaker === true,
+    ...(mediakitLanguage === undefined ? {} : { language: mediakitLanguage }),
+  };
   const video = isRemoteMedia(videoFlag.trim()) ? videoFlag.trim() : path.resolve(project, videoFlag.trim());
+  if (engine === "seed" && isRemoteMedia(video)) {
+    throw new CliError("seed-asr needs a local video so the audio track can be extracted. --engine mediakit accepts a remote url.", 2);
+  }
 
-  return settle(io, project, command, MODEL, mode, async (runId, ctx) => {
+  return settle(io, project, command, modelId, mode, async (runId, ctx) => {
     const jsonPath = path.resolve(project, flagString(values, "to") ?? path.join(LAYOUT.refs, `${runId}.captions.json`));
     const txtPath = textSibling(jsonPath);
     const srtFlag = flagString(values, "srt");
@@ -98,62 +115,115 @@ export async function transcribeCommand(args: string[], project: string, io: IO,
     const srtPath = srtFlag === undefined ? undefined : path.resolve(project, srtFlag);
     const assPath = assFlag === undefined ? undefined : path.resolve(project, assFlag);
     const outputs = [jsonPath, txtPath, ...(srtPath === undefined ? [] : [srtPath]), ...(assPath === undefined ? [] : [assPath])];
+    const asrPath = textSibling(jsonPath).replace(/\.txt$/, ".asr.json");
+    const seedOutputs = engine === "seed" ? [asrPath] : [];
     ctx.params = {
       video,
-      language: options.language ?? null,
+      language: languageRaw ?? null,
       speaker: options.speaker,
       script: null,
-      outputs,
+      engine,
+      outputs: [...outputs, ...seedOutputs],
       clamp: "on execute, each end is limited to the probed file duration",
+      ...(engine === "seed" ? { pauseGapSec: PAUSE_GAP_SEC, resource: "volc.seedasr.auc" } : {}),
     };
-    const { binding } = await adoptBinding(ctx, project, io.env, MODEL);
+    const { binding } = await adoptBinding(ctx, project, io.env, modelId);
+    ctx.resume = { videoFile: jsonPath, receipt: asrPath };
     if (mode === "execute") {
       if (!ctx.keyPresent) throw missingKey(binding);
       if (!isRemoteMedia(video) && !(await fileExists(video))) throw new CliError(`video not found: ${video}`);
-      await refuseExisting(outputs);
+      await refuseExisting([...outputs, ...seedOutputs]);
     }
-    let probed: number | undefined;
-    if (mode !== "dry-run" && !isRemoteMedia(video)) {
-      const loaded = await loadConfig(project, io.env);
-      const ffprobe = await requireBinary("ffprobe", io.env, loaded.config.tools, true, io.fetch, (name) => {
-        io.stderr(`downloading ${name}\n`);
-      });
-      probed = await probeDuration(ffprobe.path, video);
+    if (engine === "mediakit") {
+      let probed: number | undefined;
+      if (mode !== "dry-run" && !isRemoteMedia(video)) {
+        const loaded = await loadConfig(project, io.env);
+        const ffprobe = await requireBinary("ffprobe", io.env, loaded.config.tools, true, io.fetch, (name) => {
+          io.stderr(`downloading ${name}\n`);
+        });
+        probed = await probeDuration(ffprobe.path, video);
+      }
+      const outcome = await runAsr(binding, video, runId, mode, io, ctx.secret, options);
+      ctx.calls = outcome.calls;
+      if (mode === "dry-run") {
+        for (const row of [`video: ${video}`, "engine: mediakit", "script: none", `json: ${jsonPath}`, `text: ${txtPath}`]) line(io, row);
+        return;
+      }
+      const recognized = cuesFromTask(outcome.task);
+      const duration = probed ?? recognized.duration;
+      if (duration === undefined || !(duration > 0)) throw new CliError(`could not read a duration from ${video}`);
+      if (recognized.cues.length === 0) throw new CliError("MediaKit ASR returned no subtitles");
+      const clamped = clampCues(recognized.cues, duration);
+      if (clamped.cues.length === 0) throw new CliError("no captions left after clamping to the video duration");
+      const file: CaptionFile = {
+        format: "lumen.captions@1",
+        video,
+        duration: roundTime(duration),
+        clamped: clamped.clamped,
+        confirmed: false,
+        script: null,
+        ...(recognized.duration === undefined ? {} : { asrDuration: roundTime(recognized.duration) }),
+        cues: clamped.cues,
+      };
+      ctx.response = file;
+      ctx.files.push({ path: jsonPath, text: `${JSON.stringify(file, null, 2)}\n` });
+      ctx.files.push({ path: txtPath, text: toReadable(file) });
+      if (srtPath !== undefined) ctx.files.push({ path: srtPath, text: toSrt(file.cues) });
+      if (assPath !== undefined) ctx.files.push({ path: assPath, text: toAss(file.cues) });
+      for (const row of summary(file)) line(io, row);
+      return;
     }
-    const outcome = await runAsr(binding, video, runId, mode, io, ctx.secret, options);
+    const loaded = await loadConfig(project, io.env);
+    if (loaded.config.tos === undefined) {
+      throw new CliError("seed-asr uploads the extracted audio through TOS. Add \"tos\": {} to the config and set VOLC_ACCESSKEY and VOLC_SECRETKEY. There is no other upload path.");
+    }
+    const note = (name: "ffmpeg" | "ffprobe"): void => {
+      io.stderr(`downloading ${name}\n`);
+    };
+    let duration = 0;
+    let ffmpegPath = "";
+    if (mode !== "dry-run") {
+      const ffprobe = await requireBinary("ffprobe", io.env, loaded.config.tools, true, io.fetch, note);
+      const ffmpeg = await requireBinary("ffmpeg", io.env, loaded.config.tools, true, io.fetch, note);
+      ffmpegPath = ffmpeg.path;
+      duration = await probeDuration(ffprobe.path, video);
+      if (!(duration > 0)) throw new CliError(`could not read a duration from ${video}`);
+      ctx.params = { ...(ctx.params as Record<string, unknown>), duration: roundTime(duration) };
+    }
+    const outcome = await runSeedAsr({
+      binding,
+      video,
+      ffmpeg: ffmpegPath,
+      tos: loaded.config.tos,
+      mode: mode === "mock" ? "dry-run" : mode,
+      io,
+      apiKey: ctx.secret,
+      speaker: options.speaker,
+      language: languageRaw,
+      duration,
+    });
     ctx.calls = outcome.calls;
-    if (mode === "dry-run") {
+    if (mode !== "execute" || outcome.draft === undefined) {
       for (const row of [
         `video: ${video}`,
+        "engine: seed-asr",
+        `pauseGapSec: ${PAUSE_GAP_SEC}`,
         "script: none",
         `json: ${jsonPath}`,
-        `text: ${txtPath}`,
+        `asr: ${asrPath}`,
       ]) line(io, row);
       return;
     }
-    const recognized = cuesFromTask(outcome.task);
-    const duration = probed ?? recognized.duration;
-    if (duration === undefined || !(duration > 0)) throw new CliError(`could not read a duration from ${video}`);
-    if (recognized.cues.length === 0) throw new CliError("MediaKit ASR returned no subtitles");
-    const clamped = clampCues(recognized.cues, duration);
-    if (clamped.cues.length === 0) throw new CliError("no captions left after clamping to the video duration");
-    const stored = roundTime(duration);
-    const file: CaptionFile = {
-      format: "lumen.captions@1",
-      video,
-      duration: stored,
-      clamped: clamped.clamped,
-      confirmed: false,
-      script: null,
-      ...(recognized.duration === undefined ? {} : { asrDuration: roundTime(recognized.duration) }),
-      cues: clamped.cues,
-    };
-    ctx.response = file;
-    ctx.files.push({ path: jsonPath, text: `${JSON.stringify(file, null, 2)}\n` });
-    ctx.files.push({ path: txtPath, text: toReadable(file) });
-    if (srtPath !== undefined) ctx.files.push({ path: srtPath, text: toSrt(file.cues) });
-    if (assPath !== undefined) ctx.files.push({ path: assPath, text: toAss(file.cues) });
-    for (const row of summary(file)) line(io, row);
+    ctx.params = { ...ctx.params as Record<string, unknown>, duration: roundTime(duration), taskId: outcome.taskId };
+    ctx.response = outcome.draft.captions;
+    ctx.files.push({ path: jsonPath, text: `${JSON.stringify(outcome.draft.captions, null, 2)}\n` });
+    ctx.files.push({ path: txtPath, text: outcome.draft.readable });
+    ctx.files.push({ path: asrPath, text: `${JSON.stringify(outcome.draft.asr, null, 2)}\n` });
+    if (srtPath !== undefined) ctx.files.push({ path: srtPath, text: toSrt(outcome.draft.captions.cues) });
+    if (assPath !== undefined) ctx.files.push({ path: assPath, text: toAss(outcome.draft.captions.cues) });
+    for (const row of summary(outcome.draft.captions)) line(io, row);
+    line(io, `words: ${outcome.draft.asr.words.length}`);
+    line(io, `pauseGapSec: ${PAUSE_GAP_SEC}`);
   });
 }
 
