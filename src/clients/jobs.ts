@@ -94,6 +94,8 @@ export async function awaitTask(
   pending: { provider: string; taskId: string; pollUrl?: string },
   /** When set, these limits are used as-is. Callers that need a minimum window apply it first. */
   budget?: { max: number; ms: number },
+  /** Appended after `${label} ${status}` when the task fails. Empty means the status alone. */
+  failureDetail?: (value: unknown) => string | undefined,
 ): Promise<HttpResult> {
   const limits = budget ?? jobPollLimits(io.env);
   const max = budget === undefined ? effectiveMaxPolls(limits) : limits.max;
@@ -131,7 +133,9 @@ export async function awaitTask(
   }
   if (state === "fail") {
     const status = String(asRecord(current.json)?.status ?? "failed");
-    throw new TransportError(`${label} ${status}`, calls, publicResult(current));
+    const detail = failureDetail?.(current.json)?.trim();
+    const extra = detail === undefined || detail.length === 0 ? "" : `: ${detail}`;
+    throw new TransportError(`${label} ${status}${extra}`, calls, publicResult(current));
   }
   return current;
 }

@@ -52,7 +52,7 @@ Backends, one binding per model (no family fallback):
               Do not ask for the key in conversation. A missing key names the setup command.
               --region <code> is sent only when that flag is passed.
   breakdown / enhance    MediaKit video-understand-router and enhance-video-generative
-                         breakdown sends prefer_models doubao-seed-2-1-lite-260915, level Quality, need_audio true
+                         breakdown sends prefer_models doubao-seed-2-1-pro-260915, doubao-seed-2-0-lite-260428, level Quality, need_audio true
                          omitted --prompt sends the built-in 拉片 prompt; do not pass one
                          override with breakdown.preferModels, breakdown.level, or breakdown.needAudio
                          enhance is only enhance-video-generative at 2k and 30 fps. No model, resolution,

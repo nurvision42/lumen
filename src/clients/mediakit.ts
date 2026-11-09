@@ -141,6 +141,38 @@ export function taskState(value: unknown): "pending" | "ok" | "fail" {
   return "pending";
 }
 
+/** Printed `error.message` is kept to about this many characters. */
+const ERROR_MESSAGE_LIMIT = 300;
+
+function errorScalar(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+/** `error.code` and `error.message` from a MediaKit task, with the message truncated. */
+export function mediakitErrorDetail(value: unknown): string | undefined {
+  const error = asRecord(asRecord(value)?.error);
+  if (error === undefined) return undefined;
+  const code = errorScalar(error.code);
+  const message = typeof error.message === "string" ? error.message.replace(/\s+/g, " ").trim() : "";
+  if (code.length === 0 && message.length === 0) return undefined;
+  const clipped = message.length > ERROR_MESSAGE_LIMIT ? `${message.slice(0, ERROR_MESSAGE_LIMIT - 1)}…` : message;
+  if (code.length === 0) return clipped;
+  if (clipped.length === 0) return code;
+  return `${code}: ${clipped}`;
+}
+
+/** Failure line for a task that is already terminal. Includes the id when the body has one. */
+export function mediakitFailedMessage(value: unknown): string {
+  const taskId = findString(value, "task_id");
+  const record = asRecord(value);
+  const status = typeof record?.status === "string" && record.status.trim().length > 0 ? record.status.trim() : "failed";
+  const who = taskId === undefined ? "MediaKit task" : `MediaKit task ${taskId}`;
+  const detail = mediakitErrorDetail(value);
+  return detail === undefined ? `${who} ${status}` : `${who} ${status}: ${detail}`;
+}
+
 export function mediaUri(fileId: string): string {
   if (/^(mediakit:|vod:|tos:|https?:)/i.test(fileId)) return fileId;
   return `mediakit://${fileId}`;
@@ -176,7 +208,6 @@ function toolBody(
     return {
       video_urls: [video],
       prompt,
-      scene: "editing",
       level,
       prefer_models: models,
       manual_option: { need_audio: needAudio },
@@ -274,7 +305,7 @@ export async function pollMediakitTask(
     provider: "mediakit",
     taskId,
     pollUrl,
-  }, mediakitPollLimits(io.env));
+  }, mediakitPollLimits(io.env), mediakitErrorDetail);
 }
 
 export async function runMediakit(
@@ -321,7 +352,7 @@ export async function runMediakit(
   );
   let last = await perform(calls, submit, opts);
   await flushSettledMediakitTask(io, calls, binding.baseUrl, last);
-  if (taskState(last.json) === "fail") throw new TransportError("MediaKit task failed", calls, publicResult(last));
+  if (taskState(last.json) === "fail") throw new TransportError(mediakitFailedMessage(last.json), calls, publicResult(last));
   if (taskState(last.json) !== "ok") {
     const taskId = findString(last.json, "task_id");
     if (taskId === undefined) throw new TransportError("MediaKit response has no task_id", calls, publicResult(last));

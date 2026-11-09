@@ -90,7 +90,7 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     const preferModels = breakdownPreferModels(config.breakdown);
     const level = breakdownLevel(config.breakdown);
     const needAudio = breakdownNeedAudio(config.breakdown);
-    ctx.params = { video, prompt, scene: "editing", level, preferModels, needAudio };
+    ctx.params = { video, prompt, level, preferModels, needAudio };
     if (mode === "execute" && isDeferredPrompt(prompt) && values["allow-placeholder"] !== true) {
       throw new CliError("breakdown prompt is deferred");
     }

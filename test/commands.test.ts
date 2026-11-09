@@ -20,6 +20,9 @@ test("help and version name lumen and the planned backends", async () => {
   }
 
   assert.match(help.out(), /--region <code> is sent only when that flag is passed/);
+  assert.match(help.out(), /breakdown sends prefer_models doubao-seed-2-1-pro-260915, doubao-seed-2-0-lite-260428, level Quality, need_audio true/);
+  assert.equal(help.out().includes("doubao-seed-2-1-lite-260915"), false);
+  assert.equal(help.out().includes("scene=editing"), false);
   const version = capture();
   assert.equal(await run(["--version"], version.io), 0);
   assert.equal(version.out().trim(), pkg.version);
@@ -45,7 +48,10 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(skill, /lumen fish design/);
   assert.match(skill, /lumen 是本地视频工具集/);
   assert.match(skill, /单独用/);
-  assert.match(skill, /doubao-seed-2-1-lite-260915/);
+  assert.match(skill, /doubao-seed-2-1-pro-260915/);
+  assert.match(skill, /doubao-seed-2-0-lite-260428/);
+  assert.equal(skill.includes("doubao-seed-2-1-lite-260915"), false);
+  assert.equal(skill.includes("scene=editing"), false);
   assert.match(skill, /不要问用户选模型/);
   assert.match(skill, /Quality/);
   assert.match(skill, /breakdown\.preferModels/);
@@ -117,6 +123,10 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(downloadSkill, /--region <code>` 可选，只有显式传入时才会发给查询/);
   assert.equal(/https?:\/\/|\/v1\//.test(downloadSkill), false);
   const breakdownSkill = await readFile(path.join(root, "skills", "lumen", "references", "视频拆解", "SKILL.md"), "utf8");
+  assert.match(breakdownSkill, /doubao-seed-2-1-pro-260915/);
+  assert.match(breakdownSkill, /doubao-seed-2-0-lite-260428/);
+  assert.equal(breakdownSkill.includes("scene=editing"), false);
+  assert.equal(breakdownSkill.includes("doubao-seed-2-1-lite-260915"), false);
   assert.match(breakdownSkill, /不要传 prompt/);
   assert.match(breakdownSkill, /不要自己写拆解提示词/);
   assert.match(breakdownSkill, /不要因为对话里出现了视频就自动拆解/);
@@ -411,7 +421,7 @@ test("doctor lists unbound models and does not print secret values", async () =>
     assert.match(text, /voice-synthesis: unbound/);
     assert.match(text, /enhance-video: unbound/);
     assert.match(text, /breakdown prompt: default/);
-    assert.match(text, /breakdown models: doubao-seed-2-1-lite-260915/);
+    assert.match(text, /breakdown models: doubao-seed-2-1-pro-260915, doubao-seed-2-0-lite-260428/);
     assert.match(text, /breakdown level: Quality/);
     assert.match(text, /breakdown needAudio: true/);
     assert.match(text, /tikhub key: missing/);

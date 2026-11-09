@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { BREAKDOWN_DEFAULT_PROMPT } from "../src/catalog.js";
-import { mediakitPollLimits } from "../src/clients/mediakit.js";
+import { mediakitErrorDetail, mediakitPollLimits } from "../src/clients/mediakit.js";
 import { enhanceCost } from "../src/enhance/cost.js";
 import { BITRATE_FALLBACK_NOTE } from "../src/grain/apply.js";
 import { run } from "../src/run.js";
@@ -88,7 +88,7 @@ test("the built-in breakdown prompt is the 拉片表 wording", () => {
   );
 });
 
-test("breakdown dry-run plans scene=editing and the built-in 拉片 prompt", async () => {
+test("breakdown dry-run omits scene and sends the built-in 拉片 prompt", async () => {
   await withDir(async (dir) => {
     await bind(dir, "video-understand-router", "MEDIAKIT_UNDERSTAND_KEY");
     let called = false;
@@ -102,19 +102,19 @@ test("breakdown dry-run plans scene=editing and the built-in 拉片 prompt", asy
     assert.equal(called, false);
     const names = await readdir(path.join(dir, ".lumen", "runs"));
     const record = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", names[0] ?? "", "record.json"), "utf8")) as {
-      params: { prompt: string; scene: string };
+      params: { prompt: string; scene?: string; level?: string; preferModels?: string[]; needAudio?: boolean };
       calls: unknown;
     };
-    assert.equal(record.params.scene, "editing");
-    assert.equal((record.params as { level?: string }).level, "Quality");
-    assert.deepEqual((record.params as { preferModels?: string[] }).preferModels, ["doubao-seed-2-1-lite-260915"]);
-    assert.equal((record.params as { needAudio?: boolean }).needAudio, true);
+    assert.equal(record.params.scene, undefined);
+    assert.equal(record.params.level, "Quality");
+    assert.deepEqual(record.params.preferModels, ["doubao-seed-2-1-pro-260915", "doubao-seed-2-0-lite-260428"]);
+    assert.equal(record.params.needAudio, true);
     assert.equal(record.params.prompt, BREAKDOWN_DEFAULT_PROMPT);
     const body = JSON.stringify(record.calls);
     assert.match(body, /video-understand-router/);
-    assert.match(body, /"scene":"editing"/);
+    assert.equal(body.includes('"scene"'), false);
     assert.match(body, /"level":"Quality"/);
-    assert.match(body, /"prefer_models":\["doubao-seed-2-1-lite-260915"\]/);
+    assert.match(body, /"prefer_models":\["doubao-seed-2-1-pro-260915","doubao-seed-2-0-lite-260428"\]/);
     assert.match(body, /"manual_option":\{"need_audio":true\}/);
     assert.equal(body.includes("prefer_endpoints"), false);
     const calls = record.calls as Array<{ url: string; body: { kind: string; value?: { prompt?: string } } }>;
@@ -178,11 +178,11 @@ test("breakdown execute uploads, posts, polls, and writes a shot list", async ()
             prefer_endpoints?: string[];
             manual_option?: { need_audio?: boolean };
           };
-          assert.equal(body.scene, "editing");
+          assert.equal(body.scene, undefined);
           assert.equal(body.level, "Quality");
           assert.deepEqual(body.video_urls, ["mediakit://abc123"]);
           assert.equal(body.prompt, "find the cuts");
-          assert.deepEqual(body.prefer_models, ["doubao-seed-2-1-lite-260915"]);
+          assert.deepEqual(body.prefer_models, ["doubao-seed-2-1-pro-260915", "doubao-seed-2-0-lite-260428"]);
           assert.equal(body.prefer_endpoints, undefined);
           assert.deepEqual(body.manual_option, { need_audio: true });
           return Response.json({ success: true, task_id: "task-1" });
@@ -524,6 +524,14 @@ test("breakdown level and needAudio follow project config over the global file",
   });
 });
 
+test("mediakit error detail keeps the code and clips the message", () => {
+  assert.equal(mediakitErrorDetail({ status: "failed" }), undefined);
+  assert.equal(mediakitErrorDetail({ error: { code: "AbilityProcessingError" } }), "AbilityProcessingError");
+  assert.equal(mediakitErrorDetail({ error: { message: "  no audio model\n" } }), "no audio model");
+  const message = "x".repeat(400);
+  assert.equal(mediakitErrorDetail({ error: { code: "E", message } }), `E: ${"x".repeat(299)}…`);
+});
+
 test("mediakit poll budget defaults to 30 minutes and floors shorter windows", () => {
   assert.deepEqual(mediakitPollLimits({}), { max: 180, ms: 10_000 });
   assert.deepEqual(mediakitPollLimits({ MEDIAKIT_MAX_POLLS: "90", MEDIAKIT_POLL_MS: "2000" }), { max: 900, ms: 2000 });
@@ -543,6 +551,7 @@ function mediakitFetch(opts: {
   polls: Array<string | number>;
   videoUrl?: string;
   shots?: boolean;
+  failure?: { code?: string; message?: string };
 }) {
   let polls = 0;
   const auths: Array<string | null> = [];
@@ -579,7 +588,13 @@ function mediakitFetch(opts: {
           result: { video_url: opts.videoUrl ?? `https://cdn.example/out.mp4?auth_key=${SECRET}` },
         });
       }
-      if (step === "failed") return Response.json({ success: false, status: "failed" });
+      if (step === "failed") {
+        return Response.json({
+          success: false,
+          status: "failed",
+          ...(opts.failure === undefined ? {} : { error: opts.failure }),
+        });
+      }
       return Response.json({ success: true, status: step, task_id: opts.taskId });
     }
     if (url.includes("cdn.example")) {
@@ -718,11 +733,31 @@ test("a failed mediakit task is still an error", async () => {
     const fetch = mediakitFetch({ tool: GENERATIVE, taskId: "task-e", polls: ["failed"] });
     const cap = capture(withBin({ MEDIAKIT_GENERATIVE_KEY: KEY, MEDIAKIT_POLL_MS: "0" }), { fetch: fetch.fetch });
     assert.equal(await run(["enhance", "--execute", "--project", dir], cap.io), 1);
-    assert.match(cap.err(), /MediaKit task task-e failed/);
+    assert.match(cap.err(), /MediaKit task task-e failed\nrun: /);
     const id = /run: (\S+)/.exec(cap.err())?.[1];
     assert.ok(id);
     const rec = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", id, "record.json"), "utf8")) as { status: string };
     assert.equal(rec.status, "error");
+  });
+});
+
+test("a failed breakdown prints error.code and a truncated error.message", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "video-understand-router", "MEDIAKIT_UNDERSTAND_KEY");
+    await seedClip(dir);
+    const message = `${"m".repeat(320)} UNIQUE_TAIL`;
+    const fetch = mediakitFetch({
+      tool: "video-understand-router",
+      taskId: "task-b",
+      polls: ["failed"],
+      failure: { code: "AbilityProcessingError", message },
+    });
+    const cap = capture({ MEDIAKIT_UNDERSTAND_KEY: KEY, MEDIAKIT_POLL_MS: "0" }, { fetch: fetch.fetch });
+    assert.equal(await run(["breakdown", "--prompt", "find the cuts", "--execute", "--project", dir], cap.io), 1);
+    const clipped = `${message.slice(0, 299)}…`;
+    assert.equal(clipped.length, 300);
+    assert.ok(cap.err().includes(`MediaKit task task-b failed: AbilityProcessingError: ${clipped}`));
+    assert.equal(cap.err().includes("UNIQUE_TAIL"), false);
   });
 });
 

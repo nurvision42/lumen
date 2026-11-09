@@ -74,8 +74,12 @@ export const BREAKDOWN_DEFAULT_PROMPT = `请对这个视频做逐镜头拉片分
 - 声音/音乐：口播、BGM、环境音、音效、停顿、重音；听不清标“未识别”。
 短视频逐镜头完整分析。`;
 
-/** Sent as prefer_models for scene=editing when breakdown.preferModels is unset. */
-export const BREAKDOWN_PREFER_MODELS = ["doubao-seed-2-1-lite-260915"] as const;
+/**
+ * Sent as prefer_models when breakdown.preferModels is unset.
+ * The pro model does the visual analysis. The lite model stays in the pool because
+ * manual_option.need_audio requires an audio-capable model (this one, or doubao-seed-2-0-mini-260428).
+ */
+export const BREAKDOWN_PREFER_MODELS = ["doubao-seed-2-1-pro-260915", "doubao-seed-2-0-lite-260428"] as const;
 /** Highest MediaKit understand level. Used when breakdown.level is unset. */
 export const BREAKDOWN_LEVEL = "Quality";
 /** Sent as manual_option.need_audio when breakdown.needAudio is unset. */
@@ -164,7 +168,7 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: "video-understand-router",
     kind: "mediakit",
-    summary: "MediaKit video-understand-router, scene=editing, level=Quality, need_audio, prefer_models doubao-seed-2-1-lite-260915",
+    summary: "MediaKit video-understand-router, level=Quality, need_audio, prefer_models doubao-seed-2-1-pro-260915 and doubao-seed-2-0-lite-260428",
     providers: ["mediakit"],
   },
   {

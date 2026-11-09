@@ -228,7 +228,7 @@ function listedModels(value: readonly string[] | undefined): readonly string[] |
   return models.length > 0 ? models : undefined;
 }
 
-/** Project list replaces the global list. An omitted list is the lite default. */
+/** Project list replaces the global list. An omitted list is the built-in default. */
 export function breakdownPreferModels(breakdown: LumenConfig["breakdown"]): readonly string[] {
   return listedModels(breakdown.preferModels) ?? [...BREAKDOWN_PREFER_MODELS];
 }
