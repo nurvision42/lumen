@@ -53,9 +53,9 @@ lumen 是本地视频工具集。二进制是 `lumen`。多镜头作品可以放
 
 **拆解、增强。** 把一条成片拆成镜头，或增强一条已有视频。可以对单个文件做。用户要拆镜头时才跑，不要因为出现了视频就自动拆解。`lumen breakdown` · `lumen enhance`。模型 `video-understand-router`、`enhance-video-generative`，供应商只有 `mediakit`。拆解先读 `skills/lumen/references/视频拆解/SKILL.md`。只传视频，不要传 prompt。拆解默认用 `doubao-seed-2-1-pro-260915` 和 `doubao-seed-2-0-lite-260428`，`level` 为 `Quality`，需要音频，不要问用户选模型。不发送 `scene`。`doubao-seed-2-1-lite-260915` 不能处理音频。音频还要 `doubao-seed-2-0-lite-260428` 或 `doubao-seed-2-0-mini-260428` 的方舟推理接入点，只写模型名会 `status_code=11100`。接入点用可重复的 `--prefer-endpoint`，或 `LUMEN_MEDIAKIT_ENDPOINTS`（逗号分隔），或 `breakdown.preferEndpoints`。优先级是命令行、环境变量、配置。没有就不要发 `prefer_endpoints`。不要编造接入点 id。要换模型时改项目 `lumen.config.json` 或 `~/.config/lumen/providers.json` 里的 `breakdown.preferModels`、`breakdown.level`、`breakdown.needAudio`。`lumen enhance` 固定大模型版 `enhance-video-generative`、2K、30fps，没有分辨率或风格可选。提交前按 10 元/分钟打印费用估算。下载完成后自动加上固定 0.4 的黑白胶片颗粒。不要在增强之后再加颗粒，也不要自己调用 ffmpeg。细则读 `skills/lumen/references/增强/SKILL.md`。
 
-**转字幕。** 把一条视频里的话认成带时间的字幕，并把每条结束时间裁到片长以内。项目里镜头表已有口播，或前面做过语音合成、声音克隆时，自动对照文案；对得上就改错漏，不必再确认。单独丢来一条视频、没有文案时，只写出识别结果，确认后再加字幕。`lumen captions transcribe --video <file>`。默认 `--dry-run`，真正识别加 `--execute`。模型 `asr-subtitles`，供应商只有 `mediakit`。先读 `skills/lumen/references/转字幕/SKILL.md`。
+**转字幕。** 把一条视频里的话认成带时间的字幕；本地文件的结束时间仍会裁到片长以内。校对前必须 `lumen captions transcribe --video <file> --no-script`。不带 `--no-script` 时，命令仍会自动对照镜头口播或已完成的语音合成、声音克隆：对得上就改字、补进漏句、丢掉文案里没有的字，带时间的文案还会改写起止时间。校对只改文字，另存一份，保留识别文件的条数、顺序、切分和起止时间；改时间或重切要另得到用户明确同意。默认 `--dry-run`，真正识别加 `--execute`。模型 `asr-subtitles`，供应商只有 `mediakit`。先读 `skills/lumen/references/转字幕/SKILL.md`。
 
-**加字幕。** 只把已经确认的字幕压进画面，不负责识别。用本机 ffmpeg 硬压，不调用云端加字幕。默认白字、半透明灰圆角底；竖屏在顶部居中，横屏在底部居中。`lumen captions burn --video <file> --subs <file> --to <mp4>`。这条命令会立刻压制。先读 `skills/lumen/references/加字幕/SKILL.md`。
+**加字幕。** 只把已经确认的字幕按文件里的条目压进画面。不识别，不改条数、顺序、切分或起止时间。用本机 ffmpeg 硬压，不调用云端加字幕。默认白字、半透明灰圆角底；竖屏在顶部居中，横屏在底部居中。`lumen captions burn --video <file> --subs <file> --to <mp4>`。这条命令会立刻压制。先读 `skills/lumen/references/加字幕/SKILL.md`。
 
 **记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs list --pending` · `lumen runs show <id>` · `lumen runs wait <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id> --execute --detach` 接着等并取回结果，不要重新提交。助手跑生成的标准步骤见上面「助手怎么跑生成」。
 

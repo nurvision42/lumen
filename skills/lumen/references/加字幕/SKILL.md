@@ -1,13 +1,15 @@
 ---
 name: 加字幕
-description: 用 lumen captions burn 把已确认的字幕硬压进视频。本机 ffmpeg，白字灰底圆角，竖屏顶部、横屏底部。
+description: 用 lumen captions burn 把已确认的字幕按原条目硬压进视频。不改条数、切分或起止时间。本机 ffmpeg，白字灰底圆角，竖屏顶部、横屏底部。
 ---
 
 # 加字幕
 
-字幕已经确认，要压进画面时读本文件。只跑 `lumen captions burn`。不要自己调用 ffmpeg。不要调用云端加字幕：那边没有半透明圆角底，位置也只有四个预设。
+字幕文字已经核对，要压进画面时读本文件。只跑 `lumen captions burn`。不要自己调用 ffmpeg。不要调用云端加字幕：那边没有半透明圆角底，位置也只有四个预设。
 
-这一步不识别。没有字幕文件时，先读 `skills/lumen/references/转字幕/SKILL.md`。
+这一步不识别，也不校对。没有字幕文件时，先读 `skills/lumen/references/转字幕/SKILL.md`。压进去的是 `--subs` 里现成的条目：条数、顺序、切分、`start`、`end`、`text` 都按文件来。不合并，不拆开，不插入，不删除，不改时间。
+
+`--subs` 指向只改过文字的校对副本。识别原文留着；用户明确要压原文时才用原文。副本里 `confirmed` 仍是 false 时，命令会拒绝，加上 `--confirm` 只放行这份文件里的条目。逗号、顿号或句号两边在文件里已经是前后两条时，按这两条原来的起止时间先后出现。标点不能用来重算时间，按字数把一段时间摊开也不能当作精确时间。
 
 ## 命令
 
@@ -19,8 +21,8 @@ lumen captions burn --video <file> --subs <file> --to <mp4>
 
 `--subs` 可以是：
 
-- 转字幕写出的 JSON。`confirmed` 不是 true 时会拒绝，认可以后加 `--confirm`。
-- `.srt` 或 `.ass`。你把文件递进来，就当作已经确认。
+- 转字幕写出的 JSON。`confirmed` 不是 true 时会拒绝。文字已经只改在校对副本里、时间和条数仍是识别结果时，加 `--confirm` 放行这一份。`--confirm` 不改条目。
+- `.srt` 或 `.ass`。你把文件递进来，就当作已经确认。递进来的文件本身就要是核对过的条目，时间和条数已经是要压的那一版。
 
 可读的 `.txt` 不能拿来压制。ASS 里的方框样式也不会被用上。
 
@@ -56,7 +58,7 @@ lumen captions burn --video <file> --subs <file> --to <mp4>
 
 电脑上已经有 ffmpeg、ffprobe 就用电脑的。查找顺序和雪碧图相同：`LUMEN_FFMPEG` / `LUMEN_FFPROBE` 或配置里的 `tools.ffmpeg` / `tools.ffprobe`，然后 PATH，然后本机缓存，最后才下载。可以先跑 `lumen setup ffmpeg`。
 
-压制不会把视频拉长。条目若超出片长，只画片内的那一段。裁掉黑尾是转字幕的事；这里只是不再往片尾外面画。
+压制不会把视频拉长。每条用文件里的 `start` 和 `end`。超出片长的，只画落在片内的那一段，字幕文件本身不改。整段都在片外的不画。不要在这一步按字数拆时间，也不要合并或拆开条目。
 
 视频码率跟源片走，和增强后的颗粒同一套：优先用视频流 `bit_rate`，没有流码率时改用容器 `bit_rate`，并在命令输出里写明。`-b:v` 和 `-maxrate` 用这个值，`bufsize` 是两倍。分辨率和时长不变，音轨原样复制。
 
