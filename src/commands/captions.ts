@@ -20,6 +20,7 @@ import { loadConfig, missingKey } from "../config.js";
 import { CliError } from "../errors.js";
 import { fileExists } from "../fsutil.js";
 import { flagString, parseFlags, requireRestEmpty, runMode } from "../flags.js";
+import { BITRATE_FALLBACK_NOTE } from "../grain/apply.js";
 import { line, type IO } from "../io.js";
 import { isRemoteMedia } from "../media.js";
 import { LAYOUT } from "../project.js";
@@ -268,9 +269,11 @@ export async function burnCommand(args: string[], project: string, io: IO): Prom
     cues: plan.cues,
     output,
   };
+  const bitrateNote = info.bitrate.source === "format" ? BITRATE_FALLBACK_NOTE : undefined;
   if (values["dry-run"] === true) {
     if (values.json === true) line(io, JSON.stringify({ planned: true, ...report }));
     else {
+      if (bitrateNote !== undefined) line(io, bitrateNote);
       line(io, `planned: ${output}`);
       line(io, `video: ${plan.width}x${plan.height}`);
       line(io, `position: ${plan.position}`);
@@ -286,6 +289,7 @@ export async function burnCommand(args: string[], project: string, io: IO): Prom
   const burned = await burnCaptions({ ffmpeg: ffmpeg.path, video, info, cues: loaded.cues, output, style });
   if (values.json === true) line(io, JSON.stringify({ ...report, fontSize: burned.fontSize, position: burned.position, margin: burned.margin }));
   else {
+    if (bitrateNote !== undefined) line(io, bitrateNote);
     line(io, `burned: ${output}`);
     line(io, `video: ${burned.width}x${burned.height}`);
     line(io, `position: ${burned.position}`);

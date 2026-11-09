@@ -59,6 +59,23 @@ export function bitrateToken(bps: number): string {
   return String(bps);
 }
 
+export interface BitrateLimit {
+  readonly rate: string;
+  readonly bufsize: string;
+}
+
+/** `-b:v` and `-maxrate` match `bps`. The VBV buffer is twice that. */
+export function bitrateLimit(bps: number): BitrateLimit {
+  const doubled = bps * 2;
+  if (!Number.isSafeInteger(doubled)) throw new CliError("video bitrate is too large");
+  return { rate: bitrateToken(bps), bufsize: bitrateToken(doubled) };
+}
+
+export function bitrateFfmpegArgs(bps: number): string[] {
+  const limit = bitrateLimit(bps);
+  return ["-b:v", limit.rate, "-maxrate", limit.rate, "-bufsize", limit.bufsize];
+}
+
 export interface BitrateChoice {
   readonly bps: number;
   readonly source: "stream" | "format";
@@ -102,8 +119,7 @@ export function planFromProbe(data: unknown): GrainPlan {
   if (!(width > 0) || !(height > 0)) throw new CliError("could not read video size");
   const geometry = grainGeometry(width, height);
   const bitrate = chooseBitrate(stream?.bit_rate, record.format?.bit_rate);
-  const doubled = bitrate.bps * 2;
-  if (!Number.isSafeInteger(doubled)) throw new CliError("video bitrate is too large");
+  const limit = bitrateLimit(bitrate.bps);
   return {
     width,
     height,
@@ -111,8 +127,8 @@ export function planFromProbe(data: unknown): GrainPlan {
     grainHeight: geometry.grainHeight,
     filter: grainFilter(width, height),
     bitrate,
-    rate: bitrateToken(bitrate.bps),
-    bufsize: bitrateToken(doubled),
+    rate: limit.rate,
+    bufsize: limit.bufsize,
   };
 }
 
@@ -128,12 +144,7 @@ export function grainFfmpegArgs(video: string, output: string, plan: GrainPlan):
     plan.filter,
     "-c:v",
     "libx264",
-    "-b:v",
-    plan.rate,
-    "-maxrate",
-    plan.rate,
-    "-bufsize",
-    plan.bufsize,
+    ...bitrateFfmpegArgs(plan.bitrate.bps),
     "-tune",
     "grain",
     "-preset",
