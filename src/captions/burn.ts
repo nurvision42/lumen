@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { CliError } from "../errors.js";
+import { bitrateFfmpegArgs, chooseBitrate, type BitrateChoice } from "../grain/apply.js";
 import { execText } from "../tools/run.js";
 import type { Cue } from "./cues.js";
 import { findSubtitleFont } from "./font.js";
@@ -33,17 +34,21 @@ export interface VideoInfo {
   readonly width: number;
   readonly height: number;
   readonly duration: number;
+  readonly bitrate: BitrateChoice;
 }
 
 export async function probeVideo(ffprobe: string, video: string): Promise<VideoInfo> {
   const { stdout } = await execText(ffprobe, [
     "-v", "error",
     "-select_streams", "v:0",
-    "-show_entries", "stream=width,height:format=duration",
+    "-show_entries", "stream=width,height,bit_rate:format=duration,bit_rate",
     "-of", "json",
     video,
   ]);
-  let data: { streams?: { width?: number; height?: number }[]; format?: { duration?: string } };
+  let data: {
+    streams?: { width?: number; height?: number; bit_rate?: unknown }[];
+    format?: { duration?: string; bit_rate?: unknown };
+  };
   try {
     data = JSON.parse(stdout) as typeof data;
   } catch {
@@ -56,7 +61,26 @@ export async function probeVideo(ffprobe: string, video: string): Promise<VideoI
   if (width === undefined || height === undefined || !(width > 0) || !(height > 0) || !(duration > 0)) {
     throw new CliError(`could not read video size and duration from ${video}`);
   }
-  return { width, height, duration };
+  let bitrate: BitrateChoice;
+  try {
+    bitrate = chooseBitrate(stream?.bit_rate, data.format?.bit_rate);
+  } catch (error) {
+    if (error instanceof CliError) throw new CliError(`${error.message}: ${video}`);
+    throw error;
+  }
+  return { width, height, duration, bitrate };
+}
+
+/** Video rate control for a hard-sub encode. Matches film grain: source bitrate, not CRF. */
+export function burnVideoArgs(bitrate: BitrateChoice): string[] {
+  return [
+    "-c:v", "libx264",
+    "-preset", "veryfast",
+    ...bitrateFfmpegArgs(bitrate.bps),
+    "-pix_fmt", "yuv420p",
+    "-c:a", "copy",
+    "-movflags", "+faststart",
+  ];
 }
 
 export interface OverlayItem {
@@ -135,12 +159,14 @@ export async function burnCaptions(input: {
   readonly output: string;
   readonly style: BurnStyle;
 }): Promise<BurnPlan> {
+  const videoArgs = burnVideoArgs(input.info.bitrate);
   const even = input.info.width % 2 !== 0 || input.info.height % 2 !== 0;
-  const frame = even
+  const frame: VideoInfo = even
     ? {
         width: input.info.width - (input.info.width % 2),
         height: input.info.height - (input.info.height % 2),
         duration: input.info.duration,
+        bitrate: input.info.bitrate,
       }
     : input.info;
   const plan = await resolveBurnPlan(frame, input.cues, input.style);
@@ -176,12 +202,7 @@ export async function burnCaptions(input: {
       "-filter_complex", overlayGraph(items, { even }),
       "-map", "[vout]",
       "-map", "0:a?",
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-crf", "18",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "copy",
-      "-movflags", "+faststart",
+      ...videoArgs,
       input.output,
     );
     try {

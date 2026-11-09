@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { overlayGraph } from "../src/captions/burn.js";
+import { burnVideoArgs, overlayGraph, probeVideo } from "../src/captions/burn.js";
+import { BITRATE_FALLBACK_NOTE } from "../src/grain/apply.js";
 import {
   alignUntimed,
   applyTimedScript,
@@ -342,7 +343,15 @@ test("a loose video stays unconfirmed until burn is told to proceed", async () =
     await assert.rejects(readFile(path.join(dir, "out.mp4")));
 
     const portrait = path.join(dir, "tall.mp4");
-    await exec("/usr/bin/ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=360x640:d=1.2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an", portrait]);
+    // Flat blue at the default CRF probes at a few kilobits. Burn matches that rate and
+    // would quantize the glyphs this test counts, so the fixture is padded up to a real rate.
+    await exec("/usr/bin/ffmpeg", [
+      "-y", "-hide_banner", "-loglevel", "error",
+      "-f", "lavfi", "-i", "color=c=blue:s=360x640:d=1.2",
+      "-c:v", "libx264", "-b:v", "1500k", "-minrate", "1500k", "-maxrate", "1500k", "-bufsize", "1500k",
+      "-x264-params", "nal-hrd=cbr:filler=1", "-pix_fmt", "yuv420p", "-an",
+      portrait,
+    ]);
     const burned = capture();
     assert.equal(
       await run(["captions", "burn", "--video", "tall.mp4", "--subs", "refs/loose.json", "--to", "tall-out.mp4", "--font", FONT, "--confirm", "--project", dir], burned.io),
@@ -391,6 +400,93 @@ test("a loose video stays unconfirmed until burn is told to proceed", async () =
   });
 });
 
+test("burn encode args follow the source bitrate", () => {
+  const args = burnVideoArgs({ bps: 14_700_000, source: "stream" });
+  assert.equal(args.includes("-crf"), false);
+  assert.deepEqual(args.slice(args.indexOf("-c:v"), args.indexOf("-pix_fmt")), [
+    "-c:v", "libx264", "-preset", "veryfast", "-b:v", "14700k", "-maxrate", "14700k", "-bufsize", "29400k",
+  ]);
+  assert.deepEqual(args.slice(args.indexOf("-c:a")), ["-c:a", "copy", "-movflags", "+faststart"]);
+  const fallback = burnVideoArgs({ bps: 35320, source: "format" });
+  assert.equal(fallback.includes("35320"), true);
+  assert.equal(fallback.includes("70640"), true);
+});
+
+test("burn stays near the source bitrate and copies audio", { timeout: 120_000 }, async () => {
+  await withDir(async (dir) => {
+    await mkdir(path.join(dir, "refs"), { recursive: true });
+    const video = path.join(dir, "clip.mp4");
+    await exec("/usr/bin/ffmpeg", [
+      "-y", "-hide_banner", "-loglevel", "error",
+      "-f", "lavfi", "-i", "color=c=black:s=640x360:r=30:d=4,noise=alls=40:allf=t+u",
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=4",
+      "-c:v", "libx264", "-b:v", "1500k", "-maxrate", "1500k", "-bufsize", "3000k", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-shortest",
+      video,
+    ]);
+    await writeFile(path.join(dir, "refs", "ok.json"), `${JSON.stringify({
+      format: "lumen.captions@1",
+      confirmed: true,
+      cues: [{ start: 0.4, end: 2.2, text: "哎这水喝着挺顺" }],
+    })}\n`);
+    const source = await probeVideo("/usr/bin/ffprobe", video);
+    assert.equal(source.bitrate.source, "stream");
+    assert.equal(source.width, 640);
+    assert.equal(source.height, 360);
+    const burned = capture();
+    assert.equal(
+      await run(["captions", "burn", "--video", "clip.mp4", "--subs", "refs/ok.json", "--to", "out.mp4", "--font", FONT, "--project", dir], burned.io),
+      0,
+      burned.err(),
+    );
+    assert.equal(burned.out().includes(BITRATE_FALLBACK_NOTE), false);
+    const output = path.join(dir, "out.mp4");
+    const after = await probeVideo("/usr/bin/ffprobe", output);
+    const sourceSize = (await stat(video)).size;
+    const outputSize = (await stat(output)).size;
+    const bitrateRatio = after.bitrate.bps / source.bitrate.bps;
+    const sizeRatio = outputSize / sourceSize;
+    assert.ok(bitrateRatio > 0.8 && bitrateRatio < 1.25, `video bitrate ${after.bitrate.bps} vs ${source.bitrate.bps}`);
+    assert.ok(sizeRatio > 0.8 && sizeRatio < 1.25, `file size ${outputSize} vs ${sourceSize}`);
+    assert.equal(after.width, source.width);
+    assert.equal(after.height, source.height);
+    assert.ok(Math.abs(after.duration - source.duration) < 0.05, `duration ${after.duration} vs ${source.duration}`);
+    const { stdout } = await exec("/usr/bin/ffprobe", [
+      "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,bit_rate", "-of", "csv=p=0",
+      output,
+    ]);
+    const sourceAudio = await exec("/usr/bin/ffprobe", [
+      "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,bit_rate", "-of", "csv=p=0",
+      video,
+    ]);
+    assert.equal(stdout.trim(), sourceAudio.stdout.trim());
+    assert.match(stdout, /aac/);
+
+    const raw = path.join(dir, "raw.mkv");
+    await exec("/usr/bin/ffmpeg", [
+      "-y", "-hide_banner", "-loglevel", "error",
+      "-f", "lavfi", "-i", "color=c=green:s=64x64:d=0.4",
+      "-c:v", "ffv1", "-an", raw,
+    ]);
+    await writeFile(path.join(dir, "refs", "short.json"), `${JSON.stringify({
+      format: "lumen.captions@1",
+      confirmed: true,
+      cues: [{ start: 0.05, end: 0.3, text: "顺" }],
+    })}\n`);
+    const fallback = capture();
+    assert.equal(
+      await run(["captions", "burn", "--video", "raw.mkv", "--subs", "refs/short.json", "--to", "format.mp4", "--font", FONT, "--font-size", "8", "--project", dir], fallback.io),
+      0,
+      fallback.err(),
+    );
+    assert.match(fallback.out(), new RegExp(BITRATE_FALLBACK_NOTE));
+    const formatted = await probeVideo("/usr/bin/ffprobe", path.join(dir, "format.mp4"));
+    assert.equal(formatted.bitrate.source, "stream");
+    assert.equal(formatted.width, 64);
+    assert.equal(formatted.height, 64);
+  });
+});
+
 test("voice-synthesis text is the script when the shot list line is empty", async () => {
   await withDir(async (dir) => {
     await mkdir(path.join(dir, ".lumen", "runs", "run-voice"), { recursive: true });
@@ -428,6 +524,7 @@ test("captions are named in help and the skill points at both references", async
   assert.match(transcribe, /confirmed/);
   assert.match(transcribe, /0\.55/);
   assert.match(burn, /立刻压制/);
+  assert.match(burn, /bit_rate/);
   assert.match(burn, /top_center/);
   assert.match(burn, /317 \/ 2560/);
   assert.match(burn, /225 \/ 1440/);
