@@ -58,7 +58,7 @@ Backends, one binding per model (no family fallback):
                          enhance is only enhance-video-generative at 2k and 30 fps. No model, resolution,
                          fps, tool-version, scene, bitrate, or style flag.
                          Before submit, prints a cost estimate at 10 yuan/min (large-model 2K ≤30fps).
-                         After an https mp4 downloads, lumen adds monochrome film grain at strength 0.55
+                         After an https mp4 downloads, lumen adds monochrome film grain at strength 0.4
                          (half-resolution grain, output bitrate matched to that file, audio copied).
                          There is no separate grain command. Do not add grain again.
                          local upload POST /api/v1/tools-sync/request-media-upload-url sends JSON {}

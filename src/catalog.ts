@@ -176,7 +176,7 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: "enhance-video-generative",
     kind: "mediakit",
-    summary: "MediaKit enhance-video-generative. lumen enhance always sends 2k and 30 fps, then adds monochrome film grain",
+    summary: "MediaKit enhance-video-generative. lumen enhance always sends 2k and 30 fps, then adds monochrome film grain at strength 0.4 (noise c0s=40)",
     providers: ["mediakit"],
   },
   {
