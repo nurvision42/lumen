@@ -8,12 +8,11 @@ import { fileURLToPath } from "node:url";
 import { burnVideoArgs, overlayGraph, probeVideo } from "../src/captions/burn.js";
 import { BITRATE_FALLBACK_NOTE } from "../src/grain/apply.js";
 import {
-  alignUntimed,
-  applyTimedScript,
+  ASR_COVERAGE_MIN,
+  SPEECH_COVERAGE_MIN,
   clampCues,
+  correctCueTexts,
   fitRatio,
-  reconcileCaptions,
-  SCRIPT_FIT_MIN,
 } from "../src/captions/cues.js";
 import { composePill, encodePng, roundedCoverage } from "../src/captions/png.js";
 import { discoverScript } from "../src/captions/script.js";
@@ -70,72 +69,106 @@ test("clamp keeps cue ends inside the picture", () => {
   assert.equal(clean.cues[0]?.end, 1);
 });
 
-test("a known script replaces recognition errors and fills a long gap", () => {
+test("spoken text corrects words inside recognition cues and keeps their times", () => {
   assert.equal(fitRatio("这不就瓶普通矿泉水吗", "这不就瓶普通矿泉水吗"), 1);
-  assert.ok(fitRatio("这不就瓶普通矿泉谁吗", "这不就瓶普通矿泉水吗") >= SCRIPT_FIT_MIN);
-  assert.ok(fitRatio("hello world", "这不就瓶普通矿泉水吗") < SCRIPT_FIT_MIN);
+  assert.ok(fitRatio("这不就瓶普通矿泉谁吗", "这不就瓶普通矿泉水吗") >= SPEECH_COVERAGE_MIN);
+  assert.ok(fitRatio("hello world", "这不就瓶普通矿泉水吗") < SPEECH_COVERAGE_MIN);
+  assert.ok(ASR_COVERAGE_MIN < SPEECH_COVERAGE_MIN);
 
-  const fixed = alignUntimed(
+  const fixed = correctCueTexts(
     [
-      { start: 0.2, end: 1.4, text: "这不就瓶普通矿泉" },
-      { start: 1.4, end: 2.6, text: "水吗今天天气" },
+      { start: 0.2, end: 1.4, text: "这不就瓶普通矿泉", speaker: "甲" },
+      { start: 1.4, end: 2.6, text: "水吗今天" },
     ],
     "这不就瓶普通矿泉水吗",
-    4,
   );
-  assert.equal(fixed.map((cue) => cue.text).join(""), "这不就瓶普通矿泉水吗");
-  assert.equal(fixed.some((cue) => cue.text.includes("今天")), false);
+  assert.equal(fixed.ok, true, fixed.reasons.join("\n"));
+  assert.deepEqual(fixed.cues.map((cue) => cue.text), ["这不就瓶普通矿泉", "水吗"]);
+  assert.equal(fixed.cues[0]?.text.includes("谁"), false);
+  assert.equal(fixed.cues.map((cue) => cue.text).join("").includes("今天"), false);
+  assert.equal(fixed.cues[0]?.start, 0.2);
+  assert.equal(fixed.cues[0]?.end, 1.4);
+  assert.equal(fixed.cues[1]?.start, 1.4);
+  assert.equal(fixed.cues[1]?.end, 2.6);
+  assert.equal(fixed.cues[0]?.speaker, "甲");
+  assert.equal(fixed.cues[0]?.text.includes("甲"), false);
 
-  const comma = alignUntimed(
-    [
-      { start: 0, end: 1, text: "你好" },
-      { start: 1, end: 2, text: "世界" },
-    ],
-    "你好，世界",
-    2,
+  const typo = correctCueTexts(
+    [{ start: 0.4, end: 1.8, text: "这不就瓶普通矿泉谁吗" }],
+    "这不就瓶普通矿泉水吗",
   );
-  assert.equal(comma.map((cue) => cue.text).join(""), "你好，世界");
+  assert.equal(typo.ok, true, typo.reasons.join("\n"));
+  assert.equal(typo.cues[0]?.text, "这不就瓶普通矿泉水吗");
+  assert.equal(typo.cues[0]?.start, 0.4);
+  assert.equal(typo.cues[0]?.end, 1.8);
 
-  const filled = alignUntimed([{ start: 0, end: 1, text: "你好" }], "你好世界", 3);
-  assert.equal(filled.map((cue) => cue.text).join(""), "你好世界");
-  assert.equal(filled.length, 2);
-  assert.ok((filled[1]?.start ?? 0) >= 1);
-
-  const timed = applyTimedScript(
-    [
-      { start: 0.4, end: 1.8, text: "这不就瓶普通矿泉谁" },
-      { start: 2.2, end: 3.6, text: "哎这水喝着挺顺啊" },
-    ],
-    [
-      { start: 0, end: 2, text: "这不就瓶普通矿泉水吗" },
-      { start: 2, end: 4, text: "哎这水喝着挺顺" },
-    ],
+  const missingInside = correctCueTexts(
+    [{ start: 0.2, end: 1.5, text: "这不就瓶普通矿泉吗" }],
+    "这不就瓶普通矿泉水吗",
   );
-  assert.deepEqual(timed.map((cue) => cue.text), ["这不就瓶普通矿泉水吗", "哎这水喝着挺顺"]);
-  assert.equal(timed[0]?.start, 0.4);
-  assert.equal(timed[0]?.end, 1.8);
-  assert.equal(timed[1]?.start, 2.2);
-  assert.equal(timed[1]?.end, 3.6);
+  assert.equal(missingInside.ok, true, missingInside.reasons.join("\n"));
+  assert.equal(missingInside.cues[0]?.text, "这不就瓶普通矿泉水吗");
+  assert.equal(missingInside.cues.length, 1);
+  assert.equal(missingInside.cues[0]?.start, 0.2);
+  assert.equal(missingInside.cues[0]?.end, 1.5);
 });
 
-test("a poor script match is not confirmed and is not applied", () => {
-  const result = reconcileCaptions({
-    asr: [{ start: 0.2, end: 1.2, text: "hello there" }],
-    script: { source: "file", file: "script.txt", timed: false, lines: [{ text: "这不就瓶普通矿泉水吗" }], text: "这不就瓶普通矿泉水吗" },
-    duration: 2,
-  });
-  assert.equal(result.confirmed, false);
-  assert.equal(result.script?.applied, false);
-  assert.equal(result.cues[0]?.text, "hello there");
+test("a full sentence does not merge short cues, and unsafe edits do not invent times", () => {
+  const comma = correctCueTexts(
+    [
+      { start: 0, end: 0.4, text: "你好" },
+      { start: 0.4, end: 0.8, text: "世界" },
+      { start: 0.8, end: 1.2, text: "再见" },
+    ],
+    "你好，世界，再见",
+  );
+  assert.equal(comma.ok, true, comma.reasons.join("\n"));
+  assert.equal(comma.cues.length, 3);
+  assert.deepEqual(comma.cues.map((cue) => [cue.start, cue.end]), [[0, 0.4], [0.4, 0.8], [0.8, 1.2]]);
+  assert.equal(comma.cues[0]?.text.startsWith("你好"), true);
+  assert.equal(comma.cues[1]?.text.includes("世界"), true);
+  assert.equal(comma.cues[2]?.text.includes("再见"), true);
+  assert.equal(comma.cues.some((cue) => cue.text.includes("你好") && cue.text.includes("世界")), false);
 
-  const matched = reconcileCaptions({
-    asr: [{ start: 0.2, end: 1.5, text: "这不就瓶普通矿泉谁吗" }],
-    script: { source: "shotlist", file: "shotlist.md", timed: true, lines: [{ start: 0, end: 2, text: "这不就瓶普通矿泉水吗" }], text: "这不就瓶普通矿泉水吗" },
-    duration: 2,
-  });
-  assert.equal(matched.confirmed, true);
-  assert.equal(matched.script?.applied, true);
-  assert.equal(matched.cues[0]?.text, "这不就瓶普通矿泉水吗");
+  const between = correctCueTexts(
+    [
+      { start: 0.2, end: 1.2, text: "这不就瓶普通矿泉水吗" },
+      { start: 2.2, end: 3.2, text: "再见" },
+    ],
+    "这不就瓶普通矿泉水吗世界再见",
+  );
+  assert.equal(between.ok, false);
+  assert.equal(between.cues.length, 2);
+  assert.equal(between.cues[0]?.text, "这不就瓶普通矿泉水吗");
+  assert.equal(between.cues[0]?.start, 0.2);
+  assert.equal(between.cues[1]?.end, 3.2);
+  assert.match(between.reasons.join("\n"), /世界/);
+
+  const emptied = correctCueTexts(
+    [
+      { start: 0.2, end: 1.4, text: "这不就瓶普通矿泉水吗" },
+      { start: 1.4, end: 2.2, text: "废话" },
+    ],
+    "这不就瓶普通矿泉水吗",
+  );
+  assert.equal(emptied.ok, false);
+  assert.equal(emptied.cues.length, 2);
+  assert.equal(emptied.cues[1]?.text, "废话");
+  assert.equal(emptied.cues[1]?.start, 1.4);
+  assert.match(emptied.reasons.join("\n"), /empty cue 2/);
+
+  const mismatch = correctCueTexts(
+    [{ start: 0.2, end: 1.2, text: "hello there" }],
+    "这不就瓶普通矿泉水吗",
+  );
+  assert.equal(mismatch.ok, false);
+  assert.equal(mismatch.cues[0]?.text, "hello there");
+  assert.match(mismatch.reasons.join("\n"), /closely enough/);
+
+  const none = correctCueTexts([], "这不就瓶普通矿泉水吗");
+  assert.equal(none.ok, false);
+  assert.equal(none.cues.length, 0);
+  assert.match(none.reasons.join("\n"), /no recognition cues/);
 });
 
 test("ink sits in the optical center of a rounded translucent pill", () => {
@@ -255,7 +288,7 @@ test("transcribe dry-run plans asr-subtitles and writes no caption file", async 
   });
 });
 
-test("execute clamps to the file duration and confirms a matching shot-list script", async () => {
+test("execute clamps to the file duration and ignores a project script", async () => {
   await withDir(async (dir) => {
     const bind = capture();
     assert.equal(
@@ -285,7 +318,7 @@ test("execute clamps to the file duration and confirms a matching shot-list scri
       duration: number;
       clamped: boolean;
       confirmed: boolean;
-      cues: { end: number; text: string }[];
+      cues: { start: number; end: number; text: string }[];
     };
     assert.ok(looseDoc.duration < 2.1);
     assert.equal(looseDoc.clamped, true);
@@ -300,19 +333,31 @@ test("execute clamps to the file duration and confirms a matching shot-list scri
       0,
       matched.err(),
     );
-    assert.match(matched.out(), /confirmed: yes/);
+    assert.match(matched.out(), /confirmed: no/);
+    assert.match(matched.out(), /script: none/);
     assert.equal(matched.out().includes("secret-value"), false);
     const doc = JSON.parse(await readFile(path.join(dir, "refs", "matched.json"), "utf8")) as {
       confirmed: boolean;
-      cues: { end: number; text: string }[];
-      script: { applied: boolean; source: string };
+      cues: { start: number; end: number; text: string }[];
+      script: null;
       duration: number;
     };
-    assert.equal(doc.confirmed, true);
-    assert.equal(doc.script.applied, true);
-    assert.equal(doc.script.source, "shotlist");
-    assert.equal(doc.cues[0]?.text, "这不就瓶普通矿泉水吗");
+    assert.equal(doc.confirmed, false);
+    assert.equal(doc.script, null);
+    assert.equal(doc.cues[0]?.text, "这不就瓶普通矿泉谁吗");
+    assert.equal(doc.cues[0]?.start, looseDoc.cues[0]?.start);
+    assert.equal(doc.cues[0]?.end, looseDoc.cues[0]?.end);
     assert.ok((doc.cues[0]?.end ?? 99) <= doc.duration + 0.001);
+    assert.equal(doc.cues.length, looseDoc.cues.length);
+
+    const rejected = capture({ ...process.env, MEDIAKIT_ASR_KEY: "secret-value" }, { fetch });
+    assert.equal(
+      await run(["captions", "transcribe", "--video", "clip.mp4", "--script", "shotlist.md", "--execute", "--project", dir], rejected.io),
+      2,
+      rejected.err(),
+    );
+    assert.match(rejected.err(), /does not take --script/);
+    assert.match(rejected.err(), /captions burn --speech/);
   });
 });
 
@@ -328,11 +373,39 @@ test("a loose video stays unconfirmed until burn is told to proceed", async () =
       cues: [{ start: 0.2, end: 1, text: "哎这水喝着挺顺" }],
     })}\n`);
     const denied = capture();
-    assert.equal(await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/loose.json", "--to", "out.mp4", "--font", FONT, "--project", dir], denied.io), 1);
+    const speechless = capture();
+    assert.equal(
+      await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/loose.json", "--to", "out.mp4", "--font", FONT, "--confirm", "--project", dir], speechless.io),
+      2,
+    );
+    assert.match(speechless.err(), /requires --speech/);
+    await writeFile(path.join(dir, "refs", "cues.srt"), "1\n00:00:00,000 --> 00:00:01,000\n哎这水喝着挺顺\n");
+    const srt = capture();
+    assert.equal(
+      await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/cues.srt", "--to", "srt.mp4", "--font", FONT, "--speech", "哎这水喝着挺顺", "--project", dir], srt.io),
+      2,
+    );
+    assert.match(srt.err(), /SRT and ASS are not burned/);
+    await writeFile(path.join(dir, "refs", "timed.json"), `${JSON.stringify({ cues: [{ start: 0, end: 9, text: "哎这水喝着挺顺" }] })}\n`);
+    const timed = capture();
+    assert.equal(
+      await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/timed.json", "--to", "timed.mp4", "--font", FONT, "--confirm", "--speech", "哎这水喝着挺顺", "--project", dir], timed.io),
+      2,
+    );
+    assert.match(timed.err(), /not a lumen.captions file/);
+    assert.equal(await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/loose.json", "--to", "out.mp4", "--font", FONT, "--speech", "哎这水喝着挺顺", "--project", dir], denied.io), 1);
     assert.match(denied.err(), /not confirmed/);
+    const blocked = capture();
+    assert.equal(
+      await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/loose.json", "--to", "out.mp4", "--font", FONT, "--confirm", "--speech", "完全另一段话", "--project", dir], blocked.io),
+      1,
+      blocked.err(),
+    );
+    assert.match(blocked.err(), /No video was written/);
+    await assert.rejects(readFile(path.join(dir, "out.mp4")));
     const planned = capture();
     assert.equal(
-      await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/loose.json", "--to", "out.mp4", "--font", FONT, "--confirm", "--dry-run", "--project", dir], planned.io),
+      await run(["captions", "burn", "--video", "wide.mp4", "--subs", "refs/loose.json", "--to", "out.mp4", "--font", FONT, "--confirm", "--speech", "哎这水喝着挺顺", "--dry-run", "--project", dir], planned.io),
       0,
       planned.err(),
     );
@@ -354,7 +427,7 @@ test("a loose video stays unconfirmed until burn is told to proceed", async () =
     ]);
     const burned = capture();
     assert.equal(
-      await run(["captions", "burn", "--video", "tall.mp4", "--subs", "refs/loose.json", "--to", "tall-out.mp4", "--font", FONT, "--confirm", "--project", dir], burned.io),
+      await run(["captions", "burn", "--video", "tall.mp4", "--subs", "refs/loose.json", "--to", "tall-out.mp4", "--font", FONT, "--confirm", "--speech", "哎这水喝着挺顺", "--project", dir], burned.io),
       0,
       burned.err(),
     );
@@ -424,18 +497,20 @@ test("burn stays near the source bitrate and copies audio", { timeout: 120_000 }
       "-c:a", "aac", "-shortest",
       video,
     ]);
-    await writeFile(path.join(dir, "refs", "ok.json"), `${JSON.stringify({
+    const original = `${JSON.stringify({
       format: "lumen.captions@1",
       confirmed: true,
       cues: [{ start: 0.4, end: 2.2, text: "哎这水喝着挺顺" }],
-    })}\n`);
+    })}\n`;
+    await writeFile(path.join(dir, "refs", "ok.json"), original);
+    await writeFile(path.join(dir, "refs", "words.txt"), "哎这水喝着挺顺\n");
     const source = await probeVideo("/usr/bin/ffprobe", video);
     assert.equal(source.bitrate.source, "stream");
     assert.equal(source.width, 640);
     assert.equal(source.height, 360);
     const burned = capture();
     assert.equal(
-      await run(["captions", "burn", "--video", "clip.mp4", "--subs", "refs/ok.json", "--to", "out.mp4", "--font", FONT, "--project", dir], burned.io),
+      await run(["captions", "burn", "--video", "clip.mp4", "--subs", "refs/ok.json", "--to", "out.mp4", "--font", FONT, "--speech-file", "refs/words.txt", "--project", dir], burned.io),
       0,
       burned.err(),
     );
@@ -461,6 +536,14 @@ test("burn stays near the source bitrate and copies audio", { timeout: 120_000 }
     ]);
     assert.equal(stdout.trim(), sourceAudio.stdout.trim());
     assert.match(stdout, /aac/);
+    assert.equal(await readFile(path.join(dir, "refs", "ok.json"), "utf8"), original);
+    const sibling = JSON.parse(await readFile(path.join(dir, "refs", "ok.speech.json"), "utf8")) as {
+      cues: { start: number; end: number; text: string }[];
+    };
+    assert.equal(sibling.cues[0]?.start, 0.4);
+    assert.equal(sibling.cues[0]?.end, 2.2);
+    assert.equal(sibling.cues[0]?.text, "哎这水喝着挺顺");
+    assert.match(await readFile(path.join(dir, "refs", "ok.speech.txt"), "utf8"), /speechCoverage: 1.000/);
 
     const raw = path.join(dir, "raw.mkv");
     await exec("/usr/bin/ffmpeg", [
@@ -475,7 +558,7 @@ test("burn stays near the source bitrate and copies audio", { timeout: 120_000 }
     })}\n`);
     const fallback = capture();
     assert.equal(
-      await run(["captions", "burn", "--video", "raw.mkv", "--subs", "refs/short.json", "--to", "format.mp4", "--font", FONT, "--font-size", "8", "--project", dir], fallback.io),
+      await run(["captions", "burn", "--video", "raw.mkv", "--subs", "refs/short.json", "--to", "format.mp4", "--font", FONT, "--font-size", "8", "--speech", "顺", "--project", dir], fallback.io),
       0,
       fallback.err(),
     );
@@ -516,13 +599,18 @@ test("captions are named in help and the skill points at both references", async
   assert.match(skill, /references\/转字幕\/SKILL\.md/);
   assert.match(skill, /references\/加字幕\/SKILL\.md/);
   assert.match(skill, /lumen captions transcribe --video <file>/);
-  assert.match(skill, /lumen captions burn --video <file> --subs <file> --to <mp4>/);
+  assert.match(skill, /lumen captions burn --video <file> --subs <file> --speech-file <file> --to <mp4>/);
   assert.equal(skill.trim().split("\n").length <= 80, true);
   const transcribe = await readFile(path.join(root, "skills", "lumen", "references", "转字幕", "SKILL.md"), "utf8");
   const burn = await readFile(path.join(root, "skills", "lumen", "references", "加字幕", "SKILL.md"), "utf8");
   assert.match(transcribe, /--execute/);
   assert.match(transcribe, /confirmed/);
-  assert.match(transcribe, /0\.55/);
+  assert.match(transcribe, /does not take --script|不接受 `--script`/);
+  assert.match(help.out(), /--speech/);
+  assert.match(help.out(), /--script is rejected/);
+  assert.match(burn, /--speech/);
+  assert.match(burn, /0\.85/);
+  assert.match(burn, /0\.75/);
   assert.match(burn, /立刻压制/);
   assert.match(burn, /bit_rate/);
   assert.match(burn, /top_center/);

@@ -15,8 +15,17 @@ export interface CueDocument {
   format?: string;
 }
 
-/** Below this, a known script is kept for review and is not written onto the cues. */
-export const SCRIPT_FIT_MIN = 0.55;
+/**
+ * Portion of the spoken reference that must be found in the recognition
+ * before a burn may replace cue text. Below this, the words are not the same passage.
+ */
+export const SPEECH_COVERAGE_MIN = 0.85;
+
+/**
+ * Portion of the recognition that must be found in the spoken reference.
+ * Below this, too much recognized speech would be deleted to trust the edit.
+ */
+export const ASR_COVERAGE_MIN = 0.75;
 
 export interface ScriptLine {
   text: string;
@@ -232,28 +241,20 @@ export function fitRatio(asrText: string, scriptText: string): number {
   return matched / b.length;
 }
 
-interface NormCue {
-  start: number;
-  end: number;
-  normStart: number;
-  normEnd: number;
-  parts: string[];
-  speaker?: string;
-}
-
-function scriptPieces(text: string): { chars: string[]; pieces: string[] } {
+/** Punctuation stays on the previous word so a comma does not open a new cue. */
+function speechPieces(text: string): { chars: string[]; pieces: string[] } {
   const chars: string[] = [];
   const pieces: string[] = [];
   let pending = "";
   for (const ch of text) {
     if (/[\s\p{P}\p{S}]/u.test(ch)) {
-      pending += ch;
+      if (pieces.length === 0) pending += ch;
+      else pieces[pieces.length - 1] = `${pieces[pieces.length - 1] ?? ""}${ch}`;
       continue;
     }
-    pending += ch;
-    chars.push(ch.toLowerCase());
-    pieces.push(pending);
+    pieces.push(`${pending}${ch}`);
     pending = "";
+    chars.push(ch.toLowerCase());
   }
   if (pending.length > 0) {
     if (pieces.length === 0) pieces.push(pending);
@@ -262,9 +263,11 @@ function scriptPieces(text: string): { chars: string[]; pieces: string[] } {
   return { chars, pieces };
 }
 
-function give(pieces: readonly string[], targets: { cue: NormCue; weight: number }[]): void {
-  if (targets.length === 0 || pieces.length === 0) return;
+function give(pieces: readonly string[], targets: { cue: SpokenCue; weight: number }[]): boolean {
+  if (pieces.length === 0) return true;
+  if (targets.length === 0) return false;
   const total = targets.reduce((sum, target) => sum + target.weight, 0);
+  if (!(total > 0)) return false;
   const base = targets.map((target) => Math.floor((pieces.length * target.weight) / total));
   let left = pieces.length - base.reduce((sum, count) => sum + count, 0);
   const order = targets
@@ -281,166 +284,158 @@ function give(pieces: readonly string[], targets: { cue: NormCue; weight: number
     target.cue.parts.push(...pieces.slice(cursor, cursor + count));
     cursor += count;
   });
+  return true;
 }
 
-function placeInsert(pieces: readonly string[], at: number, cues: NormCue[], duration: number): void {
-  if (pieces.length === 0) return;
-  const internal = cues.find((cue) => at > cue.normStart && at < cue.normEnd);
-  if (internal !== undefined) {
-    internal.parts.push(...pieces);
-    return;
-  }
-  const previous = [...cues].reverse().find((cue) => cue.normEnd <= at && cue.normEnd >= 0);
-  const next = cues.find((cue) => cue.normStart >= at);
-  const gapStart = previous?.end ?? 0;
-  const gapEnd = next?.start ?? duration;
-  const words = pieces.join("").replace(/[\s\p{P}\p{S}]/gu, "");
-  if (words.length >= 2 && gapEnd - gapStart >= 0.35) {
-    cues.push({
-      start: gapStart,
-      end: gapEnd,
-      normStart: -1,
-      normEnd: -1,
-      parts: [...pieces],
-    });
-    return;
-  }
-  if (previous !== undefined) previous.parts.push(...pieces);
-  else if (next !== undefined) next.parts.unshift(...pieces);
-  else if (duration > 0) {
-    cues.push({ start: 0, end: duration, normStart: -1, normEnd: -1, parts: [...pieces] });
-  }
+interface SpokenCue {
+  index: number;
+  start: number;
+  end: number;
+  normStart: number;
+  normEnd: number;
+  parts: string[];
+  original: string;
+  speaker?: string;
 }
 
-/** Keep ASR timing. Replace the words with the script where the two line up, and fill long gaps. */
-export function alignUntimed(asr: readonly Cue[], script: string, duration: number): Cue[] {
-  const { chars, pieces } = scriptPieces(script);
-  if (chars.length === 0) return asr.map((cue) => ({ ...cue }));
-  const cues: NormCue[] = [];
+export interface CueTextChange {
+  index: number;
+  from: string;
+  to: string;
+}
+
+export interface CueCorrection {
+  ok: boolean;
+  cues: Cue[];
+  speechCoverage: number;
+  asrCoverage: number;
+  unplaced: string[];
+  emptied: number[];
+  changes: CueTextChange[];
+  reasons: string[];
+}
+
+function overlapTargets(cues: SpokenCue[], from: number, to: number): { cue: SpokenCue; weight: number }[] {
+  return cues
+    .map((cue) => {
+      const lo = Math.max(cue.normStart, from);
+      const hi = Math.min(cue.normEnd, to);
+      return { cue, weight: Math.max(0, hi - lo) };
+    })
+    .filter((target) => target.weight > 0);
+}
+
+/**
+ * Replace cue text from a spoken reference. Cue count, order, start, and end
+ * stay on the recognition. Words are placed by character alignment onto the
+ * cue that already contains the matching recognition characters, not by
+ * slicing time. A passage that falls between cues is left unplaced.
+ */
+export function correctCueTexts(asr: readonly Cue[], speech: string): CueCorrection {
+  const spoken = speech.replace(/^\uFEFF/, "").trim();
+  const original = asr.map((cue) => ({ ...cue }));
+  if (asr.length === 0) {
+    return {
+      ok: false,
+      cues: original,
+      speechCoverage: 0,
+      asrCoverage: 0,
+      unplaced: [],
+      emptied: [],
+      changes: [],
+      reasons: ["no recognition cues; refusing to invent timed subtitles from the spoken text"],
+    };
+  }
+  if (spoken.length === 0) {
+    return {
+      ok: false,
+      cues: original,
+      speechCoverage: 0,
+      asrCoverage: 0,
+      unplaced: [],
+      emptied: [],
+      changes: [],
+      reasons: ["spoken text is empty"],
+    };
+  }
+  const { chars, pieces } = speechPieces(spoken);
+  const cues: SpokenCue[] = [];
   let cursor = 0;
-  for (const cue of asr) {
+  asr.forEach((cue, index) => {
     const norm = normalizeCaption(cue.text);
     cues.push({
+      index,
       start: cue.start,
       end: cue.end,
       normStart: cursor,
       normEnd: cursor + norm.length,
       parts: [],
+      original: cue.text,
       ...(cue.speaker === undefined ? {} : { speaker: cue.speaker }),
     });
     cursor += norm.length;
-  }
-  if (cues.length === 0) return [];
+  });
   const flat: string[] = [];
   for (const cue of asr) flat.push(...normalizeCaption(cue.text));
-  const blocks = matchingBlocks(flat, chars);
+  const speechCoverage = chars.length === 0 ? 0 : fitRatio(flat.join(""), spoken);
+  const asrCoverage = flat.length === 0 ? 0 : fitRatio(spoken, flat.join(""));
+  const unplaced: string[] = [];
+  const noteUnplaced = (slice: readonly string[]): void => {
+    const text = slice.join("").trim();
+    if (normalizeCaption(text).length > 0) unplaced.push(text);
+  };
+  const blocks = chars.length === 0 || flat.length === 0 ? [] : matchingBlocks(flat, chars);
   let i = 0;
   let j = 0;
   for (const block of blocks) {
     if (i < block.i && j < block.j) {
-      const targets = cues
-        .map((cue) => {
-          const lo = Math.max(cue.normStart, i);
-          const hi = Math.min(cue.normEnd, block.i);
-          return { cue, weight: Math.max(0, hi - lo) };
-        })
-        .filter((target) => target.weight > 0);
-      give(pieces.slice(j, block.j), targets);
+      const slice = pieces.slice(j, block.j);
+      if (!give(slice, overlapTargets(cues, i, block.i))) noteUnplaced(slice);
     } else if (j < block.j) {
-      placeInsert(pieces.slice(j, block.j), i, cues, duration);
+      const slice = pieces.slice(j, block.j);
+      const internal = cues.find((cue) => i > cue.normStart && i < cue.normEnd);
+      if (internal !== undefined) internal.parts.push(...slice);
+      else noteUnplaced(slice);
     }
     if (block.size > 0) {
-      const targets = cues
-        .map((cue) => {
-          const lo = Math.max(cue.normStart, block.i);
-          const hi = Math.min(cue.normEnd, block.i + block.size);
-          return { cue, weight: Math.max(0, hi - lo) };
-        })
-        .filter((target) => target.weight > 0);
-      give(pieces.slice(block.j, block.j + block.size), targets);
+      const slice = pieces.slice(block.j, block.j + block.size);
+      if (!give(slice, overlapTargets(cues, block.i, block.i + block.size))) noteUnplaced(slice);
     }
     i = block.i + block.size;
     j = block.j + block.size;
   }
-  return cues
-    .map((cue) => {
-      const text = cue.parts.join("").trim();
-      return {
-        start: roundTime(cue.start),
-        end: roundTime(cue.end),
-        text,
-        ...(cue.speaker === undefined ? {} : { speaker: cue.speaker }),
-      };
-    })
-    .filter((cue) => cue.text.length > 0 && cue.end > cue.start)
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-}
-
-export function applyTimedScript(asr: readonly Cue[], lines: readonly ScriptLine[]): Cue[] {
-  const cues: Cue[] = [];
-  for (const line of lines) {
-    const text = line.text.trim();
-    if (text.length === 0 || line.start === undefined || line.end === undefined || !(line.end > line.start)) continue;
-    const overlap = asr.filter((cue) => cue.end > line.start! && cue.start < line.end!);
-    let start = line.start;
-    let end = line.end;
-    if (overlap.length > 0) {
-      start = Math.max(line.start, Math.min(...overlap.map((cue) => cue.start)));
-      end = Math.min(line.end, Math.max(...overlap.map((cue) => cue.end)));
-      if (!(end > start)) {
-        start = line.start;
-        end = line.end;
-      }
-    }
-    const speakers = [...new Set(overlap.map((cue) => cue.speaker).filter((speaker): speaker is string => speaker !== undefined))];
-    cues.push({
-      start: roundTime(start),
-      end: roundTime(end),
+  const emptied: number[] = [];
+  const corrected: Cue[] = cues.map((cue) => {
+    const text = cue.parts.join("").trim();
+    if (cue.original.trim().length > 0 && text.length === 0) emptied.push(cue.index);
+    return {
+      start: cue.start,
+      end: cue.end,
       text,
-      ...(speakers.length === 1 && speakers[0] !== undefined ? { speaker: speakers[0] } : {}),
-    });
+      ...(cue.speaker === undefined ? {} : { speaker: cue.speaker }),
+    };
+  });
+  const reasons: string[] = [];
+  if (speechCoverage + 1e-9 < SPEECH_COVERAGE_MIN || asrCoverage + 1e-9 < ASR_COVERAGE_MIN) {
+    reasons.push(
+      `spoken text does not match the recognition cues closely enough (speech ${speechCoverage.toFixed(3)}, asr ${asrCoverage.toFixed(3)}; need ${SPEECH_COVERAGE_MIN.toFixed(2)} and ${ASR_COVERAGE_MIN.toFixed(2)})`,
+    );
   }
-  return cues;
-}
-
-export function reconcileCaptions(input: {
-  asr: readonly Cue[];
-  script?: { source: ScriptNote["source"]; file: string; timed: boolean; lines: readonly ScriptLine[]; text: string };
-  duration: number;
-}): { cues: Cue[]; clamped: boolean; confirmed: boolean; script: ScriptNote | null } {
-  const script = input.script;
-  const fit = script === undefined ? undefined : fitRatio(input.asr.map((cue) => cue.text).join(""), script.text);
-  const apply = script !== undefined && fit !== undefined && fit >= SCRIPT_FIT_MIN;
-  let chosen: Cue[] = input.asr.map((cue) => ({ ...cue }));
-  let applied = false;
-  if (apply && script !== undefined) {
-    const aligned = script.timed ? applyTimedScript(input.asr, script.lines) : alignUntimed(input.asr, script.text, input.duration);
-    if (aligned.length > 0) {
-      chosen = aligned;
-      applied = true;
-    }
-  } else if (script?.timed === true && input.asr.length === 0) {
-    const filled = applyTimedScript([], script.lines);
-    if (filled.length > 0) {
-      chosen = filled;
-      applied = true;
-    }
+  for (const bit of unplaced) reasons.push(`spoken passage has no recognition cue: ${bit}`);
+  for (const index of emptied) {
+    const cue = asr[index];
+    reasons.push(
+      `correction would empty cue ${index + 1} (${cue?.start.toFixed(3)}-${cue?.end.toFixed(3)}) "${cue?.text ?? ""}". The cue was not deleted`,
+    );
   }
-  const clamped = clampCues(chosen, input.duration);
-  const confirmed = apply && applied && clamped.cues.length > 0;
-  return {
-    cues: clamped.cues,
-    clamped: clamped.clamped,
-    confirmed,
-    script: script === undefined || fit === undefined
-      ? null
-      : {
-          source: script.source,
-          file: script.file,
-          fit: Math.round(fit * 1000) / 1000,
-          applied,
-        },
-  };
+  const changes = corrected.flatMap((cue, index) => {
+    const from = asr[index]?.text ?? "";
+    return from === cue.text ? [] : [{ index, from, to: cue.text }];
+  });
+  if (reasons.length > 0) {
+    return { ok: false, cues: original, speechCoverage, asrCoverage, unplaced, emptied, changes: [], reasons };
+  }
+  return { ok: true, cues: corrected, speechCoverage, asrCoverage, unplaced, emptied, changes, reasons };
 }
 
 export function toSrt(cues: readonly Cue[]): string {

@@ -104,7 +104,10 @@ function timedFromShots(shots: readonly Shot[], voice: readonly VoiceLine[]): Sc
   return lines;
 }
 
-/** Shot list voice-over wins. A finished voice-synthesis or voice-clone run fills an empty line. */
+/**
+ * Reads a shot list or a finished voice-synthesis / voice-clone run.
+ * `captions transcribe` and `captions burn` do not call this.
+ */
 export async function discoverScript(project: string): Promise<ScriptCopy | undefined> {
   const shotlist = await quietShotlist(project);
   const voice = await voiceLines(project);
