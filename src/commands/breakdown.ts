@@ -1,10 +1,10 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { BREAKDOWN_DEFAULT_PROMPT, isDeferredPrompt } from "../catalog.js";
-import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, missingKey } from "../config.js";
+import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, missingKey, resolvePreferEndpoints } from "../config.js";
 import { CliError, errorCode } from "../errors.js";
 import { fileExists } from "../fsutil.js";
-import { flagString, parseFlags, requireRestEmpty, runMode } from "../flags.js";
+import { flagList, flagString, parseFlags, requireRestEmpty, runMode } from "../flags.js";
 import type { IO } from "../io.js";
 import { LAYOUT } from "../project.js";
 import { settle, type OutputFile } from "../runs.js";
@@ -69,6 +69,7 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     video: "string",
     prompt: "string",
     "prompt-file": "string",
+    "prefer-endpoint": "list",
     "allow-placeholder": "boolean",
     "dry-run": "boolean",
     execute: "boolean",
@@ -88,9 +89,10 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     else if (config.breakdown.prompt !== undefined && !isDeferredPrompt(config.breakdown.prompt)) prompt = config.breakdown.prompt;
     if (prompt === undefined || isDeferredPrompt(prompt)) prompt = BREAKDOWN_DEFAULT_PROMPT;
     const preferModels = breakdownPreferModels(config.breakdown);
+    const preferEndpoints = resolvePreferEndpoints(config.breakdown, io.env, flagList(values, "prefer-endpoint"));
     const level = breakdownLevel(config.breakdown);
     const needAudio = breakdownNeedAudio(config.breakdown);
-    ctx.params = { video, prompt, level, preferModels, needAudio };
+    ctx.params = { video, prompt, level, preferModels, preferEndpoints, needAudio };
     if (mode === "execute" && isDeferredPrompt(prompt) && values["allow-placeholder"] !== true) {
       throw new CliError("breakdown prompt is deferred");
     }
@@ -102,6 +104,7 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     ctx.resume = { videoFile: understand, receipt: understand };
     const outcome = await runMediakit(MODEL, binding, video, runId, mode, io, ctx.secret, prompt, undefined, {
       preferModels,
+      preferEndpoints,
       level,
       needAudio,
     });

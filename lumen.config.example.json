@@ -76,6 +76,7 @@
   "breakdown": {
     "prompt": "",
     "preferModels": ["doubao-seed-2-1-pro-260915", "doubao-seed-2-0-lite-260428"],
+    "preferEndpoints": ["ep-xxxxxxxx"],
     "level": "Quality",
     "needAudio": true
   },

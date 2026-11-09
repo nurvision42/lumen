@@ -141,6 +141,17 @@ async function resumeSeedance(
   );
 }
 
+/** Breakdown defaults to need_audio. Enhance and other tools do not. */
+function understandNeedAudio(record: RunRecord): boolean | undefined {
+  if (record.modelId !== "video-understand-router") return undefined;
+  const params = record.params;
+  if (params !== null && typeof params === "object" && !Array.isArray(params) && "needAudio" in params) {
+    const need = (params as { needAudio?: unknown }).needAudio;
+    if (typeof need === "boolean") return need;
+  }
+  return true;
+}
+
 async function resumeMediakit(
   project: string,
   record: RunRecord,
@@ -151,7 +162,7 @@ async function resumeMediakit(
 ): Promise<{ response: unknown; files: OutputFile[] }> {
   const binding = record.binding;
   if (binding === null) throw new CliError(`run ${record.id} has no provider binding`, 2);
-  const task = await pollMediakitTask(calls, binding.baseUrl, pending.taskId, opts, io);
+  const task = await pollMediakitTask(calls, binding.baseUrl, pending.taskId, opts, io, understandNeedAudio(record));
   const result = publishedMediakit(task);
   if (record.modelId === "video-understand-router") {
     return { response: result.response, files: await materializeBreakdown(project, record.id, result.task) };

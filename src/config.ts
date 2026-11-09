@@ -36,6 +36,7 @@ export const configSchema = z
         prompt: z.string().optional(),
         promptFile: z.string().optional(),
         preferModels: z.array(z.string().trim().min(1)).min(1).optional(),
+        preferEndpoints: z.array(z.string().trim().min(1)).min(1).optional(),
         level: z.string().trim().min(1).optional(),
         needAudio: z.boolean().optional(),
       })
@@ -127,6 +128,7 @@ export interface LumenConfig {
     prompt?: string;
     promptFile?: string;
     preferModels?: readonly string[];
+    preferEndpoints?: readonly string[];
     level?: string;
     needAudio?: boolean;
   };
@@ -243,6 +245,31 @@ export function breakdownNeedAudio(breakdown: LumenConfig["breakdown"]): boolean
   return breakdown.needAudio ?? BREAKDOWN_NEED_AUDIO;
 }
 
+/** Env that overrides breakdown.preferEndpoints. Comma-separated Ark endpoint ids. */
+export const MEDIAKIT_ENDPOINTS_ENV = "LUMEN_MEDIAKIT_ENDPOINTS";
+
+/** Project list replaces the global list. Unset means no endpoints. */
+export function breakdownPreferEndpoints(breakdown: LumenConfig["breakdown"]): readonly string[] {
+  return listedModels(breakdown.preferEndpoints) ?? [];
+}
+
+/**
+ * Ark endpoint ids for prefer_endpoints.
+ * A non-empty flag list wins, then a set LUMEN_MEDIAKIT_ENDPOINTS, then config.
+ * An empty result means the request omits the field.
+ */
+export function resolvePreferEndpoints(
+  breakdown: LumenConfig["breakdown"],
+  env: NodeJS.ProcessEnv,
+  flags: readonly string[] = [],
+): string[] {
+  const flagged = flags.map((item) => item.trim()).filter((item) => item.length > 0);
+  if (flagged.length > 0) return flagged;
+  const raw = env[MEDIAKIT_ENDPOINTS_ENV];
+  if (raw !== undefined) return raw.split(",").map((item) => item.trim()).filter((item) => item.length > 0);
+  return [...breakdownPreferEndpoints(breakdown)];
+}
+
 /** A project path replaces that tool only. The other tool can still come from the global file. */
 function mergeTools(global: ToolPaths, local: ToolPaths): ToolPaths {
   return {
@@ -261,12 +288,14 @@ function mergeBreakdown(
   const prompt = local.prompt?.trim() ? local.prompt : global.prompt?.trim() ? global.prompt : undefined;
   const promptFile = local.promptFile?.trim() ? local.promptFile : global.promptFile?.trim() ? global.promptFile : undefined;
   const preferModels = listedModels(local.preferModels) ?? listedModels(global.preferModels);
+  const preferEndpoints = listedModels(local.preferEndpoints) ?? listedModels(global.preferEndpoints);
   const level = local.level?.trim() || global.level?.trim() || undefined;
   const needAudio = local.needAudio ?? global.needAudio;
   return {
     ...(prompt === undefined ? {} : { prompt }),
     ...(promptFile === undefined ? {} : { promptFile }),
     ...(preferModels === undefined ? {} : { preferModels }),
+    ...(preferEndpoints === undefined ? {} : { preferEndpoints }),
     ...(level === undefined ? {} : { level }),
     ...(needAudio === undefined ? {} : { needAudio }),
   };

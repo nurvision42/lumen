@@ -168,7 +168,7 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: "video-understand-router",
     kind: "mediakit",
-    summary: "MediaKit video-understand-router, level=Quality, need_audio, prefer_models doubao-seed-2-1-pro-260915 and doubao-seed-2-0-lite-260428",
+    summary: "MediaKit video-understand-router, level=Quality, need_audio, prefer_models doubao-seed-2-1-pro-260915 and doubao-seed-2-0-lite-260428. prefer_endpoints only when an Ark endpoint is set. doubao-seed-2-1-lite cannot do audio",
     providers: ["mediakit"],
   },
   {

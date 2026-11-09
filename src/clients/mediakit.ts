@@ -95,6 +95,7 @@ export function resolveEnhance(input: EnhanceOptions | undefined, tool: EnhanceT
 
 export interface UnderstandOptions {
   preferModels?: readonly string[];
+  preferEndpoints?: readonly string[];
   level?: string;
   needAudio?: boolean;
 }
@@ -150,6 +151,33 @@ function errorScalar(value: unknown): string {
   return "";
 }
 
+/** Appended when need_audio fails because the account has no Ark audio endpoint. */
+export const AUDIO_ENDPOINT_HINT =
+  "audio needs an Ark endpoint for doubao-seed-2-0-lite/mini; set breakdown.preferEndpoints or LUMEN_MEDIAKIT_ENDPOINTS";
+
+function is11100(value: unknown): boolean {
+  if (value === 11100) return true;
+  return typeof value === "string" && value.trim() === "11100";
+}
+
+/** True when the task failed with MediaKit status_code 11100 (no audio model on the account). */
+export function mediakitAudioUnavailable(value: unknown): boolean {
+  const record = asRecord(value);
+  if (record === undefined) return false;
+  if (is11100(record.status_code)) return true;
+  const error = asRecord(record.error);
+  if (error !== undefined && (is11100(error.status_code) || is11100(error.code))) return true;
+  const message =
+    typeof error?.message === "string"
+      ? error.message
+      : typeof record.error === "string"
+        ? record.error
+        : typeof record.message === "string"
+          ? record.message
+          : "";
+  return /status_code\s*=\s*11100\b/.test(message);
+}
+
 /** `error.code` and `error.message` from a MediaKit task, with the message truncated. */
 export function mediakitErrorDetail(value: unknown): string | undefined {
   const error = asRecord(asRecord(value)?.error);
@@ -163,13 +191,22 @@ export function mediakitErrorDetail(value: unknown): string | undefined {
   return `${code}: ${clipped}`;
 }
 
+/** Error text for a failed task. The audio hint is added only when need_audio was requested. */
+export function mediakitFailureDetail(value: unknown, needAudio?: boolean): string | undefined {
+  const detail = mediakitErrorDetail(value);
+  const hint = needAudio === true && mediakitAudioUnavailable(value) ? AUDIO_ENDPOINT_HINT : undefined;
+  if (detail === undefined) return hint;
+  if (hint === undefined) return detail;
+  return `${detail} ${hint}`;
+}
+
 /** Failure line for a task that is already terminal. Includes the id when the body has one. */
-export function mediakitFailedMessage(value: unknown): string {
+export function mediakitFailedMessage(value: unknown, needAudio?: boolean): string {
   const taskId = findString(value, "task_id");
   const record = asRecord(value);
   const status = typeof record?.status === "string" && record.status.trim().length > 0 ? record.status.trim() : "failed";
   const who = taskId === undefined ? "MediaKit task" : `MediaKit task ${taskId}`;
-  const detail = mediakitErrorDetail(value);
+  const detail = mediakitFailureDetail(value, needAudio);
   return detail === undefined ? `${who} ${status}` : `${who} ${status}: ${detail}`;
 }
 
@@ -205,11 +242,13 @@ function toolBody(
     const models = listed !== undefined && listed.length > 0 ? [...listed] : [...BREAKDOWN_PREFER_MODELS];
     const level = understand?.level?.trim() ? understand.level.trim() : BREAKDOWN_LEVEL;
     const needAudio = understand?.needAudio ?? BREAKDOWN_NEED_AUDIO;
+    const endpoints = (understand?.preferEndpoints ?? []).map((id) => id.trim()).filter((id) => id.length > 0);
     return {
       video_urls: [video],
       prompt,
       level,
       prefer_models: models,
+      ...(endpoints.length === 0 ? {} : { prefer_endpoints: endpoints }),
       manual_option: { need_audio: needAudio },
       client_token: runId,
       ...queue,
@@ -291,6 +330,7 @@ export async function pollMediakitTask(
   taskId: string,
   opts: SendOptions,
   io: IO,
+  needAudio?: boolean,
 ): Promise<HttpResult> {
   const pollUrl = mediakitPollUrl(base, taskId);
   // The submit body is not a task snapshot. Seed a pending result so the first GET happens immediately.
@@ -305,7 +345,7 @@ export async function pollMediakitTask(
     provider: "mediakit",
     taskId,
     pollUrl,
-  }, mediakitPollLimits(io.env), mediakitErrorDetail);
+  }, mediakitPollLimits(io.env), (value) => mediakitFailureDetail(value, needAudio));
 }
 
 export async function runMediakit(
@@ -352,11 +392,12 @@ export async function runMediakit(
   );
   let last = await perform(calls, submit, opts);
   await flushSettledMediakitTask(io, calls, binding.baseUrl, last);
-  if (taskState(last.json) === "fail") throw new TransportError(mediakitFailedMessage(last.json), calls, publicResult(last));
+  const needAudio = understand?.needAudio;
+  if (taskState(last.json) === "fail") throw new TransportError(mediakitFailedMessage(last.json, needAudio), calls, publicResult(last));
   if (taskState(last.json) !== "ok") {
     const taskId = findString(last.json, "task_id");
     if (taskId === undefined) throw new TransportError("MediaKit response has no task_id", calls, publicResult(last));
-    last = await pollMediakitTask(calls, binding.baseUrl, taskId, opts, io);
+    last = await pollMediakitTask(calls, binding.baseUrl, taskId, opts, io, needAudio);
   }
   return { calls, ...publishedMediakit(last) };
 }
