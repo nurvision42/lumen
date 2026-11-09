@@ -12,7 +12,18 @@ export type DouyinDownloadInfo = {
   readonly originalVideoUrl: string;
 };
 
-const API_URL = "https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_high_quality_play_url";
+const ORIGINAL_QUALITY_ENDPOINTS = [
+  {
+    name: "app",
+    url: "https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_high_quality_play_url",
+  },
+  {
+    name: "web",
+    url: "https://api.tikhub.io/api/v1/douyin/web/fetch_video_high_quality_play_url",
+  },
+] as const;
+
+type OriginalQualityEndpoint = (typeof ORIGINAL_QUALITY_ENDPOINTS)[number];
 
 export function isDouyinUrl(value: string): boolean {
   try {
@@ -64,23 +75,29 @@ function apiError(status: number, body: string): CliError {
 
 type FetchImpl = (input: string, init?: RequestInit) => Promise<Response>;
 
-async function fetchInfo(
-  url: string,
-  apiKey: string,
-  region: string | undefined,
-  fetchImpl: FetchImpl,
-): Promise<DouyinDownloadInfo> {
-  const endpoint = new URL(API_URL);
-  const awemeId = awemeIdFromUrl(url);
-  if (awemeId === undefined) endpoint.searchParams.set("share_url", url);
-  else endpoint.searchParams.set("aweme_id", awemeId);
+function lookupUrl(endpoint: string, shareUrl: string, region: string | undefined): URL {
+  const target = new URL(endpoint);
+  const awemeId = awemeIdFromUrl(shareUrl);
+  if (awemeId === undefined) target.searchParams.set("share_url", shareUrl);
+  else target.searchParams.set("aweme_id", awemeId);
   const regionCode = region?.trim();
-  if (regionCode !== undefined && regionCode.length > 0) endpoint.searchParams.set("region", regionCode);
-  const response = await fetchImpl(endpoint.toString(), {
-    headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
-  });
-  const body = await response.text();
-  if (!response.ok) throw apiError(response.status, body);
+  if (regionCode !== undefined && regionCode.length > 0) target.searchParams.set("region", regionCode);
+  return target;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value === "string") {
+    try {
+      return asRecord(JSON.parse(value) as unknown);
+    } catch {
+      throw new CliError("TikHub API returned invalid JSON");
+    }
+  }
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  return undefined;
+}
+
+function readInfo(body: string): DouyinDownloadInfo {
   let payload: { code?: number; message?: string; message_zh?: string; data?: unknown };
   try {
     payload = JSON.parse(body) as typeof payload;
@@ -90,10 +107,9 @@ async function fetchInfo(
   if (payload.code !== 200) {
     throw new CliError(`TikHub API error ${payload.code ?? "unknown"}: ${payload.message_zh ?? payload.message ?? "unknown error"}`);
   }
-  const data = typeof payload.data === "string"
-    ? JSON.parse(payload.data) as Record<string, unknown>
-    : payload.data as Record<string, unknown> | undefined;
-  const originalVideoUrl = typeof data?.original_video_url === "string" ? data.original_video_url : undefined;
+  const data = asRecord(payload.data);
+  const rawUrl = data?.original_video_url;
+  const originalVideoUrl = typeof rawUrl === "string" && rawUrl.trim().length > 0 ? rawUrl : undefined;
   if (originalVideoUrl === undefined) {
     throw new CliError("TikHub did not return an original video URL; the post may be private, deleted or region restricted");
   }
@@ -107,6 +123,33 @@ async function fetchInfo(
   };
 }
 
+function failureText(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) return error.message;
+  return String(error);
+}
+
+async function fetchInfo(
+  url: string,
+  apiKey: string,
+  region: string | undefined,
+  fetchImpl: FetchImpl,
+): Promise<{ info: DouyinDownloadInfo; endpoint: OriginalQualityEndpoint }> {
+  const failures: string[] = [];
+  for (const endpoint of ORIGINAL_QUALITY_ENDPOINTS) {
+    try {
+      const response = await fetchImpl(lookupUrl(endpoint.url, url, region).toString(), {
+        headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      });
+      const body = await response.text();
+      if (!response.ok) throw apiError(response.status, body);
+      return { info: readInfo(body), endpoint };
+    } catch (error) {
+      failures.push(`${endpoint.name}: ${failureText(error)}`);
+    }
+  }
+  throw new CliError(`TikHub original-quality lookup failed. ${failures.join("; ")}`);
+}
+
 export async function downloadDouyinVideo(
   url: string,
   target: string,
@@ -115,12 +158,18 @@ export async function downloadDouyinVideo(
     readonly region?: string;
     readonly signal?: AbortSignal;
     readonly fetchImpl?: FetchImpl;
+    readonly log?: (message: string) => void;
   },
 ): Promise<DouyinDownloadInfo> {
   if (!isDouyinUrl(url)) throw new CliError("only douyin.com links are supported");
   if (options.apiKey.trim() === "") throw new CliError("TikHub API key is required");
   const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
-  const info = await fetchInfo(url, options.apiKey.trim(), options.region, fetchImpl);
+  const found = await fetchInfo(url, options.apiKey.trim(), options.region, fetchImpl);
+  const info = found.info;
+  const log = options.log ?? ((message: string) => {
+    process.stderr.write(`${message}\n`);
+  });
+  log(`TikHub original-quality endpoint succeeded: ${found.endpoint.name} ${new URL(found.endpoint.url).pathname}`);
   await mkdir(dirname(target), { recursive: true });
   const response = await fetchImpl(info.originalVideoUrl, {
     ...(options.signal === undefined ? {} : { signal: options.signal }),

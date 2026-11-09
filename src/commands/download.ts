@@ -28,6 +28,9 @@ export async function downloadCommand(args: string[], project: string, io: IO): 
     apiKey,
     ...(region === undefined ? {} : { region }),
     ...(io.fetch === undefined ? {} : { fetchImpl: io.fetch }),
+    log: (message) => {
+      io.stderr(`${message}\n`);
+    },
   });
   if (values.json === true) {
     line(io, JSON.stringify({
