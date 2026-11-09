@@ -4,7 +4,7 @@ import { access, mkdir, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { BREAKDOWN_DEFAULT_PROMPT } from "../src/catalog.js";
-import { downloadDouyinVideo, isDouyinUrl } from "../src/download/douyin.js";
+import { awemeIdFromUrl, downloadDouyinVideo, isDouyinUrl } from "../src/download/douyin.js";
 import { run } from "../src/run.js";
 import { capture, withDir } from "./helpers.js";
 
@@ -20,7 +20,7 @@ function homeEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv
   return { HOME: home, PATH: process.env.PATH ?? "", ...extra };
 }
 
-type Seen = { url: string; authorization?: string; userAgent?: string };
+type Seen = { url: string; authorization?: string; userAgent?: string; referer?: string };
 
 function scriptedFetch(body: unknown, bytes: Uint8Array = BYTES, status = 200): {
   fetch: (input: string, init?: RequestInit) => Promise<Response>;
@@ -35,6 +35,7 @@ function scriptedFetch(body: unknown, bytes: Uint8Array = BYTES, status = 200): 
         url: input,
         ...(headers.get("authorization") === null ? {} : { authorization: headers.get("authorization") ?? undefined }),
         ...(headers.get("user-agent") === null ? {} : { userAgent: headers.get("user-agent") ?? undefined }),
+        ...(headers.get("referer") === null ? {} : { referer: headers.get("referer") ?? undefined }),
       });
       if (input.includes("api.tikhub.io")) {
         return new Response(JSON.stringify(body), {
@@ -53,6 +54,8 @@ function payload(fileSize = BYTES.length, asString = false): { code: number; dat
     video_id: "vid-1",
     content_type: "video/mp4",
     file_size: fileSize,
+    file_size_in_mb: "0.01",
+    video_data: { width: 1080, height: 1920 },
   };
   return { code: 200, data: asString ? JSON.stringify(data) : data };
 }
@@ -187,13 +190,16 @@ test("download uses the credential store, then the env var, and keeps the key ou
     await assert.rejects(access(path.join(project, ".lumen")));
     const calls = viaStore.seen();
     assert.equal(calls.length, 2);
-    assert.match(calls[0]?.url ?? "", /api\.tikhub\.io/);
-    assert.match(calls[0]?.url ?? "", /share_url=/);
-    assert.match(calls[0]?.url ?? "", /v\.douyin\.com/);
-    assert.match(calls[0]?.url ?? "", /region=CN/);
+    const lookup = new URL(calls[0]?.url ?? "");
+    assert.equal(lookup.origin, "https://api.tikhub.io");
+    assert.equal(lookup.pathname, "/api/v1/douyin/app/v3/fetch_video_high_quality_play_url");
+    assert.equal(lookup.searchParams.get("share_url"), SHARE);
+    assert.equal(lookup.searchParams.get("aweme_id"), null);
+    assert.equal(lookup.searchParams.get("region"), "CN");
     assert.equal(calls[0]?.authorization, `Bearer ${stored}`);
     assert.equal(calls[1]?.url, CDN);
     assert.equal(calls[1]?.userAgent, "lumen-douyin-downloader/1.0");
+    assert.equal(calls[1]?.referer, "https://www.douyin.com/");
     assert.equal(calls[1]?.authorization, undefined);
 
     const xdg = path.join(dir, "xdg");
@@ -216,6 +222,35 @@ test("download uses the credential store, then the env var, and keeps the key ou
     assert.equal(envOnly.seen()[0]?.authorization, `Bearer ${fromEnv}`);
     assert.match(envOnly.seen()[0]?.url ?? "", /region=US/);
     await assert.rejects(access(path.join(xdg, "lumen", "credentials", "tikhub.api")));
+  });
+});
+
+test("long video urls are sent as aweme_id and the original play url is saved", async () => {
+  const long = "https://www.douyin.com/video/7704966440873342331?previous_page=app_code_link";
+  assert.equal(awemeIdFromUrl(long), "7704966440873342331");
+  assert.equal(awemeIdFromUrl("https://www.douyin.com/note/7704966440873342331/"), "7704966440873342331");
+  assert.equal(awemeIdFromUrl("https://www.douyin.com/share/video/7704966440873342331/"), "7704966440873342331");
+  assert.equal(awemeIdFromUrl("https://www.douyin.com/discover?modal_id=7704966440873342331"), "7704966440873342331");
+  assert.equal(awemeIdFromUrl("https://v.douyin.com/IAfl1lEWnb4/"), undefined);
+  await withDir(async (dir) => {
+    const target = path.join(dir, "clip.mp4");
+    const media = scriptedFetch(payload());
+    const info = await downloadDouyinVideo(long, target, { apiKey: secret(), region: "US", fetchImpl: media.fetch });
+    assert.equal(info.videoId, "vid-1");
+    assert.equal(info.originalVideoUrl, CDN);
+    assert.equal(info.contentType, "video/mp4");
+    assert.equal(info.fileSize, BYTES.length);
+    assert.equal(await readFile(target, "utf8"), BYTES.toString());
+    const calls = media.seen();
+    assert.equal(calls.length, 2);
+    const lookup = new URL(calls[0]?.url ?? "");
+    assert.equal(lookup.pathname, "/api/v1/douyin/app/v3/fetch_video_high_quality_play_url");
+    assert.equal(lookup.searchParams.get("aweme_id"), "7704966440873342331");
+    assert.equal(lookup.searchParams.get("share_url"), null);
+    assert.equal(lookup.searchParams.get("region"), "US");
+    assert.equal(calls[1]?.url, CDN);
+    assert.equal(calls[1]?.userAgent, "lumen-douyin-downloader/1.0");
+    assert.equal(calls[1]?.referer, "https://www.douyin.com/");
   });
 });
 
