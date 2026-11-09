@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { MODELS } from "../catalog.js";
 import { isDeferredPrompt } from "../catalog.js";
 import { tosDoctorLine } from "../clients/tos.js";
-import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, globalConfigPath, loadConfig, projectConfigPath } from "../config.js";
+import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, globalConfigPath, loadConfig, projectConfigPath, resolvePreferEndpoints } from "../config.js";
 import { tikhubKeyPresent } from "../credentials.js";
 import { rejectUnknown } from "../args.js";
 import { envPresence } from "../fsutil.js";
@@ -60,6 +60,8 @@ export async function doctorCommand(args: string[], project: string, io: IO): Pr
   const promptSet = (file !== undefined && file.length > 0) || !isDeferredPrompt(loaded.config.breakdown.prompt ?? "");
   line(io, `breakdown prompt: ${promptSet ? "set" : "default"}`);
   line(io, `breakdown models: ${breakdownPreferModels(loaded.config.breakdown).join(", ")}`);
+  const endpoints = resolvePreferEndpoints(loaded.config.breakdown, io.env);
+  line(io, `breakdown endpoints: ${endpoints.length === 0 ? "none" : endpoints.join(", ")}`);
   line(io, `breakdown level: ${breakdownLevel(loaded.config.breakdown)}`);
   line(io, `breakdown needAudio: ${breakdownNeedAudio(loaded.config.breakdown)}`);
   line(io, `tikhub key: ${(await tikhubKeyPresent(io.env)) ? "present" : "missing"}`);

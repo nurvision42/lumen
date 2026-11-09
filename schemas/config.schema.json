@@ -20,6 +20,12 @@
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         },
+        "preferEndpoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Ark inference endpoint ids sent as prefer_endpoints. Omit the field to leave it off the request."
+        },
         "level": { "type": "string", "minLength": 1 },
         "needAudio": { "type": "boolean" }
       }

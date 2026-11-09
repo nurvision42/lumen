@@ -9,7 +9,7 @@ Usage:
   lumen providers list|set|doctor
   lumen gen <image|video|voice> --model <id> [--shot N] [--dry-run|--execute|--mock] [--detach]
   lumen fish <design|clone|synth> [--shot N]
-  lumen breakdown [--video file]
+  lumen breakdown [--video file] [--prefer-endpoint <id>]
   lumen download <douyin-url> --to <path> [--region <code>] [--json]
   lumen setup --key tikhub
   lumen setup ffmpeg
@@ -52,9 +52,12 @@ Backends, one binding per model (no family fallback):
               Do not ask for the key in conversation. A missing key names the setup command.
               --region <code> is sent only when that flag is passed.
   breakdown / enhance    MediaKit video-understand-router and enhance-video-generative
-                         breakdown sends prefer_models doubao-seed-2-1-lite-260915, level Quality, need_audio true
+                         breakdown sends prefer_models doubao-seed-2-1-pro-260915, doubao-seed-2-0-lite-260428, level Quality, need_audio true
                          omitted --prompt sends the built-in 拉片 prompt; do not pass one
-                         override with breakdown.preferModels, breakdown.level, or breakdown.needAudio
+                         prefer_endpoints: repeatable --prefer-endpoint, else LUMEN_MEDIAKIT_ENDPOINTS, else breakdown.preferEndpoints
+                         omit prefer_endpoints when that list is empty. doubao-seed-2-1-lite-260915 cannot do audio
+                         status_code 11100 with need_audio asks for an Ark endpoint for doubao-seed-2-0-lite or mini
+                         override with breakdown.preferModels, breakdown.level, breakdown.needAudio, or breakdown.preferEndpoints
                          enhance is only enhance-video-generative at 2k and 30 fps. No model, resolution,
                          fps, tool-version, scene, bitrate, or style flag.
                          Before submit, prints a cost estimate at 10 yuan/min (large-model 2K ≤30fps).

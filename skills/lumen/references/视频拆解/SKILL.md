@@ -15,7 +15,7 @@ lumen breakdown --video <file>
 
 用户明确要提交时才加 `--execute`。默认 `--dry-run` 只记请求。如果输出 `running` 并提示 `lumen runs resume <id>`，任务还在服务端跑，执行那条命令接着等，不要重新拆解。
 
-拆解固定 `scene=editing`。默认模型 `doubao-seed-2-1-lite-260915`，`level` 为 `Quality`，需要音频。不要问用户改这些。
+不发送 `scene`。默认模型 `doubao-seed-2-1-pro-260915`（画面分析）和 `doubao-seed-2-0-lite-260428`，`level` 为 `Quality`，需要音频。不要问用户改模型。`doubao-seed-2-1-lite-260915` 不能处理音频。`need_audio` 需要 `doubao-seed-2-0-lite-260428` 或 `doubao-seed-2-0-mini-260428`，并且请求里要有该模型的方舟推理接入点。只写 `prefer_models` 会失败，`status_code=11100`。接入点用可重复的 `--prefer-endpoint <ep-id>`，或环境变量 `LUMEN_MEDIAKIT_ENDPOINTS`（逗号分隔），或配置 `breakdown.preferEndpoints`。优先级是命令行、环境变量、配置。列表为空就不要发 `prefer_endpoints`。不要编造接入点 id；用户没有就先不传。
 
 ## 结果怎么展示
 
