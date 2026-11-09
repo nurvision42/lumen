@@ -50,6 +50,7 @@ Backends, one binding per model (no family fallback):
   download    douyin.com only. Saves a file for breakdown. No key on the command line.
               lumen setup --key tikhub stores it in the machine credential store, or set TIKHUB_API_KEY.
               Do not ask for the key in conversation. A missing key names the setup command.
+              --region <code> is sent only when that flag is passed.
   breakdown / enhance    MediaKit video-understand-router and enhance-video-generative
                          breakdown sends prefer_models doubao-seed-2-1-lite-260915, level Quality, need_audio true
                          omitted --prompt sends the built-in 拉片 prompt; do not pass one

@@ -19,6 +19,7 @@ test("help and version name lumen and the planned backends", async () => {
     assert.match(help.out(), new RegExp(word.replace(".", "\\.")));
   }
 
+  assert.match(help.out(), /--region <code> is sent only when that flag is passed/);
   const version = capture();
   assert.equal(await run(["--version"], version.io), 0);
   assert.equal(version.out().trim(), pkg.version);
@@ -113,6 +114,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(downloadSkill, /lumen breakdown --video refs\/source\.mp4/);
   assert.match(downloadSkill, /不要传 prompt/);
   assert.match(downloadSkill, /不要自己拼 HTTP/);
+  assert.match(downloadSkill, /--region <code>` 可选，只有显式传入时才会发给查询/);
   assert.equal(/https?:\/\/|\/v1\//.test(downloadSkill), false);
   const breakdownSkill = await readFile(path.join(root, "skills", "lumen", "references", "视频拆解", "SKILL.md"), "utf8");
   assert.match(breakdownSkill, /不要传 prompt/);

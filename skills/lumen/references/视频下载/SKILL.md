@@ -17,7 +17,7 @@ description: 用 lumen download 把 douyin.com 成片存成项目文件。不要
 lumen download "<链接>" --to refs/source.mp4
 ```
 
-`--region <code>` 选择查询地区，默认 `CN`。`--json` 只打印保存路径、来源链接、视频编号、类型和大小，不打印直链。
+`--region <code>` 可选，只有显式传入时才会发给查询。`--json` 只打印保存路径、来源链接、视频编号、类型和大小，不打印直链。
 
 这条命令会立刻下载，没有 `--dry-run`。
 
