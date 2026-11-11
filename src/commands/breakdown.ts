@@ -74,9 +74,11 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     "dry-run": "boolean",
     execute: "boolean",
     mock: "boolean",
+    detach: "boolean",
   });
   requireRestEmpty(rest);
   const mode = runMode(values);
+  if (values.detach === true && mode !== "execute" && mode !== "mock") throw new CliError("--detach 需要 --execute", 2);
   return settle(io, project, command, MODEL, mode, async (runId, ctx) => {
     const video = await oneVideo(project, flagString(values, "video"));
     const { binding, config } = await adoptBinding(ctx, project, io.env, MODEL);
@@ -102,6 +104,7 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     }
     const understand = path.join(project, LAYOUT.refs, `${runId}.video-understand.json`);
     ctx.resume = { videoFile: understand, receipt: understand };
+    if (ctx.afterLocal) await ctx.afterLocal();
     const outcome = await runMediakit(MODEL, binding, video, runId, mode, io, ctx.secret, prompt, undefined, {
       preferModels,
       preferEndpoints,
@@ -112,5 +115,5 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
     ctx.response = outcome.response;
     if (mode !== "execute" || outcome.task === undefined) return;
     ctx.files.push(...(await materializeBreakdown(project, runId, outcome.task)));
-  });
+  }, { detach: values.detach === true });
 }
