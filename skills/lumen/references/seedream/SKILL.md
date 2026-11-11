@@ -5,7 +5,7 @@ description: 用 Seedream 5.0 Pro 或 Flash 调用 lumen 之前先读。默认�
 
 # Seedream 使用说明
 
-本文件只管怎么用 `lumen` 调用 Seedream 5.0 Pro 和 Flash。默认供应商是 `beeftv`，也可以绑 `volcark`。提示词用中文写。提示词写法读 `生图-提示词写法/SKILL.md`，那份只写正文，不提交，所有出图模型共用。不要把提示词翻译成英文。要写设备、镜头、视场、光圈、光、色或运镜时，再读 `skills/lumen/references/拍摄设定/SKILL.md`。
+本文件只管怎么用 `lumen` 调用 Seedream 5.0 Pro 和 Flash。默认供应商是 `beeftv`，也可以绑 `volcark`。提示词用中文写。提示词写法读 `../生图-提示词写法/SKILL.md`，那份只写正文，不提交，所有出图模型共用。不要把提示词翻译成英文。需要摄影设计时读 `../拍摄设定/SKILL.md`，按当前画面具体表达；真实设备与镜头名称保留准确原名，不把型号译成画质词。
 
 比例、分辨率、背景和参考图用旗标。不要写进提示词，也不要自己拼请求。接口路径不在这里写。
 
