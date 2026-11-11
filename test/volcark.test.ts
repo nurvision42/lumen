@@ -503,7 +503,7 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   assert.match(usage, /省略时是 `2K`/);
   assert.equal(skill.includes("本地参考图上传到火山引擎 TOS"), false);
   assert.match(pe, /提示词用中文写/);
-  assert.match(pe, /不要把中文提示词再翻译成英文/);
+  assert.match(pe, /不要把中文正文另译成英文/);
   assert.match(pe, /图 1/);
   const readme = await readFile(path.join(root, "README.md"), "utf8");
   assert.match(readme, /volcark/);
