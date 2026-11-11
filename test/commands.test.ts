@@ -15,7 +15,7 @@ test("help and version name lumen and the planned backends", async () => {
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { version: string };
   const help = capture();
   assert.equal(await run(["--help"], help.io), 0);
-  for (const word of ["lumen", "init", "validate", "breakdown", "download", "setup", "tikhub", "TIKHUB_API_KEY", "sprite", "cuts", "concat", "doctor", "yunqiao", "grsai", "volcark", "ARK_API_KEY", "haomao", "kitta", "fishaudio.org", "MediaKit", "models", "providers", "runs", "enhance", "ycyapi"]) {
+  for (const word of ["lumen", "init", "validate", "breakdown", "download", "setup", "tikhub", "TIKHUB_API_KEY", "sprite", "cuts", "concat", "doctor", "yunqiao", "grsai", "volcark", "ARK_API_KEY", "haomao", "kitta", "fishaudio.org", "MediaKit", "models", "providers", "runs", "enhance", "ycyapi", "yir", "YIR_API_KEY", "seedream-5.5"]) {
     assert.match(help.out(), new RegExp(word.replace(".", "\\.")));
   }
 

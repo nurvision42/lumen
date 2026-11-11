@@ -1,4 +1,4 @@
-import { SEEDREAM_FLASH_MODEL, SEEDREAM_PRO_MODEL } from "../catalog.js";
+import { SEEDREAM_55_MODEL, SEEDREAM_FLASH_MODEL, SEEDREAM_PRO_MODEL } from "../catalog.js";
 import { seedreamSize } from "../clients/volcark.js";
 import { CliError } from "../errors.js";
 
@@ -8,6 +8,8 @@ import { CliError } from "../errors.js";
  * beeftv: Flash 0.04 at 1K/1.5K/2K, refs free.
  *   Pro image ≤2.61M px 0.09, above that (the 2K tier) 0.18.
  *   Pro refs: the first is free, each later one is under 0.01.
+ * yir (Seedream 5.5, APIMart via Yir, prices as of 2026-11-10): 1K $0.0182, 2K $0.0280.
+ *   Reference images cost extra; Yir has not published the per-ref amount, so it is not added.
  * Layer output is not requested, so it is not estimated.
  */
 export const SEEDREAM_PRO_YUAN_LE_1_5K = 0.3;
@@ -18,6 +20,9 @@ export const BEEFTV_PRO_YUAN_LE = 0.09;
 export const BEEFTV_PRO_YUAN_GT = 0.18;
 /** 261万像素. At or under this, BeefTV Pro image generation is 0.09. */
 export const BEEFTV_PIXEL_THRESHOLD = 2_610_000;
+/** Yir APIMart public prices for Seedream 5.5, 2026-11-10. https://yir.ai/zh/models/seedream-5-5 */
+export const YIR_SEEDREAM_55_USD_1K = 0.0182;
+export const YIR_SEEDREAM_55_USD_2K = 0.0280;
 
 export interface SeedreamCostInput {
   modelId: string;
@@ -28,7 +33,8 @@ export interface SeedreamCostInput {
 }
 
 export interface SeedreamCost {
-  readonly yuan: number;
+  readonly yuan?: number;
+  readonly usd?: number;
   /** Known image-generation fee. Extra BeefTV Pro refs are an upper bound in `text`, not added here. */
   readonly text: string;
 }
@@ -50,7 +56,18 @@ export function seedreamCost(input: SeedreamCostInput): SeedreamCost {
   const refs = input.references ?? 0;
   if (input.provider === "volcark") return volcarkCost(input.modelId, input.resolution);
   if (input.provider === "beeftv") return beeftvCost(input.modelId, input.resolution, input.aspectRatio ?? "auto", refs);
+  if (input.provider === "yir") return yirCost(input.modelId, input.resolution, refs);
   throw new CliError(`no seedream price for provider ${input.provider}`);
+}
+
+function yirCost(modelId: string, resolution: string, refs: number): SeedreamCost {
+  if (modelId !== SEEDREAM_55_MODEL) throw new CliError(`no seedream price for ${modelId} on yir`);
+  const usd = resolution === "1K" ? YIR_SEEDREAM_55_USD_1K : YIR_SEEDREAM_55_USD_2K;
+  const refText = refs > 0 ? `; ${refs} refs extra, amount unpublished` : "";
+  return {
+    usd,
+    text: `estimate: $${usd.toFixed(4)} (${modelId} yir APIMart ${resolution}, 1 image${refText})`,
+  };
 }
 
 function volcarkCost(modelId: string, resolution: string): SeedreamCost {

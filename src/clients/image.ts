@@ -8,6 +8,7 @@ import type { RunMode } from "../flags.js";
 import type { OutputFile } from "../runs.js";
 import { assertBeeftvImageRef, isLocalMedia, mapLocalMediaViaBeeftv, planBeeftvImage } from "./beeftv.js";
 import { planVolcarkImage, seedreamSize, volcarkImageRef } from "./volcark.js";
+import { runYirImage } from "./yir.js";
 import { findString } from "../walk.js";
 import { assertHttps, bytesFromResult, httpUrlFromResult, imageSize, jsonCall, wireModel } from "./wire.js";
 
@@ -17,6 +18,9 @@ export function planImage(request: ImageRequest, binding: ModelBinding): HttpCal
   }
   if (binding.provider === "beeftv") {
     throw new CliError("beeftv image calls are built by planBeeftvImage");
+  }
+  if (binding.provider === "yir") {
+    throw new CliError("yir image calls are built by planYirImage");
   }
   const model = wireModel(request.modelId, binding.modelAlias);
   if (request.resolution === "1.5K") {
@@ -85,6 +89,7 @@ export async function runImage(
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
   if (binding.provider === "volcark") return runVolcarkImage(request, binding, mode, io, apiKey, outFile);
   if (binding.provider === "beeftv") return runBeeftvImage(request, binding, mode, io, apiKey, outFile);
+  if (binding.provider === "yir") return runYirImage(request, binding, mode, io, apiKey, outFile);
   const calls = planImage(request, binding);
   if (mode === "dry-run") return { calls, response: null, files: [] };
   if (mode === "execute") checkExecute(request, binding);

@@ -119,7 +119,11 @@ export async function genImage(args: string[], project: string, io: IO, command:
         references: request.references.length,
       });
       line(io, cost.text);
-      ctx.params = { ...request, yuan: cost.yuan };
+      ctx.params = {
+        ...request,
+        ...(cost.yuan === undefined ? {} : { yuan: cost.yuan }),
+        ...(cost.usd === undefined ? {} : { usd: cost.usd }),
+      };
     }
     if (mode === "execute" && !ctx.keyPresent) {
       throw binding.provider === "volcark" ? missingVolcarkKey(binding.apiKeyEnv) : missingKey(binding);

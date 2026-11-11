@@ -24,6 +24,10 @@
       "provider": "beeftv",
       "apiKeyEnv": "BEEFAPI_KEY"
     },
+    "seedream-5.5": {
+      "provider": "yir",
+      "apiKeyEnv": "YIR_API_KEY"
+    },
     "seedance-2": {
       "provider": "haomao",
       "baseUrl": "https://haomao.example/api/v3",

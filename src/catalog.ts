@@ -1,11 +1,13 @@
 import { CliError } from "./errors.js";
 
 export const GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
-/** Shared Seedream ids. Default provider is beeftv; volcark is the other binding. Aliases: seedream-5-pro, seedream-5-flash. */
+/** Shared Seedream ids. 5.0 Pro/Flash default to beeftv (also volcark). 5.5 defaults to yir. Aliases: seedream-5-pro, seedream-5-flash, seedream-5-5, bytedance/seedream-5.5. */
 export const SEEDREAM_DEFAULT_RESOLUTION = "2K";
 export const SEEDREAM_PRO_MODEL = "doubao-seedream-5-0-pro-260628";
 export const SEEDREAM_FLASH_MODEL = "doubao-seedream-5-0-flash-260915";
-export const SEEDREAM_MODELS = [SEEDREAM_PRO_MODEL, SEEDREAM_FLASH_MODEL] as const;
+/** Yir Standard API model. Wire id is bytedance/seedream-5.5. Aliases: seedream-5-5, bytedance/seedream-5.5. */
+export const SEEDREAM_55_MODEL = "seedream-5.5";
+export const SEEDREAM_MODELS = [SEEDREAM_PRO_MODEL, SEEDREAM_FLASH_MODEL, SEEDREAM_55_MODEL] as const;
 export const IMAGE_MODELS = [...GPT_IMAGE_MODELS, ...SEEDREAM_MODELS] as const;
 export const SEEDANCE_MODELS = ["seedance-2", "seedance-2-fast", "seedance-2.5"] as const;
 export const FISH_MODELS = ["voice-clone", "voice-design-1", "voice-synthesis"] as const;
@@ -19,6 +21,12 @@ export const IMAGE_ASPECTS = [
 export const GPT_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 /** Seedream 5.0 Pro / Flash tiers. 4K is not a tier. 1.5K is the same price as 1K. */
 export const SEEDREAM_RESOLUTIONS = ["1K", "1.5K", "2K"] as const;
+/** Seedream 5.5 on Yir: 1K and 2K only. 1.5K is not open on Yir. */
+export const SEEDREAM_55_RESOLUTIONS = ["1K", "2K"] as const;
+/** Seedream 5.5 on Yir. `auto` is not listed; omitted or auto becomes 1:1. */
+export const SEEDREAM_55_ASPECTS = [
+  "1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "2:1", "1:2", "21:9",
+] as const;
 export const IMAGE_RESOLUTIONS = ["1K", "1.5K", "2K", "4K"] as const;
 export const IMAGE_BACKGROUNDS = ["transparent", "opaque", "auto"] as const;
 export const IMAGE_QUALITIES_2 = ["auto", "low", "medium", "high"] as const;
@@ -30,7 +38,7 @@ export const VIDEO_SHAPES = ["text", "frame", "reference"] as const;
 /** Official Seedance 2.5 omni-reference subtasks. `auto` is the default when `--task-type` is omitted. */
 export const OMNI_TASK_TYPES = ["auto", "reference", "edit", "extend"] as const;
 
-export const PROVIDERS = ["yunqiao", "grsai", "volcark", "haomao", "kitta", "mediakit", "beeftv", "ycyapi", "openspeech"] as const;
+export const PROVIDERS = ["yunqiao", "grsai", "volcark", "haomao", "kitta", "mediakit", "beeftv", "ycyapi", "yir", "openspeech"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /**
@@ -46,6 +54,7 @@ export const PROVIDER_DEFAULT_BASE_URLS: Record<ProviderId, string> = {
   mediakit: "https://mediakit.cn-beijing.volces.com",
   beeftv: "https://enterprise.beefapi.com",
   ycyapi: "https://ycyapi.cn",
+  yir: "https://gateway.yir.ai",
   openspeech: "https://openspeech.bytedance.com",
 };
 
@@ -58,6 +67,7 @@ export const IMAGE_PROVIDER_RESOLUTIONS: Partial<Record<ProviderId, readonly (ty
   grsai: ["1K", "2K", "4K"],
   volcark: SEEDREAM_RESOLUTIONS,
   beeftv: SEEDREAM_RESOLUTIONS,
+  yir: SEEDREAM_55_RESOLUTIONS,
 };
 
 export const BREAKDOWN_PROMPT_PLACEHOLDER =
@@ -138,6 +148,12 @@ export const MODELS: readonly ModelInfo[] = [
     summary: "Seedream 5.0 Flash. Default provider beeftv (wire dola-seedream-5-0-flash-260915), also volcark. Default resolution 2K. beeftv 0.04 yuan/image. volcark 0.12 yuan/image",
     providers: ["beeftv", "volcark"],
   },
+  {
+    id: SEEDREAM_55_MODEL,
+    kind: "image",
+    summary: "Seedream 5.5. Provider yir (wire bytedance/seedream-5.5). Default resolution 2K. 1K and 2K only. Yir APIMart 1K $0.0182/image, 2K $0.0280/image (2026-11-10). Reference images cost extra (amount unpublished). Transparent background and layer split are not open on Yir",
+    providers: ["yir"],
+  },
   ...SEEDANCE_MODELS.map((id) => ({
     id,
     kind: "video" as const,
@@ -208,12 +224,14 @@ const MODEL_ALIASES: Record<string, ModelId> = {
   "2.5": "seedance-2.5",
   "seedream-5-pro": SEEDREAM_PRO_MODEL,
   "seedream-5-flash": SEEDREAM_FLASH_MODEL,
+  "seedream-5-5": SEEDREAM_55_MODEL,
+  "bytedance/seedream-5.5": SEEDREAM_55_MODEL,
 };
 
 /** Model ids and aliases that lumen no longer ships. Using one is an explicit error. */
 const REMOVED_MODELS = new Set(["seedance-2-mini", "mini"]);
 
-/** Aliases `standard`, `fast`, `2.5`, `seedream-5-pro`, and `seedream-5-flash` map to lumen model ids. */
+/** Aliases `standard`, `fast`, `2.5`, `seedream-5-pro`, `seedream-5-flash`, `seedream-5-5`, and `bytedance/seedream-5.5` map to lumen model ids. */
 export function canonicalModel(id: string): string {
   const key = id.trim().toLowerCase();
   if (REMOVED_MODELS.has(key)) {
@@ -249,6 +267,10 @@ export function providersFor(id: string): readonly ProviderId[] {
 
 export function isSeedreamModel(id: string): id is (typeof SEEDREAM_MODELS)[number] {
   return (SEEDREAM_MODELS as readonly string[]).includes(canonicalModel(id));
+}
+
+export function isSeedream55Model(id: string): boolean {
+  return canonicalModel(id) === SEEDREAM_55_MODEL;
 }
 
 export function assertProviderServes(provider: string, modelId: string): void {
@@ -329,10 +351,23 @@ export function validateImage(input: {
   if (prompt.length === 0) throw new CliError("image prompt is empty");
   if (prompt.length > 20_000) throw new CliError("prompt is longer than 20000 characters");
   const seedream = isSeedreamModel(modelId);
-  const aspectRatio = oneOf(input.aspectRatio, IMAGE_ASPECTS, "aspect-ratio");
-  const resolution = oneOf(input.resolution, seedream ? SEEDREAM_RESOLUTIONS : GPT_IMAGE_RESOLUTIONS, "resolution");
+  const seedream55 = isSeedream55Model(modelId);
+  const aspectRatio = seedream55 && (input.aspectRatio === undefined || input.aspectRatio === "auto")
+    ? "1:1"
+    : oneOf(input.aspectRatio, IMAGE_ASPECTS, "aspect-ratio");
+  if (seedream55 && !(SEEDREAM_55_ASPECTS as readonly string[]).includes(aspectRatio)) {
+    throw new CliError(`seedream-5.5 aspect-ratio must be one of ${SEEDREAM_55_ASPECTS.join(", ")}`);
+  }
+  const resolution = oneOf(
+    input.resolution,
+    seedream55 ? SEEDREAM_55_RESOLUTIONS : seedream ? SEEDREAM_RESOLUTIONS : GPT_IMAGE_RESOLUTIONS,
+    "resolution",
+  );
   const background = input.background === undefined ? undefined : oneOf(input.background, IMAGE_BACKGROUNDS, "background");
   if (seedream && input.quality !== undefined) throw new CliError("seedream does not take --quality");
+  if (seedream55 && background !== undefined) {
+    throw new CliError("seedream-5.5 on yir does not take --background (transparent output is not open on Yir yet)");
+  }
   if (seedream && background === "auto") throw new CliError("seedream background must be transparent or opaque");
   if (seedream && background === "transparent" && input.references.length !== 1) {
     throw new CliError("seedream transparent background needs exactly one reference image");
