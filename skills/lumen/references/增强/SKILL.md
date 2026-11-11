@@ -31,4 +31,4 @@ https 结果下载完之后，同一条命令会加上黑白胶片颗粒，强�
 
 ## 输出
 
-`--out` 优先。否则有 `--shot` 时写到 `shots/NN/clip/enhance-<id>.mp4`，没有就写 `out/enhance-<id>.mp4`。等满仍未完成时用 `lumen runs resume <id> --execute --detach`，取回结果时同样会加颗粒。不要重新提交。
+`--out` 优先；带扩展名时按该路径保存，不改名，不一致时打 warning。没有 `--out` 时写到 `shots/NN/clip/enhance-<id>.<ext>` 或 `out/enhance-<id>.<ext>`。加颗粒后会再按文件魔数确定扩展名，探测不到时是 `.mp4`（颗粒输出是 libx264，通常就是 MP4）。等满仍未完成时用 `lumen runs resume <id> --execute --detach`，取回结果时同样会加颗粒。不要重新提交。

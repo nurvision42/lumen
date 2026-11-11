@@ -11,6 +11,7 @@ import { awaitTask } from "./jobs.js";
 import { jsonCall } from "./wire.js";
 import { isLocalMedia, withMediaSources, type UploadKind } from "./beeftv.js";
 import { mapLocalMediaViaTos } from "./tos.js";
+import { namedMediaFile } from "../format.js";
 
 /**
  * YCY API Seedance 2.5 (docs on https://ycyapi.cn via channel 22-SD-2.5视频).
@@ -154,7 +155,7 @@ export async function finishYcyapiVideo(
         await pause(io, 5_000);
       }
     }
-    files.push({ path: videoFile, bytes: downloaded.body });
+    files.push(namedMediaFile(videoFile, downloaded.body, { kind: "video", fallback: ".mp4", contentType: downloaded.contentType }));
     files.push({ path: receipt, text: `${JSON.stringify(response, null, 2)}\n` });
   }
   return { calls, response, files };

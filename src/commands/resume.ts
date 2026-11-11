@@ -1,8 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { finishHaomaoVideo } from "../clients/seedance.js";
 import { finishBeeftvVideo } from "../clients/beeftv.js";
 import { finishYcyapiVideo } from "../clients/ycyapi.js";
+import { finishYirImage, yirJobId } from "../clients/yir.js";
 import { pollMediakitTask, publishedMediakit } from "../clients/mediakit.js";
 import { resumeSeedAsr } from "../clients/seedasr.js";
 import { asRecord } from "../walk.js";
@@ -12,6 +13,7 @@ import { CliError } from "../errors.js";
 import { fileExists } from "../fsutil.js";
 import { fetchOf, joinUrl, perform, TransportError, type HttpCall, type SendOptions } from "../http.js";
 import { line, type IO } from "../io.js";
+import { namedMediaFile, settleMediaPath, withoutMediaExtension } from "../format.js";
 import { LAYOUT, outputPath } from "../project.js";
 import { redactUrl } from "../redact.js";
 import {
@@ -97,7 +99,7 @@ function derivePending(record: RunRecord, project: string, overrides: { task?: s
     taskId,
     lastStatus: record.pending?.lastStatus ?? "unknown",
     videoFile,
-    receipt: `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`,
+    receipt: `${withoutMediaExtension(videoFile)}.seedance.json`,
     ...(record.pending?.pollUrl === undefined ? {} : { pollUrl: record.pending.pollUrl }),
   };
 }
@@ -225,11 +227,23 @@ async function rawImageUrl(project: string, record: RunRecord): Promise<string |
   return record.image?.url;
 }
 
+function yirImageTaskId(record: RunRecord): string | undefined {
+  if (record.pending?.provider === "yir" && record.pending.taskId.length > 0) return record.pending.taskId;
+  if (record.image?.provider === "yir" && record.image.taskId !== undefined && record.image.taskId.length > 0) {
+    return record.image.taskId;
+  }
+  if (record.binding?.provider === "yir" && record.image?.taskId !== undefined && record.image.taskId.length > 0) {
+    return record.image.taskId;
+  }
+  return undefined;
+}
+
 function imageBlocked(record: RunRecord): string | undefined {
-  const taskId = record.image?.taskId;
+  const taskId = record.image?.taskId ?? record.pending?.taskId;
   if (record.image?.url !== undefined) return undefined;
+  if (yirImageTaskId(record) !== undefined) return undefined;
   if (taskId !== undefined) {
-    return `run ${record.id} 的出图有任务 ${taskId}，但 ${record.image?.provider ?? "该供应商"} 的出图接口不能续查。不能 resume。不要重新提交。`;
+    return `run ${record.id} 的出图有任务 ${taskId}，但 ${record.image?.provider ?? record.pending?.provider ?? "该供应商"} 的出图接口不能续查。不能 resume。不要重新提交。`;
   }
   return `run ${record.id} 没有出图，也没有结果 URL 或任务 id。不能 resume。不要重新提交。`;
 }
@@ -241,6 +255,7 @@ async function finishImageFile(project: string, record: RunRecord, outFile: stri
     status: "ok",
     outputs: [outFile],
     resumedAt: [...(record.resumedAt ?? []), now],
+    ...(record.image === undefined ? {} : { image: { ...record.image, outFile } }),
   };
   delete next.pending;
   delete next.error;
@@ -267,10 +282,11 @@ async function resumeImage(
     return 0;
   }
   const outFile = record.image?.outFile;
+  let saved = outFile;
   const url = await rawImageUrl(project, record);
   const onDisk = outFile !== undefined && (await fileExists(outFile));
   if (detach && io.env.LUMEN_DETACH_WORKER === undefined) {
-    if (url === undefined && !onDisk) throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
+    if (url === undefined && !onDisk && yirImageTaskId(record) === undefined) throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
     await startDetached({
       project,
       id,
@@ -279,22 +295,35 @@ async function resumeImage(
     });
     return 0;
   }
-  if (onDisk && outFile !== undefined) return finishImageFile(project, record, outFile, io);
-  if (url === undefined || outFile === undefined) throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
-  if (url.includes("[redacted]")) {
-    throw new CliError(`run ${id} 的结果 URL 已打码，不能下载。不要重新提交。`, 2);
+  if (onDisk && outFile !== undefined) {
+    const existing = await adoptExistingImage(record, outFile, io);
+    return finishImageFile(project, record, existing, io);
+  }
+  const taskId = yirImageTaskId(record);
+  if ((url === undefined || outFile === undefined) && taskId === undefined) {
+    throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
   }
   const calls: HttpCall[] = [];
   try {
-    const downloaded = await perform(
-      calls,
-      { method: "GET", url, headers: {}, body: { kind: "empty" } },
-      { mode: "execute", fetchImpl: fetchOf(io), auth: false },
-    );
-    const payload = bytesFromResult(downloaded) ?? downloaded.body;
-    if (payload.byteLength === 0) throw new CliError(`run ${id} 的结果 URL 没有图像数据。不要重新提交。`);
-    await mkdir(path.dirname(outFile), { recursive: true });
-    await writeFile(outFile, payload);
+    if (url !== undefined && outFile !== undefined) {
+      if (url.includes("[redacted]")) {
+        throw new CliError(`run ${id} 的结果 URL 已打码，不能下载。不要重新提交。`, 2);
+      }
+      const downloaded = await perform(
+        calls,
+        { method: "GET", url, headers: {}, body: { kind: "empty" } },
+        { mode: "execute", fetchImpl: fetchOf(io), auth: false },
+      );
+      const payload = bytesFromResult(downloaded) ?? downloaded.body;
+      if (payload.byteLength === 0) throw new CliError(`run ${id} 的结果 URL 没有图像数据。不要重新提交。`);
+      saved = writeSettledImage(record, outFile, payload, downloaded.contentType, io);
+      await mkdir(path.dirname(saved), { recursive: true });
+      await writeFile(saved, payload);
+    } else if (taskId !== undefined && outFile !== undefined) {
+      saved = await resumeYirImageJob(record, taskId, outFile, calls, io);
+    } else {
+      throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
+    }
   } catch (err) {
     if (err instanceof CliError && err.exitCode === 2) throw err;
     const message = err instanceof Error ? err.message : String(err);
@@ -302,7 +331,51 @@ async function resumeImage(
     await writeRun(project, next, []);
     throw new CliError(`${message}\nrun: ${id}`);
   }
-  return finishImageFile(project, record, outFile, io);
+  return finishImageFile(project, record, saved!, io);
+}
+
+async function resumeYirImageJob(
+  record: RunRecord,
+  taskId: string,
+  outFile: string,
+  calls: HttpCall[],
+  io: IO,
+): Promise<string> {
+  const binding = record.binding;
+  if (binding === null) throw new CliError(`run ${record.id} has no provider binding`, 2);
+  const apiKey = io.env[binding.apiKeyEnv]?.trim();
+  if (apiKey === undefined || apiKey.length === 0) throw new CliError(`set ${binding.apiKeyEnv} to resume run ${record.id}`, 2);
+  const opts = { mode: "execute" as const, fetchImpl: fetchOf(io), apiKey };
+  const pollUrl = record.pending?.pollUrl ?? `${binding.baseUrl.replace(/\/$/, "")}/v1/jobs/${encodeURIComponent(taskId)}/status`;
+  const first = await perform(calls, { method: "GET", url: pollUrl, headers: {}, body: { kind: "empty" } }, opts);
+  const knownId = yirJobId(first.json) ?? taskId;
+  const outcome = await finishYirImage(calls, binding.baseUrl, first, opts, io, "execute", outFile, knownId);
+  const file = outcome.files[0];
+  if (file?.bytes === undefined) throw new CliError(`run ${record.id} 的 yir 任务没有图像数据。不要重新提交。`);
+  if (file.warning !== undefined) line(io, file.warning);
+  await mkdir(path.dirname(file.path), { recursive: true });
+  await writeFile(file.path, file.bytes);
+  if (record.image !== undefined) record.image = { ...record.image, outFile: file.path };
+  return file.path;
+}
+
+function writeSettledImage(record: RunRecord, planned: string, bytes: Uint8Array, contentType: string | undefined, io: IO): string {
+  const file = namedMediaFile(planned, bytes, { kind: "image", fallback: ".png", ...(contentType === undefined ? {} : { contentType }) });
+  if (file.warning !== undefined) line(io, file.warning);
+  if (record.image !== undefined) record.image = { ...record.image, outFile: file.path };
+  return file.path;
+}
+
+async function adoptExistingImage(record: RunRecord, planned: string, io: IO): Promise<string> {
+  const bytes = new Uint8Array(await readFile(planned));
+  const settled = settleMediaPath(planned, bytes, { kind: "image", fallback: ".png" });
+  if (settled.warning !== undefined) line(io, settled.warning);
+  if (settled.path !== planned) {
+    await mkdir(path.dirname(settled.path), { recursive: true });
+    await rename(planned, settled.path);
+  }
+  if (record.image !== undefined) record.image = { ...record.image, outFile: settled.path };
+  return settled.path;
 }
 
 export async function resumeRun(
@@ -312,14 +385,20 @@ export async function resumeRun(
   io: IO,
   options?: { detach?: boolean },
 ): Promise<number> {
-  const record = await readRunRecord(project, id);
-  if (record.status === "ok" && overrides.task === undefined) {
+  const loaded = await readRunRecord(project, id);
+  if (loaded.status === "ok" && overrides.task === undefined) {
     line(io, `run ${id} already finished`);
-    for (const output of record.outputs) line(io, `wrote: ${output}`);
+    for (const output of loaded.outputs) line(io, `wrote: ${output}`);
     return 0;
   }
-  if (imageRun(record) && overrides.task === undefined && record.pending === undefined) {
-    return resumeImage(project, record, io, options?.detach === true);
+  let record = loaded;
+  if (imageRun(record) && (overrides.task === undefined || yirImageTaskId(record) !== undefined || record.binding?.provider === "yir")) {
+    if (overrides.task !== undefined && record.image !== undefined && record.image.taskId !== overrides.task) {
+      record = { ...record, image: { ...record.image, taskId: overrides.task }, pending: { provider: "yir", taskId: overrides.task, lastStatus: record.pending?.lastStatus ?? "unknown", videoFile: record.pending?.videoFile ?? "", receipt: record.pending?.receipt ?? "" } };
+    }
+    if (record.pending === undefined || record.pending.provider === "yir" || yirImageTaskId(record) !== undefined) {
+      return resumeImage(project, record, io, options?.detach === true);
+    }
   }
   const pending = derivePending(record, project, overrides);
   if (pending === undefined) throw new CliError(`run ${id} has no remote task to resume (pass --task <id>)`, 2);
@@ -364,6 +443,7 @@ export async function resumeRun(
         : await resumeSeedance(pending, binding.baseUrl, calls, opts, io);
     const outputs: string[] = [];
     for (const file of outcome.files) {
+      if (file.warning !== undefined) line(io, file.warning);
       await mkdir(path.dirname(file.path), { recursive: true });
       if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
       else if (file.text !== undefined) await writeFile(file.path, file.text);

@@ -85,6 +85,8 @@ export interface OutputFile {
   path: string;
   bytes?: Uint8Array;
   text?: string;
+  /** Printed once when the file is written; not stored in record.json. */
+  warning?: string;
 }
 
 export interface RunCtx {
@@ -375,9 +377,17 @@ export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): s
       lines.push("服务商返回过结果 URL。");
       lines.push(`lumen runs resume ${record.id} 只下载该地址。不要重新提交。`);
     } else if (filesOnDisk.length === 0 && record.image?.taskId !== undefined && record.status !== "ok") {
-      lines.push(
-        `服务商返回过任务 ${record.image.taskId}，但 ${record.image.provider} 的出图接口不能续查。不能 resume。不要重新提交。`,
-      );
+      if (record.image.provider === "yir" || record.pending?.provider === "yir") {
+        lines.push(`服务商返回过任务 ${record.image.taskId}。`);
+        lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
+      } else {
+        lines.push(
+          `服务商返回过任务 ${record.image.taskId}，但 ${record.image.provider} 的出图接口不能续查。不能 resume。不要重新提交。`,
+        );
+      }
+    } else if (filesOnDisk.length === 0 && record.pending?.provider === "yir" && record.status !== "ok") {
+      lines.push(`服务商返回过任务 ${record.pending.taskId}。`);
+      lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
     }
     return lines;
   }
@@ -403,9 +413,14 @@ export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): s
     return lines;
   }
   if (record.image?.taskId !== undefined) {
-    lines.push(
-      `服务商返回过任务 ${record.image.taskId}，但 ${record.image.provider} 的出图接口不能续查。不能 resume。不要重新提交。`,
-    );
+    if (record.image.provider === "yir") {
+      lines.push(`服务商返回过任务 ${record.image.taskId}。`);
+      lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
+    } else {
+      lines.push(
+        `服务商返回过任务 ${record.image.taskId}，但 ${record.image.provider} 的出图接口不能续查。不能 resume。不要重新提交。`,
+      );
+    }
     return lines;
   }
   if (imageLike) {
@@ -573,13 +588,14 @@ export async function settle(
         handedOff = true;
       } else if (err instanceof CliError && err.exitCode === 2) {
         throw err;
-      } else if (err instanceof PendingTaskError && ctx.resume !== undefined && mode === "execute") {
+      } else if (err instanceof PendingTaskError && mode === "execute" && (ctx.resume !== undefined || ctx.image !== undefined)) {
         status = "running";
         pending = {
           provider: err.provider,
           taskId: err.taskId,
           lastStatus: err.lastStatus,
-          ...ctx.resume,
+          videoFile: ctx.resume?.videoFile ?? ctx.image?.outFile ?? "",
+          receipt: ctx.resume?.receipt ?? "",
           ...(err.pollUrl === undefined ? {} : { pollUrl: err.pollUrl }),
         };
         ctx.calls = err.calls;
@@ -601,10 +617,20 @@ export async function settle(
     const outputs: string[] = [];
     if (thrown === undefined && pending === undefined && mode === "execute") {
       for (const file of ctx.files) {
+        if (file.warning !== undefined) line(io, file.warning);
         await mkdir(path.dirname(file.path), { recursive: true });
         if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
         else if (file.text !== undefined) await writeFile(file.path, file.text);
         outputs.push(file.path);
+      }
+      const written = ctx.files.find((file) => file.bytes !== undefined || (file.text === undefined && file.path !== ctx.resume?.receipt));
+      if (ctx.image !== undefined) {
+        const pic = ctx.files.find((file) => file.bytes !== undefined) ?? written;
+        if (pic !== undefined && pic.path !== ctx.image.outFile) ctx.image = { ...ctx.image, outFile: pic.path };
+      }
+      if (ctx.resume !== undefined) {
+        const media = ctx.files.find((file) => file.path !== ctx.resume!.receipt && (file.bytes !== undefined || file.text === undefined));
+        if (media !== undefined && media.path !== ctx.resume.videoFile) ctx.resume = { ...ctx.resume, videoFile: media.path };
       }
     }
 

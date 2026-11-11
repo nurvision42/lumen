@@ -90,7 +90,7 @@ lumen gen image --model gpt-image-2.5-flare --prompt "…" --ref refs/person.png
 
 lumen 不发送 `output_format`，也没有这个旗标，也不转码。返回的字节原样写入文件；返回 URL 就下载后再存；两者都没有就在旁边写一份 `.json` 回执，不造假图。
 
-默认路径是 `out/<run-id>.png`。带了 `--shot N` 则是 `shots/NN/frame/<run-id>.png`。`--out` 覆盖这两者。文件名是 `.png` 只表示路径，不是向上游声明的格式。要透明时不要把 `--out` 写成 `.jpg`：JPEG 没有透明通道。lumen 也不会主动改成 WebP。
+默认路径是 `out/<run-id>.<ext>`，带了 `--shot N` 则是 `shots/NN/frame/<run-id>.<ext>`。扩展名先看文件魔数（PNG、JPEG、WebP、GIF 等），再看响应 Content-Type，最后才是 `.png`。不转码。`--out` 带扩展名时按你给的路径保存，不改名；扩展名和实际格式不一致时打一条 warning。`--out` 没有扩展名时补上探测到的扩展名。要透明时不要把 `--out` 写成 `.jpg`：JPEG 没有透明通道。
 
 ## 提交
 

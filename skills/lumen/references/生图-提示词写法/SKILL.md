@@ -7,7 +7,7 @@ description: 所有出图模型共用的提示词写法。GPT Image、Seedream �
 
 本文件的说明用中文。提示词用中文写。模板、样例、约束用中文。真实设备、镜头的品牌型号与指定原文保留准确名称，不把型号翻译成画质词。不要把中文正文另译成英文。
 
-本文件只写提示词，不提交任务。所有出图模型共用这一份，包括 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`、`doubao-seedream-5-0-pro-260628`、`doubao-seedream-5-0-flash-260915`，以及以后新增的生图模型。选模型、比例、分辨率、质量、背景、参考图和提交：GPT Image 读 `../gpt-image/SKILL.md`，Seedream 读 `../seedream/SKILL.md`。那些参数不写进提示词，本文件也不列参数表。模型名不写进正文。正文里可以写成品自己的方向，例如竖条四格漫画、一张横幅幻灯片，因为那是画面结构，不是像素或比例开关。参考图按顺序叫 `image 1`、`image 2`，也可以写成图 1、图 2。
+本文件只写提示词，不提交任务。所有出图模型共用这一份，包括 `gpt-image-2`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`、`doubao-seedream-5-0-pro-260628`、`doubao-seedream-5-0-flash-260915`、`seedream-5.5`，以及以后新增的生图模型。选模型、比例、分辨率、质量、背景、参考图和提交：GPT Image 读 `../gpt-image/SKILL.md`，Seedream 读 `../seedream/SKILL.md`。那些参数不写进提示词，本文件也不列参数表。模型名不写进正文。正文里可以写成品自己的方向，例如竖条四格漫画、一张横幅幻灯片，因为那是画面结构，不是像素或比例开关。参考图按顺序叫 `image 1`、`image 2`，也可以写成图 1、图 2。
 
 没有参考图就是生成。有参考图就是改图或合成。不要把 Seedance 的镜头时间轴、延长、`@ImageN`、`@VideoN`、`@AudioN` 写进这张图的正文。用户原稿里的 `@图片N` 按同一序号改成 `image N`。
 

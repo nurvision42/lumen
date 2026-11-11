@@ -19,6 +19,7 @@ import { flagList, flagString, parseFlags, requireRestEmpty, runMode, type FlagK
 import { line, type IO } from "../io.js";
 import { seedreamCost } from "../seedream/cost.js";
 import { outputPath } from "../project.js";
+import { withoutMediaExtension } from "../format.js";
 import { settle } from "../runs.js";
 import { loadShotlist } from "../shotlist.js";
 import { runFish } from "../clients/fish.js";
@@ -119,7 +120,11 @@ export async function genImage(args: string[], project: string, io: IO, command:
         references: request.references.length,
       });
       line(io, cost.text);
-      ctx.params = { ...request, yuan: cost.yuan };
+      ctx.params = {
+        ...request,
+        ...(cost.yuan === undefined ? {} : { yuan: cost.yuan }),
+        ...(cost.usd === undefined ? {} : { usd: cost.usd }),
+      };
     }
     if (mode === "execute" && !ctx.keyPresent) {
       throw binding.provider === "volcark" ? missingVolcarkKey(binding.apiKeyEnv) : missingKey(binding);
@@ -200,7 +205,7 @@ export async function genVideo(args: string[], project: string, io: IO, command:
       filename: `${runId}.mp4`,
       out: flagString(values, "out"),
     });
-    const receipt = `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`;
+    const receipt = `${withoutMediaExtension(videoFile)}.seedance.json`;
     ctx.resume = { videoFile, receipt };
     if (ctx.afterLocal) await ctx.afterLocal();
     let outcome;

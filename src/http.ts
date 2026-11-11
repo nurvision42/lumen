@@ -122,6 +122,66 @@ function mockJson(call: HttpCall): unknown {
       },
     };
   }
+  if (url.includes("/v1/jobs/") && url.endsWith("/status")) {
+    return { id: "mock-yir-job", object: "job", status: "succeeded", error: null };
+  }
+  if (url.includes("/v1/jobs/")) {
+    return {
+      id: "mock-yir-job",
+      object: "job",
+      status: "succeeded",
+      error: null,
+      result: {
+        availability: "available",
+        files: [{ url: "https://cdn.example/mock.png", media_type: "image/png", width: 1024, height: 1024 }],
+      },
+    };
+  }
+  if (url.includes("/v1/files/") && url.endsWith("/complete")) {
+    return {
+      id: "file_11111111-1111-4111-8111-111111111111",
+      object: "file",
+      status: "ready",
+      name: "ref.png",
+      media_type: "image/png",
+      size: 1,
+    };
+  }
+  if ((url.includes("/v1/files/") && !url.endsWith("/files")) || /\/v1\/files\/[^/]+$/.test(url)) {
+    return {
+      id: "file_11111111-1111-4111-8111-111111111111",
+      object: "file",
+      status: "ready",
+      name: "ref.png",
+      media_type: "image/png",
+      size: 1,
+    };
+  }
+  if (url.replace(/\/$/, "").endsWith("/v1/files")) {
+    return {
+      files: [
+        {
+          id: "file_11111111-1111-4111-8111-111111111111",
+          object: "file",
+          status: "pending_upload",
+          name: "ref.png",
+          media_type: "image/png",
+          size: 1,
+          upload: {
+            type: "multipart",
+            expires_at: 1_790_000_900,
+            parts: [{ part_number: 1, size: 1, url: "https://upload.example/part" }],
+          },
+        },
+      ],
+    };
+  }
+  if (url.includes("/v1/images/generations") && call.body.kind === "json") {
+    const body = call.body.value;
+    if (typeof body === "object" && body !== null && "input" in body) {
+      return { id: "mock-yir-job", object: "job", status: "queued", error: null };
+    }
+  }
   if (url.includes("/images/")) return { created: 0, data: [{ b64_json: "aGVsbG8=" }] };
   if (url.includes("/contents/generations/tasks/")) {
     return { id: "mock-task", status: "succeeded", content: { video_url: "https://cdn.example/mock.mp4" } };

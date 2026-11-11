@@ -8,7 +8,9 @@ import type { RunMode } from "../flags.js";
 import type { OutputFile } from "../runs.js";
 import { assertBeeftvImageRef, isLocalMedia, mapLocalMediaViaBeeftv, planBeeftvImage } from "./beeftv.js";
 import { planVolcarkImage, seedreamSize, volcarkImageRef } from "./volcark.js";
+import { runYirImage } from "./yir.js";
 import { findString } from "../walk.js";
+import { namedMediaFile } from "../format.js";
 import { assertHttps, bytesFromResult, httpUrlFromResult, imageSize, jsonCall, wireModel } from "./wire.js";
 
 export function planImage(request: ImageRequest, binding: ModelBinding): HttpCall[] {
@@ -17,6 +19,9 @@ export function planImage(request: ImageRequest, binding: ModelBinding): HttpCal
   }
   if (binding.provider === "beeftv") {
     throw new CliError("beeftv image calls are built by planBeeftvImage");
+  }
+  if (binding.provider === "yir") {
+    throw new CliError("yir image calls are built by planYirImage");
   }
   const model = wireModel(request.modelId, binding.modelAlias);
   if (request.resolution === "1.5K") {
@@ -85,6 +90,7 @@ export async function runImage(
 ): Promise<{ calls: HttpCall[]; response: unknown; files: OutputFile[] }> {
   if (binding.provider === "volcark") return runVolcarkImage(request, binding, mode, io, apiKey, outFile);
   if (binding.provider === "beeftv") return runBeeftvImage(request, binding, mode, io, apiKey, outFile);
+  if (binding.provider === "yir") return runYirImage(request, binding, mode, io, apiKey, outFile);
   const calls = planImage(request, binding);
   if (mode === "dry-run") return { calls, response: null, files: [] };
   if (mode === "execute") checkExecute(request, binding);
@@ -192,12 +198,12 @@ async function saveImage(
   opts: { mode: "execute" | "mock"; fetchImpl: (input: string, init?: RequestInit) => Promise<Response>; apiKey?: string },
 ): Promise<OutputFile> {
   const bytes = bytesFromResult(result);
-  if (bytes !== undefined) return { path: outFile, bytes };
+  if (bytes !== undefined) return namedMediaFile(outFile, bytes, { kind: "image", fallback: ".png", contentType: result.contentType });
   const url = httpUrlFromResult(result);
   if (url !== undefined) {
     const downloaded = await perform(calls, { method: "GET", url, headers: {}, body: { kind: "empty" } }, { ...opts, auth: false });
     const payload = bytesFromResult(downloaded) ?? downloaded.body;
-    return { path: outFile, bytes: payload };
+    return namedMediaFile(outFile, payload, { kind: "image", fallback: ".png", contentType: downloaded.contentType });
   }
   const receipt = outFile.replace(/\.[^.]+$/, "") + ".json";
   return { path: receipt, text: `${JSON.stringify(publicResult(result), null, 2)}\n` };
