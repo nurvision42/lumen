@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { finishHaomaoVideo } from "../clients/seedance.js";
 import { finishBeeftvVideo } from "../clients/beeftv.js";
@@ -13,6 +13,7 @@ import { CliError } from "../errors.js";
 import { fileExists } from "../fsutil.js";
 import { fetchOf, joinUrl, perform, TransportError, type HttpCall, type SendOptions } from "../http.js";
 import { line, type IO } from "../io.js";
+import { namedMediaFile, settleMediaPath, withoutMediaExtension } from "../format.js";
 import { LAYOUT, outputPath } from "../project.js";
 import { redactUrl } from "../redact.js";
 import {
@@ -98,7 +99,7 @@ function derivePending(record: RunRecord, project: string, overrides: { task?: s
     taskId,
     lastStatus: record.pending?.lastStatus ?? "unknown",
     videoFile,
-    receipt: `${videoFile.replace(/\.mp4$/i, "")}.seedance.json`,
+    receipt: `${withoutMediaExtension(videoFile)}.seedance.json`,
     ...(record.pending?.pollUrl === undefined ? {} : { pollUrl: record.pending.pollUrl }),
   };
 }
@@ -254,6 +255,7 @@ async function finishImageFile(project: string, record: RunRecord, outFile: stri
     status: "ok",
     outputs: [outFile],
     resumedAt: [...(record.resumedAt ?? []), now],
+    ...(record.image === undefined ? {} : { image: { ...record.image, outFile } }),
   };
   delete next.pending;
   delete next.error;
@@ -280,6 +282,7 @@ async function resumeImage(
     return 0;
   }
   const outFile = record.image?.outFile;
+  let saved = outFile;
   const url = await rawImageUrl(project, record);
   const onDisk = outFile !== undefined && (await fileExists(outFile));
   if (detach && io.env.LUMEN_DETACH_WORKER === undefined) {
@@ -292,7 +295,10 @@ async function resumeImage(
     });
     return 0;
   }
-  if (onDisk && outFile !== undefined) return finishImageFile(project, record, outFile, io);
+  if (onDisk && outFile !== undefined) {
+    const existing = await adoptExistingImage(record, outFile, io);
+    return finishImageFile(project, record, existing, io);
+  }
   const taskId = yirImageTaskId(record);
   if ((url === undefined || outFile === undefined) && taskId === undefined) {
     throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
@@ -310,10 +316,11 @@ async function resumeImage(
       );
       const payload = bytesFromResult(downloaded) ?? downloaded.body;
       if (payload.byteLength === 0) throw new CliError(`run ${id} 的结果 URL 没有图像数据。不要重新提交。`);
-      await mkdir(path.dirname(outFile), { recursive: true });
-      await writeFile(outFile, payload);
+      saved = writeSettledImage(record, outFile, payload, downloaded.contentType, io);
+      await mkdir(path.dirname(saved), { recursive: true });
+      await writeFile(saved, payload);
     } else if (taskId !== undefined && outFile !== undefined) {
-      await resumeYirImageJob(record, taskId, outFile, calls, io);
+      saved = await resumeYirImageJob(record, taskId, outFile, calls, io);
     } else {
       throw new CliError(imageBlocked(record) ?? "不能 resume", 2);
     }
@@ -324,7 +331,7 @@ async function resumeImage(
     await writeRun(project, next, []);
     throw new CliError(`${message}\nrun: ${id}`);
   }
-  return finishImageFile(project, record, outFile!, io);
+  return finishImageFile(project, record, saved!, io);
 }
 
 async function resumeYirImageJob(
@@ -333,7 +340,7 @@ async function resumeYirImageJob(
   outFile: string,
   calls: HttpCall[],
   io: IO,
-): Promise<void> {
+): Promise<string> {
   const binding = record.binding;
   if (binding === null) throw new CliError(`run ${record.id} has no provider binding`, 2);
   const apiKey = io.env[binding.apiKeyEnv]?.trim();
@@ -345,8 +352,30 @@ async function resumeYirImageJob(
   const outcome = await finishYirImage(calls, binding.baseUrl, first, opts, io, "execute", outFile, knownId);
   const file = outcome.files[0];
   if (file?.bytes === undefined) throw new CliError(`run ${record.id} 的 yir 任务没有图像数据。不要重新提交。`);
-  await mkdir(path.dirname(outFile), { recursive: true });
-  await writeFile(outFile, file.bytes);
+  if (file.warning !== undefined) line(io, file.warning);
+  await mkdir(path.dirname(file.path), { recursive: true });
+  await writeFile(file.path, file.bytes);
+  if (record.image !== undefined) record.image = { ...record.image, outFile: file.path };
+  return file.path;
+}
+
+function writeSettledImage(record: RunRecord, planned: string, bytes: Uint8Array, contentType: string | undefined, io: IO): string {
+  const file = namedMediaFile(planned, bytes, { kind: "image", fallback: ".png", ...(contentType === undefined ? {} : { contentType }) });
+  if (file.warning !== undefined) line(io, file.warning);
+  if (record.image !== undefined) record.image = { ...record.image, outFile: file.path };
+  return file.path;
+}
+
+async function adoptExistingImage(record: RunRecord, planned: string, io: IO): Promise<string> {
+  const bytes = new Uint8Array(await readFile(planned));
+  const settled = settleMediaPath(planned, bytes, { kind: "image", fallback: ".png" });
+  if (settled.warning !== undefined) line(io, settled.warning);
+  if (settled.path !== planned) {
+    await mkdir(path.dirname(settled.path), { recursive: true });
+    await rename(planned, settled.path);
+  }
+  if (record.image !== undefined) record.image = { ...record.image, outFile: settled.path };
+  return settled.path;
 }
 
 export async function resumeRun(
@@ -414,6 +443,7 @@ export async function resumeRun(
         : await resumeSeedance(pending, binding.baseUrl, calls, opts, io);
     const outputs: string[] = [];
     for (const file of outcome.files) {
+      if (file.warning !== undefined) line(io, file.warning);
       await mkdir(path.dirname(file.path), { recursive: true });
       if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
       else if (file.text !== undefined) await writeFile(file.path, file.text);

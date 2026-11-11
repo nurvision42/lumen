@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { loadConfig, missingKey } from "../config.js";
@@ -9,6 +9,7 @@ import { flagString, parseFlags, requireRestEmpty, runMode } from "../flags.js";
 import { applyFilmGrain, BITRATE_FALLBACK_NOTE } from "../grain/apply.js";
 import { fetchOf, perform, type HttpCall } from "../http.js";
 import { line, type IO } from "../io.js";
+import { settleMediaPath } from "../format.js";
 import { isRemoteMedia } from "../media.js";
 import { LAYOUT, outputPath } from "../project.js";
 import { settle, type OutputFile } from "../runs.js";
@@ -91,7 +92,13 @@ export async function materializeEnhance(
         output: paths.videoFile,
       });
       if (plan.bitrate.source === "format") line(io, BITRATE_FALLBACK_NOTE);
-      return [{ path: paths.videoFile }];
+      const grained = new Uint8Array(await readFile(paths.videoFile));
+      const settled = settleMediaPath(paths.videoFile, grained, { kind: "video", fallback: ".mp4" });
+      if (settled.path !== paths.videoFile) {
+        await mkdir(path.dirname(settled.path), { recursive: true });
+        await rename(paths.videoFile, settled.path);
+      }
+      return [{ path: settled.path, ...(settled.warning === undefined ? {} : { warning: settled.warning }) }];
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

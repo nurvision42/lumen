@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { contentTypeFor } from "../media.js";
+import { namedMediaFile } from "../format.js";
 
 /** haomao lists seedance 2.0 models with the ".0" suffix (GET /v1/models). */
 export const HAOMAO_SEEDANCE_MODELS: Record<string, string> = {
@@ -200,7 +201,7 @@ export async function finishHaomaoVideo(
       { method: "GET", url: finished.videoUrl, headers: {}, body: { kind: "empty" } },
       { ...opts, auth: false },
     );
-    files.push({ path: videoFile, bytes: downloaded.body });
+    files.push(namedMediaFile(videoFile, downloaded.body, { kind: "video", fallback: ".mp4", contentType: downloaded.contentType }));
     files.push({ path: receipt, text: `${JSON.stringify(response, null, 2)}\n` });
   }
   return { calls, response, files };

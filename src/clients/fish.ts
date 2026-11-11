@@ -16,6 +16,7 @@ import { contentTypeFor, isProbablyFile } from "../media.js";
 import type { OutputFile } from "../runs.js";
 import { asRecord, findString } from "../walk.js";
 import { bytesFromResult, jsonCall } from "./wire.js";
+import { namedMediaFile } from "../format.js";
 
 function ttsValue(text: string, voiceId: string, alias: string | undefined): Record<string, unknown> {
   return {
@@ -157,7 +158,7 @@ function finish(
   const files: OutputFile[] = [];
   if (mode === "execute") {
     const bytes = bytesFromResult(last);
-    if (bytes !== undefined) files.push({ path: outFile, bytes });
+    if (bytes !== undefined) files.push(namedMediaFile(outFile, bytes, { kind: "audio", fallback: ".mp3", contentType: last.contentType }));
     else files.push({ path: outFile.replace(/\.[^.]+$/, "") + ".json", text: `${JSON.stringify(response, null, 2)}\n` });
   }
   return { calls, response, files };

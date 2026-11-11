@@ -13,6 +13,7 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { contentTypeFor } from "../media.js";
+import { namedMediaFile } from "../format.js";
 
 /**
  * BeefTV enterprise video API (docs.enterprise.beefapi.com/docs/seedance).
@@ -337,7 +338,7 @@ export async function finishBeeftvVideo(
         await pause(io, 5_000);
       }
     }
-    files.push({ path: videoFile, bytes: downloaded.body });
+    files.push(namedMediaFile(videoFile, downloaded.body, { kind: "video", fallback: ".mp4", contentType: downloaded.contentType }));
     files.push({ path: receipt, text: `${JSON.stringify(response, null, 2)}\n` });
   }
   return { calls, response, files };

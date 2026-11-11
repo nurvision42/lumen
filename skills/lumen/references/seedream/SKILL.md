@@ -112,7 +112,7 @@ lumen gen image --model doubao-seedream-5-0-pro-260628 --prompt "…" --ref refs
 
 ## 保存
 
-返回的图会下载到本地。默认路径是 `out/<run-id>.png`。带了 `--shot N` 则是 `shots/NN/frame/<run-id>.png`。`--out` 覆盖这两者。要透明时不要把 `--out` 写成 `.jpg`。
+返回的图会下载到本地，扩展名按实际字节确定（先看魔数，再看 Content-Type，最后才是 `.png`），不转码。默认路径是 `out/<run-id>.<ext>`。带了 `--shot N` 则是 `shots/NN/frame/<run-id>.<ext>`。`--out` 带扩展名时按你给的路径保存，不改名；不一致时打 warning。`--out` 没有扩展名时补上探测到的扩展名。要透明时不要把 `--out` 写成 `.jpg`。
 
 ## 提交
 

@@ -24,6 +24,7 @@ import { asRecord } from "../walk.js";
 import { isLocalMedia } from "./beeftv.js";
 import { awaitTask } from "./jobs.js";
 import { jsonCall } from "./wire.js";
+import { namedMediaFile } from "../format.js";
 
 /**
  * Yir Standard async image API (https://yir.ai/docs/guides/image-generation).
@@ -389,7 +390,7 @@ export async function finishYirImage(
       { method: "GET", url, headers: {}, body: { kind: "empty" } },
       { ...opts, auth: false },
     );
-    files.push({ path: outFile, bytes: downloaded.body });
+    files.push(namedMediaFile(outFile, downloaded.body, { kind: "image", fallback: ".png", contentType: downloaded.contentType }));
   }
   return { calls, response, files };
 }

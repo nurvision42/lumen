@@ -10,6 +10,7 @@ import { assertBeeftvImageRef, isLocalMedia, mapLocalMediaViaBeeftv, planBeeftvI
 import { planVolcarkImage, seedreamSize, volcarkImageRef } from "./volcark.js";
 import { runYirImage } from "./yir.js";
 import { findString } from "../walk.js";
+import { namedMediaFile } from "../format.js";
 import { assertHttps, bytesFromResult, httpUrlFromResult, imageSize, jsonCall, wireModel } from "./wire.js";
 
 export function planImage(request: ImageRequest, binding: ModelBinding): HttpCall[] {
@@ -197,12 +198,12 @@ async function saveImage(
   opts: { mode: "execute" | "mock"; fetchImpl: (input: string, init?: RequestInit) => Promise<Response>; apiKey?: string },
 ): Promise<OutputFile> {
   const bytes = bytesFromResult(result);
-  if (bytes !== undefined) return { path: outFile, bytes };
+  if (bytes !== undefined) return namedMediaFile(outFile, bytes, { kind: "image", fallback: ".png", contentType: result.contentType });
   const url = httpUrlFromResult(result);
   if (url !== undefined) {
     const downloaded = await perform(calls, { method: "GET", url, headers: {}, body: { kind: "empty" } }, { ...opts, auth: false });
     const payload = bytesFromResult(downloaded) ?? downloaded.body;
-    return { path: outFile, bytes: payload };
+    return namedMediaFile(outFile, payload, { kind: "image", fallback: ".png", contentType: downloaded.contentType });
   }
   const receipt = outFile.replace(/\.[^.]+$/, "") + ".json";
   return { path: receipt, text: `${JSON.stringify(publicResult(result), null, 2)}\n` };

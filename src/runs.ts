@@ -85,6 +85,8 @@ export interface OutputFile {
   path: string;
   bytes?: Uint8Array;
   text?: string;
+  /** Printed once when the file is written; not stored in record.json. */
+  warning?: string;
 }
 
 export interface RunCtx {
@@ -615,10 +617,20 @@ export async function settle(
     const outputs: string[] = [];
     if (thrown === undefined && pending === undefined && mode === "execute") {
       for (const file of ctx.files) {
+        if (file.warning !== undefined) line(io, file.warning);
         await mkdir(path.dirname(file.path), { recursive: true });
         if (file.bytes !== undefined) await writeFile(file.path, file.bytes);
         else if (file.text !== undefined) await writeFile(file.path, file.text);
         outputs.push(file.path);
+      }
+      const written = ctx.files.find((file) => file.bytes !== undefined || (file.text === undefined && file.path !== ctx.resume?.receipt));
+      if (ctx.image !== undefined) {
+        const pic = ctx.files.find((file) => file.bytes !== undefined) ?? written;
+        if (pic !== undefined && pic.path !== ctx.image.outFile) ctx.image = { ...ctx.image, outFile: pic.path };
+      }
+      if (ctx.resume !== undefined) {
+        const media = ctx.files.find((file) => file.path !== ctx.resume!.receipt && (file.bytes !== undefined || file.text === undefined));
+        if (media !== undefined && media.path !== ctx.resume.videoFile) ctx.resume = { ...ctx.resume, videoFile: media.path };
       }
     }
 
