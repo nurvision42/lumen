@@ -22,6 +22,7 @@ import {
   readRunRecord,
   resumeHint,
   runDir,
+  runsFollow,
   startDetached,
   writeRun,
   type OutputFile,
@@ -260,7 +261,7 @@ async function finishImageFile(project: string, record: RunRecord, outFile: stri
   delete next.pending;
   delete next.error;
   if (next.worker !== undefined) next.worker = { ...next.worker, exited: "clean" };
-  await writeRun(project, next, []);
+  await writeRun(project, next, [], { cwd: io.cwd });
   line(io, `ok ${record.modelId}`);
   line(io, `run: ${record.id}`);
   line(io, `wrote: ${outFile}`);
@@ -278,7 +279,7 @@ async function resumeImage(
   const inflight = record.status === "pending" || record.status === "running";
   if (inflight && record.worker?.pid !== undefined && pidAlive(record.worker.pid) && record.worker.exited !== "clean") {
     line(io, `仍在生成（pid ${record.worker.pid}）`);
-    line(io, `下一步: lumen runs wait ${id}`);
+    line(io, `下一步: ${runsFollow("wait", id, { project, cwd: io.cwd })}`);
     return 0;
   }
   const outFile = record.image?.outFile;
@@ -328,7 +329,7 @@ async function resumeImage(
     if (err instanceof CliError && err.exitCode === 2) throw err;
     const message = err instanceof Error ? err.message : String(err);
     const next: RunRecord = { ...record, status: "error", error: message, calls };
-    await writeRun(project, next, []);
+    await writeRun(project, next, [], { cwd: io.cwd });
     throw new CliError(`${message}\nrun: ${id}`);
   }
   return finishImageFile(project, record, saved!, io);
@@ -420,7 +421,7 @@ export async function resumeRun(
     record.worker.exited !== "clean";
   if (workerAlive) {
     line(io, `仍在生成（pid ${record.worker?.pid}）`);
-    line(io, `下一步: lumen runs wait ${id}`);
+    line(io, `下一步: ${runsFollow("wait", id, { project, cwd: io.cwd })}`);
     return 0;
   }
   if (options?.detach === true && io.env.LUMEN_DETACH_WORKER === undefined) {
@@ -452,7 +453,7 @@ export async function resumeRun(
     delete next.pending;
     delete next.error;
     Object.assign(next, { status: "ok", response: outcome.response, outputs });
-    await writeRun(project, next, [apiKey]);
+    await writeRun(project, next, [apiKey], { cwd: io.cwd });
     line(io, `ok ${record.modelId}`);
     line(io, `run: ${id}`);
     for (const output of outputs) line(io, `wrote: ${output}`);
@@ -467,17 +468,17 @@ export async function resumeRun(
       };
       Object.assign(next, { status: "running", pending: still, response: err.response });
       delete next.error;
-      await writeRun(project, next, [apiKey]);
+      await writeRun(project, next, [apiKey], { cwd: io.cwd });
       line(io, `running ${record.modelId}`);
       line(io, `run: ${id}`);
       line(io, `task: ${still.provider} ${still.taskId} (${still.lastStatus})`);
       if (still.pollUrl !== undefined) line(io, `poll: ${redactUrl(still.pollUrl)}`);
-      line(io, resumeHint(id));
+      line(io, resumeHint(id, { project, cwd: io.cwd }));
       return 0;
     }
     const message = err instanceof Error ? err.message : String(err);
     Object.assign(next, { status: "error", error: message, pending, ...(err instanceof TransportError ? { response: err.response } : {}) });
-    await writeRun(project, next, [apiKey]);
+    await writeRun(project, next, [apiKey], { cwd: io.cwd });
     throw new CliError(`${message}\nrun: ${id}`);
   }
 }

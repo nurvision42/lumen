@@ -28,9 +28,11 @@ lumen 是本地视频工具集。二进制是 `lumen`。本文中的 `references
 出图、出视频、增强、拆解不要在前台一直占着 `--execute`。用户一发新消息，这一轮会被打断，前台进程被杀掉，生成中断；再提交一次会重新扣费。不要依赖子任务，也不要用 `nohup`、`&` 或 `pkill -f` 自己管后台。
 
 1. 生成一律加上 `--detach --execute`：`lumen gen image`、`lumen gen video`、`lumen enhance`、`lumen breakdown`。续跑是 `lumen runs resume <id> --execute --detach`。命令做完本地校验、打出预估、写好 run 后，把提交、轮询、下载和后处理（增强的颗粒）交给脱离终端的子进程，自己打印 run id，退出码 0。
-2. 同一轮里接着循环 `lumen runs wait <id> --timeout 60`。退出码 0：把 `wrote:` 路径发给用户。退出码 3：仍在生成，可以先回一句进度再 wait。退出码 1：把失败原因告诉用户。`wait` 只读记录，不提交。杀掉 `wait` 不影响生成。
-3. 用户中途发消息后，先回用户，再 `lumen runs list --pending`。有未取走的就继续 wait，把结果发回去。不要重新提交。
+2. 同一轮里接着循环 `lumen runs wait <id> --timeout 60`。生成时用了 `--project <dir>`，wait 就要带同一个 `--project`；省略 `--project` 表示当前目录。退出码 0：把 `wrote:` 路径发给用户。退出码 3：仍在生成，可以先回一句进度再 wait。退出码 1：把失败原因告诉用户。`wait` 只读记录，不提交。杀掉 `wait` 不影响生成。
+3. 用户中途发消息后，先回用户，再 `lumen runs list --pending`（同样带上创建时的 `--project`）。有未取走的就继续 wait，把结果发回去。不要重新提交。
 4. 要停任务只用 run 记录里的 pid。`runs show <id>` 能看状态。生图若已中断：有结果 URL 就 `runs resume`（只下载，不重提）；有服务端任务就 resume 同一个任务；什么都没有就说明不能 resume，不要重提。
+
+run 记录在 `<project>/.lumen/runs/<id>/`，含 `record.json` 和 `worker.log`。`runs wait`、`show`、`list`、`resume` 必须使用创建该 run 时的同一个 `--project`。例如 `lumen gen image --model <id> --prompt <中文> --project proj --execute --detach`，然后 `lumen runs wait <id> --project proj`。
 
 ## 工具
 
@@ -57,7 +59,7 @@ lumen 是本地视频工具集。二进制是 `lumen`。本文中的 `references
 
 **加字幕。** 只压你交来的核对稿，按文件里的文字和时间画。命令不对照、不去标点、不重切。校对在压制前由助手完成：对照实际说出口的台词改错字，并审核初分段；要合并或拆开时，只用对应首尾字的真实时间，记下落在哪些字上。对不上就标出来，不猜时间，不用分镜时长，不补一句。`lumen captions burn --video <file> --subs <file> --to <mp4>`。不接受 `--speech`。用本机 ffmpeg 硬压。默认白字、半透明灰圆角底；竖屏顶部、横屏底部。先读 `references/加字幕/SKILL.md`。
 
-**记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs list --pending` · `lumen runs show <id>` · `lumen runs wait <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id> --execute --detach` 接着等并取回结果，不要重新提交。助手跑生成的标准步骤见上面「助手怎么跑生成」。
+**记录。** 查看已经记下的请求和结果，不重新生成。`lumen runs list` · `lumen runs list --pending` · `lumen runs show <id>` · `lumen runs wait <id>`。视频生成、增强或拆解等满仍未完成时，run 状态是 `running` 而不是失败，用 `lumen runs resume <id> --execute --detach` 接着等并取回结果，不要重新提交。助手跑生成的标准步骤见上面「助手怎么跑生成」。记录在 `<project>/.lumen/runs/<id>/`（`record.json`、`worker.log`）。这些命令要带上创建时的同一个 `--project`，省略则是当前目录。
 
 **拼接。** `lumen concat` 把镜头接成一条成片。它仍是占位，不调用外部程序。
 

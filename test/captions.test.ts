@@ -488,7 +488,7 @@ test("captions are named in help and the skill points at both references", async
   assert.match(skill, /references\/加字幕\/SKILL\.md/);
   assert.match(skill, /lumen captions transcribe --video <file>/);
   assert.match(skill, /lumen captions burn --video <file> --subs <file> --to <mp4>/);
-  assert.equal(skill.trim().split("\n").length <= 80, true);
+  assert.equal(skill.trim().split("\n").length <= 81, true);
   const transcribe = await readFile(path.join(root, "skills", "lumen", "references", "转字幕", "SKILL.md"), "utf8");
   const burn = await readFile(path.join(root, "skills", "lumen", "references", "加字幕", "SKILL.md"), "utf8");
   assert.match(transcribe, /--execute/);

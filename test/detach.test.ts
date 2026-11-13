@@ -81,6 +81,12 @@ test("help describes detach, wait exit codes, and the assistant loop in Chinese"
   const text = helpText("0.1.21");
   assert.match(text, /--detach --execute/);
   assert.match(text, /lumen runs wait <id> --timeout 60/);
+  assert.match(text, /<project>\/\.lumen\/runs\/<id>\//);
+  assert.match(text, /record\.json and worker\.log/);
+  assert.match(text, /same --project/);
+  assert.match(text, /Omitting --project means the current directory/);
+  assert.match(text, /lumen runs wait <id> --project proj/);
+  assert.match(text, /同一个 --project/);
   assert.match(text, /退出码：0 完成/);
   assert.match(text, /3 仍在生成/);
   assert.match(text, /lumen runs list --pending/);
@@ -896,5 +902,115 @@ test("runs list --pending is empty when nothing is waiting", async () => {
     const cap = capture(env(dir));
     assert.equal(await run(["runs", "list", "--pending", "--project", dir], cap.io), 0);
     assert.match(cap.out(), /没有未取走的 run/);
+  });
+});
+
+test("detach --project hint is pasteable from the parent directory", async () => {
+  await withDir(async (parent) => {
+    const proj = path.join(parent, "proj");
+    await mkdir(proj, { recursive: true });
+    await bind(proj, "gpt-image-2", "grsai", "https://grsai.example", "GRSAI");
+    const sentinel = "sent-ark-key";
+    const cap = capture(env(parent, { ARK_API_KEY: sentinel }), { cwd: parent });
+    let spec: { args: string[]; cwd: string; env: NodeJS.ProcessEnv; logFile: string } | undefined;
+    cap.io.spawnDetached = (input) => {
+      spec = input;
+      return { pid: process.pid };
+    };
+    assert.equal(
+      await run(
+        ["gen", "image", "--model", "gpt-image-2", "--prompt", "一只猫", "--mock", "--detach", "--project", "proj"],
+        cap.io,
+      ),
+      0,
+      cap.err(),
+    );
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id, cap.out());
+    const logFile = path.join(proj, ".lumen", "runs", id, "worker.log");
+    assert.match(cap.out(), new RegExp(`log: ${logFile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(cap.out(), new RegExp(`下一步: lumen runs wait ${id} --project proj\\n`));
+    assert.equal(spec?.cwd, parent);
+    assert.equal(spec?.env.ARK_API_KEY, sentinel);
+    assert.equal(spec?.env.LUMEN_DETACH_WORKER, id);
+    assert.equal(spec?.logFile, logFile);
+    assert.equal((await readRunRecord(proj, id)).status, "pending");
+
+    const missingWait = capture(env(parent), { cwd: parent });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "0"], missingWait.io), 1);
+    assert.match(missingWait.err(), new RegExp(`no run ${id}`));
+    assert.match(missingWait.err(), new RegExp(`查找的项目目录: ${parent.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(missingWait.err(), /--project 必须和创建该 run 的命令相同/);
+    assert.match(missingWait.err(), /省略 --project 就是当前目录/);
+
+    const missingShow = capture(env(parent), { cwd: parent });
+    assert.equal(await run(["runs", "show", id], missingShow.io), 1);
+    assert.match(missingShow.err(), new RegExp(`no run ${id}`));
+    assert.match(missingShow.err(), /--project 必须和创建该 run 的命令相同/);
+
+    const waited = capture(env(parent), { cwd: parent });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "0", "--project", "proj"], waited.io), 3);
+    assert.match(waited.out(), /仍在生成/);
+    assert.match(waited.out(), new RegExp(`下一步: lumen runs wait ${id} --project proj`));
+
+    const shown = capture(env(parent), { cwd: parent });
+    assert.equal(await run(["runs", "show", id, "--project", "proj"], shown.io), 0, shown.err());
+    assert.match(shown.out(), new RegExp(`# run ${id}`));
+    assert.match(shown.out(), new RegExp(`log: ${logFile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(shown.out(), new RegExp(`下一步: lumen runs wait ${id} --project proj`));
+
+    const resumed = capture(env(parent), { cwd: parent });
+    assert.equal(await run(["runs", "resume", id, "--project", "proj"], resumed.io), 0, resumed.err());
+    assert.match(resumed.out(), new RegExp(`下一步: lumen runs wait ${id} --project proj`));
+  });
+});
+
+test("detach without --project prints a wait command that works in that directory", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "gpt-image-2", "grsai", "https://grsai.example", "GRSAI");
+    const cap = capture(env(dir), { cwd: dir });
+    let childOut = "";
+    cap.io.spawnDetached = (spec) => {
+      const child: IO = {
+        stdout: (chunk) => {
+          childOut += chunk;
+        },
+        stderr: (chunk) => {
+          childOut += chunk;
+        },
+        cwd: spec.cwd,
+        env: spec.env,
+        fetch: cap.io.fetch,
+      };
+      void run(spec.args, child).then(
+        (exitCode) => {
+          childOut += `\nexit ${exitCode}\n`;
+        },
+        (err: unknown) => {
+          childOut += `\n${err instanceof Error ? err.message : String(err)}\n`;
+        },
+      );
+      return { pid: process.pid };
+    };
+    assert.equal(
+      await run(["gen", "image", "--model", "gpt-image-2", "--prompt", "一只猫", "--mock", "--detach"], cap.io),
+      0,
+      cap.err(),
+    );
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id, cap.out());
+    assert.match(cap.out(), new RegExp(`下一步: lumen runs wait ${id}\\n`));
+    assert.equal(cap.out().includes("--project"), false);
+    await until(async () => {
+      const record = await readRunRecord(dir, id);
+      return record.status === "mock" || record.status === "error";
+    });
+    assert.equal((await readRunRecord(dir, id)).status, "mock", childOut);
+    const waited = capture(env(dir), { cwd: dir });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "5"], waited.io), 0, waited.err());
+    assert.match(waited.out(), new RegExp(`run: ${id}`));
+    const shown = capture(env(dir), { cwd: dir });
+    assert.equal(await run(["runs", "show", id], shown.io), 0, shown.err());
+    assert.match(shown.out(), new RegExp(`# run ${id}`));
   });
 });

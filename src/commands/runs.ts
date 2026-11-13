@@ -13,6 +13,7 @@ import {
   pidAlive,
   readRunMarkdown,
   readRunRecord,
+  runsFollow,
   type RunRecord,
 } from "../runs.js";
 
@@ -59,8 +60,9 @@ export async function waitForRun(project: string, id: string, timeoutSec: number
       line(io, "仍在生成");
       line(io, `run: ${id}`);
       line(io, `status: ${record.status}`);
-      for (const text of explainRun(record, await outputsOnDisk(record))) line(io, text);
-      line(io, `下一步: lumen runs wait ${id}`);
+      const locate = { project, cwd: io.cwd };
+      for (const text of explainRun(record, await outputsOnDisk(record), locate)) line(io, text);
+      line(io, `下一步: ${runsFollow("wait", id, locate)}`);
       return WAIT_STILL_RUNNING;
     }
     const left = timeoutSec * 1000 - (Date.now() - started);
@@ -69,7 +71,7 @@ export async function waitForRun(project: string, id: string, timeoutSec: number
   }
   const at = (io.now?.() ?? new Date()).toISOString();
   if (record.status === "ok" || record.status === "error" || record.status === "mock") {
-    await claimRun(project, id, "wait", at);
+    await claimRun(project, id, "wait", at, io.cwd);
   }
   if (record.status === "error") {
     const reason = record.error ?? "failed";
@@ -102,9 +104,9 @@ export async function runsCommand(args: string[], project: string, io: IO): Prom
     requireRestEmpty(parsed.rest.slice(1));
     const record = await readRunRecord(project, id);
     io.stdout(await readRunMarkdown(project, id));
-    for (const text of explainRun(record, await outputsOnDisk(record))) line(io, text);
+    for (const text of explainRun(record, await outputsOnDisk(record), { project, cwd: io.cwd })) line(io, text);
     if ((record.status === "ok" || record.status === "error" || record.status === "mock") && record.claimed !== true) {
-      await claimRun(project, id, "show", (io.now?.() ?? new Date()).toISOString());
+      await claimRun(project, id, "show", (io.now?.() ?? new Date()).toISOString(), io.cwd);
     }
     return 0;
   }
