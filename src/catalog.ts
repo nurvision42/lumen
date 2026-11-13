@@ -1,7 +1,7 @@
 import { CliError } from "./errors.js";
 
 export const GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
-/** Shared Seedream ids. 5.0 Pro/Flash default to beeftv (also volcark). 5.5 defaults to yir (also volcark). Aliases: seedream-5-pro, seedream-5-flash, seedream-5-5, bytedance/seedream-5.5. */
+/** Shared Seedream ids. 5.0 Pro/Flash default to beeftv (also volcark). 5.5 defaults to volcark (also yir). Aliases: seedream-5-pro, seedream-5-flash, seedream-5-5, bytedance/seedream-5.5. */
 export const SEEDREAM_DEFAULT_RESOLUTION = "2K";
 export const SEEDREAM_PRO_MODEL = "doubao-seedream-5-0-pro-260628";
 export const SEEDREAM_FLASH_MODEL = "doubao-seedream-5-0-flash-260915";
@@ -151,8 +151,8 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: SEEDREAM_55_MODEL,
     kind: "image",
-    summary: "Seedream 5.5. Providers yir (default, wire bytedance/seedream-5.5) and volcark (wire doubao-seedream-5-5-261028). Default resolution 2K. yir: 1K and 2K only, APIMart 1K $0.0182/image, 2K $0.0280/image (2026-11-10); refs extra (amount unpublished); no --background. volcark: 1K, 1.5K, 2K; output 0.13 yuan ≤2.61M px, 0.23 yuan above that up to 4.63M; input images 0.05 yuan each from the first; --background transparent|opaque|auto (transparent requires png)",
-    providers: ["yir", "volcark"],
+    summary: "Seedream 5.5. Default provider volcark (wire doubao-seedream-5-5-261028), also yir (wire bytedance/seedream-5.5). Default resolution 2K on volcark and yir. volcark: 1K, 1.5K, 2K; output 0.13 yuan ≤2.61M px, 0.23 yuan above that up to 4.63M; input images 0.05 yuan each from the first; --background transparent|opaque|auto (transparent requires png). yir: 1K and 2K only, APIMart 1K $0.0182/image, 2K $0.0280/image (2026-11-10); refs extra (amount unpublished); no --background",
+    providers: ["volcark", "yir"],
   },
   ...SEEDANCE_MODELS.map((id) => ({
     id,
@@ -362,7 +362,7 @@ export function validateImage(input: {
   background: string | undefined;
   quality: string | undefined;
   references: string[];
-  /** Bound provider. Seedream 5.5 rules differ for yir and volcark. Omitted means the yir rules. */
+  /** Bound provider. Seedream 5.5 uses volcark rules unless this is yir. Omitted means volcark, the listed default. */
   provider?: string;
   /** Seedream 5.5 on volcark. Omitted means png. */
   outputFormat?: string;
@@ -376,7 +376,8 @@ export function validateImage(input: {
   if (prompt.length > 20_000) throw new CliError("prompt is longer than 20000 characters");
   const seedream = isSeedreamModel(modelId);
   const seedream55 = isSeedream55Model(modelId);
-  const volcark55 = seedream55 && input.provider === "volcark";
+  const yir55 = seedream55 && input.provider === "yir";
+  const volcark55 = seedream55 && !yir55;
   const aspectRatio = seedream55 && !volcark55 && (input.aspectRatio === undefined || input.aspectRatio === "auto")
     ? "1:1"
     : oneOf(input.aspectRatio, IMAGE_ASPECTS, "aspect-ratio");

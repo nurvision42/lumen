@@ -8,6 +8,7 @@ import {
   IMAGE_ASPECTS,
   PROVIDER_DEFAULT_BASE_URLS,
   SEEDREAM_55_MODEL,
+  SEEDREAM_DEFAULT_RESOLUTION,
   SEEDREAM_FLASH_MODEL,
   SEEDREAM_PRO_MODEL,
   SEEDREAM_RESOLUTIONS,
@@ -754,7 +755,7 @@ test("dry-run seedream-5.5 on volcark posts the Ark body and the pixel estimate"
 test("models list and docs name seedream-5.5 on yir and volcark", async () => {
   const listed = capture();
   assert.equal(await run(["models", SEEDREAM_55_MODEL], listed.io), 0, listed.err());
-  assert.match(listed.out(), new RegExp(`^${SEEDREAM_55_MODEL}  image  yir,volcark`, "m"));
+  assert.match(listed.out(), new RegExp(`^${SEEDREAM_55_MODEL}  image  volcark,yir`, "m"));
   assert.match(listed.out(), /doubao-seedream-5-5-261028/);
   assert.match(listed.out(), /0\.13 yuan/);
   const skill = await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8");
@@ -767,7 +768,37 @@ test("models list and docs name seedream-5.5 on yir and volcark", async () => {
     assert.match(text, /0\.05/);
     assert.match(text, /transparent/);
   }
-  assert.match(skill, /默认供应商是 `yir`/);
-  assert.match(usage, /默认 `yir`/);
-  assert.match(readme, /yir（默认）、volcark/);
+  assert.match(skill, /默认供应商是 `volcark`/);
+  assert.match(skill, /默认供应商是 `beeftv`/);
+  assert.match(usage, /默认 `volcark`/);
+  assert.match(usage, /默认供应商是 `beeftv`/);
+  assert.match(readme, /volcark（默认）、yir/);
+  assert.match(help, /Default resolution 2K on volcark and on yir/);
+  assert.equal(SEEDREAM_DEFAULT_RESOLUTION, "2K");
+});
+
+test("omitted seedream-5.5 provider uses volcark rules at the default 2K resolution", () => {
+  const request = validateImage({
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "auto",
+    resolution: SEEDREAM_DEFAULT_RESOLUTION,
+    background: "transparent",
+    quality: undefined,
+    references: [],
+  });
+  assert.equal(request.aspectRatio, "auto");
+  assert.equal(request.resolution, "2K");
+  assert.equal(request.background, "transparent");
+  assert.equal(jsonBody(planVolcarkImage(request, binding())[0]).size, "2K");
+  const mid = validateImage({
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "1:1",
+    resolution: "1.5K",
+    background: undefined,
+    quality: undefined,
+    references: [],
+  });
+  assert.equal(mid.resolution, "1.5K");
 });

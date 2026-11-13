@@ -1,11 +1,11 @@
 ---
 name: seedream
-description: 用 Seedream 5.0 Pro、Flash 或 5.5 调用 lumen 之前先读。5.0 默认 beeftv，5.5 默认 yir，也可绑 volcark。只管选模型、比例、分辨率、参考图、估价和提交。
+description: 用 Seedream 5.0 Pro、Flash 或 5.5 调用 lumen 之前先读。5.0 默认 beeftv，5.5 默认 volcark，也可绑 yir。只管选模型、比例、分辨率、参考图、估价和提交。
 ---
 
 # Seedream 使用说明
 
-本文件只管怎么用 `lumen` 调用 Seedream 5.0 Pro、Flash 和 5.5。5.0 默认供应商是 `beeftv`，也可以绑 `volcark`。5.5 默认供应商是 `yir`，也可以绑 `volcark`。提示词用中文写。提示词写法读 `../生图-提示词写法/SKILL.md`，那份只写正文，不提交，所有出图模型共用。不要把提示词翻译成英文。需要摄影设计时读 `../拍摄设定/SKILL.md`，按当前画面具体表达；真实设备与镜头名称保留准确原名，不把型号译成画质词。
+本文件只管怎么用 `lumen` 调用 Seedream 5.0 Pro、Flash 和 5.5。5.0 默认供应商是 `beeftv`，也可以绑 `volcark`。5.5 默认供应商是 `volcark`，也可以绑 `yir`。提示词用中文写。提示词写法读 `../生图-提示词写法/SKILL.md`，那份只写正文，不提交，所有出图模型共用。不要把提示词翻译成英文。需要摄影设计时读 `../拍摄设定/SKILL.md`，按当前画面具体表达；真实设备与镜头名称保留准确原名，不把型号译成画质词。
 
 比例、分辨率、背景和参考图用旗标。不要写进提示词，也不要自己拼请求。接口路径不在这里写。
 
@@ -15,7 +15,7 @@ description: 用 Seedream 5.0 Pro、Flash 或 5.5 调用 lumen 之前先读。5.
 | --- | --- | --- |
 | `doubao-seedream-5-0-pro-260628` | `seedream-5-pro` | Seedream 5.0 Pro。质量优先。默认 `beeftv`：≤261 万像素 0.09 元/张，更大（含默认 2K）0.18 元/张。`volcark`：≤1.5K 0.30 元/张，2K 0.60 元/张 |
 | `doubao-seedream-5-0-flash-260915` | `seedream-5-flash` | Seedream 5.0 Flash。速度优先。默认 `beeftv` 0.04 元/张。`volcark` 0.12 元/张 |
-| `seedream-5.5` | `seedream-5-5`、`bytedance/seedream-5.5` | Seedream 5.5。默认 `yir`，也可以绑 `volcark`（上游 `doubao-seedream-5-5-261028`）。多轮编辑更稳，写实和小字更好。Yir APIMart（2026-11-10）：1K 0.0182 美元/张，2K 0.0280 美元/张。参考图另收费，单价未公布。`volcark`：输入图 0.05 元/张（从第一张起），输出 ≤261 万像素 0.13 元/张，更大（到 463 万像素）0.23 元/张。`volcark` 支持透明背景 |
+| `seedream-5.5` | `seedream-5-5`、`bytedance/seedream-5.5` | Seedream 5.5。默认 `volcark`（上游 `doubao-seedream-5-5-261028`），也可以绑 `yir`。多轮编辑更稳，写实和小字更好。省略分辨率时是 `2K`（两边都接受）。`volcark`：输入图 0.05 元/张（从第一张起），输出 ≤261 万像素 0.13 元/张，更大（到 463 万像素）0.23 元/张，支持透明背景。Yir APIMart（2026-11-10）：1K 0.0182 美元/张，2K 0.0280 美元/张。参考图另收费，单价未公布 |
 
 `--model` 写上表的完整 id 或别名。别名只在 lumen 里展开成完整 id。
 
@@ -23,7 +23,7 @@ description: 用 Seedream 5.0 Pro、Flash 或 5.5 调用 lumen 之前先读。5.
 
 ## 绑定
 
-5.0 的默认供应商是 `beeftv`。`volcark` 也能绑这两支。5.5 默认 `yir`，也可以绑 `volcark`。每支模型一条绑定，没有绑定就停，不换模型，不换密钥。`beeftv` 尚未公布 5.5 的模型 id，不要把 5.5 绑到 `beeftv`。
+5.0 的默认供应商是 `beeftv`。`volcark` 也能绑这两支。5.5 默认 `volcark`，也可以绑 `yir`。每支模型一条绑定，没有绑定就停，不换模型，不换密钥。`beeftv` 尚未公布 5.5 的模型 id，不要把 5.5 绑到 `beeftv`。
 
 ```bash
 lumen providers set doubao-seedream-5-0-pro-260628 --provider beeftv --api-key-env BEEFAPI_KEY
@@ -33,21 +33,21 @@ Flash 同样写，把模型 id 换成 `doubao-seedream-5-0-flash-260915`。`beef
 
 要改走火山方舟时才绑 `volcark`，密钥环境变量用 `ARK_API_KEY`。执行时没有这个变量，错误是中文，并写出要设置的变量名。不要把密钥写进命令、项目或对话。
 
-5.5 这样绑：
-
-```bash
-lumen providers set seedream-5.5 --provider yir --api-key-env YIR_API_KEY
-```
-
-`yir` 上游默认是 `bytedance/seedream-5.5`。`--model-alias` 可覆盖。不发送 `group`。密钥环境变量用 `YIR_API_KEY`。
-
-要改走火山方舟时，5.5 这样绑：
+5.5 这样绑（默认）：
 
 ```bash
 lumen providers set seedream-5.5 --provider volcark --api-key-env ARK_API_KEY
 ```
 
-`volcark` 上游默认是 `doubao-seedream-5-5-261028`。`--model-alias` 可覆盖。不发送 `group`。
+`volcark` 上游默认是 `doubao-seedream-5-5-261028`。`--model-alias` 可覆盖。不发送 `group`。省略分辨率时是 `2K`。
+
+要改走 `yir` 时，5.5 这样绑：
+
+```bash
+lumen providers set seedream-5.5 --provider yir --api-key-env YIR_API_KEY
+```
+
+`yir` 上游默认是 `bytedance/seedream-5.5`。`--model-alias` 可覆盖。不发送 `group`。密钥环境变量用 `YIR_API_KEY`。省略分辨率时也是 `2K`。
 
 `yunqiao`、`grsai`、`haomao`、`kitta`、`mediakit` 不能绑这三支。`beeftv` 不能绑 5.5。`yir` 不能绑 5.0。
 
@@ -95,7 +95,7 @@ lumen gen image --model doubao-seedream-5-0-pro-260628 --prompt "…" --ref refs
 
 ## 比例和分辨率
 
-5.0 的 `--resolution` 只取 `1K`、`1.5K`、`2K`。`volcark` 上的 5.5 同样是 `1K`、`1.5K`、`2K`。`yir` 上的 5.5 只取 `1K`、`2K`。省略时发出 `2K`。`3K` 和 `4K` 会失败。
+5.0 的 `--resolution` 只取 `1K`、`1.5K`、`2K`。`volcark` 上的 5.5 同样是 `1K`、`1.5K`、`2K`。`yir` 上的 5.5 只取 `1K`、`2K`。省略时发出 `2K`。5.5 在 `volcark` 和 `yir` 上都是这个默认值。`3K` 和 `4K` 会失败。
 
 5.0 的 `auto` 把档位交给上游，由模型按提示词里的形状或用途决定宽高。选了 `auto` 时，提示词里要用中文写明画幅或用途，例如竖屏海报、横幅。`volcark` 上的 5.5 同样：`auto` 发送档位，具体比例发送官方像素。`yir` 上的 5.5 没有 `auto`，省略或写 `auto` 都会变成 `1:1`。用 `yir` 的 5.5 时要明确传比例。
 
@@ -138,12 +138,12 @@ lumen gen image --model seedream-5-flash \
   --ref refs/product.png --project <dir>
 ```
 
-Seedream 5.5（默认 `yir`，异步任务，用 `runs resume` 续跑，不要重新提交）：
+Seedream 5.5（默认 `volcark`，省略分辨率是 `2K`）：
 
 ```bash
 lumen gen image --model seedream-5.5 --prompt "…" --aspect-ratio 1:1 --resolution 2K --project <dir>
 ```
 
-绑了 `volcark` 时同一条命令可用。透明背景加 `--background transparent`（要 png，文生图和图生图都可以）。`1.5K` 只在 `volcark` 上可用。
+透明背景加 `--background transparent`（要 png，文生图和图生图都可以）。`1.5K` 只在 `volcark` 上可用。绑了 `yir` 时同一条命令可用，省略分辨率也是 `2K`，但是异步任务，用 `runs resume` 续跑，不要重新提交。`yir` 不接受 `--background`。
 
 默认 `--dry-run`。用户明确要成图、并且已经确认比例时才加 `--execute --detach`，然后用 `lumen runs wait <id> --timeout 60` 取结果。不要前台一直等到命令结束，也不要重新提交。比例、分辨率、背景和参考图用旗标，不要只写进提示词。不要自己拼请求。

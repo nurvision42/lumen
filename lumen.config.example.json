@@ -25,8 +25,8 @@
       "apiKeyEnv": "BEEFAPI_KEY"
     },
     "seedream-5.5": {
-      "provider": "yir",
-      "apiKeyEnv": "YIR_API_KEY"
+      "provider": "volcark",
+      "apiKeyEnv": "ARK_API_KEY"
     },
     "seedance-2": {
       "provider": "haomao",
