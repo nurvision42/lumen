@@ -35,7 +35,7 @@ lumen setup --key tikhub
 
 ## 接着拆解
 
-保存后的文件可以交给拆解。只传视频，不要传 prompt。不要因为出现了视频就自动拆解。
+保存后的文件可以交给拆解。省略提示词时用已绑定的拆解提示词，否则用内置拉片表。不要因为出现了视频就自动拆解。
 
 ```text
 lumen breakdown --video refs/source.mp4

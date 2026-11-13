@@ -73,7 +73,7 @@ export const IMAGE_PROVIDER_RESOLUTIONS: Partial<Record<ProviderId, readonly (ty
 export const BREAKDOWN_PROMPT_PLACEHOLDER =
   "[lumen] breakdown prompt is deferred; set breakdown.prompt, breakdown.promptFile, or --prompt-file";
 
-/** Sent when breakdown is run without --prompt, --prompt-file, or a configured prompt. */
+/** Sent when breakdown has no --prompt, --prompt-file, project binding, or global binding. */
 export const BREAKDOWN_DEFAULT_PROMPT = `请对这个视频做逐镜头拉片分析，不要生成任何创作/生成用提示词。
 按镜头输出表格，字段：
 镜头序号｜起止时间码｜时长(秒)｜概述｜叙事作用｜景别｜画面元素｜镜头运动｜转场/剪辑｜字幕/台词｜声音/音乐｜情绪/节奏｜视觉风格｜备注/置信度

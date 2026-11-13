@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { MODELS } from "../catalog.js";
-import { isDeferredPrompt } from "../catalog.js";
+import { layerHasBreakdownPrompt } from "../breakdown-prompt.js";
 import { tosDoctorLine } from "../clients/tos.js";
 import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, globalConfigPath, loadConfig, projectConfigPath, resolvePreferEndpoints } from "../config.js";
 import { tikhubKeyPresent } from "../credentials.js";
@@ -56,8 +56,8 @@ export async function doctorCommand(args: string[], project: string, io: IO): Pr
     if (!accepted) line(io, `    accepts: ${model.providers.join(", ")}`);
   }
   line(io, "");
-  const file = loaded.config.breakdown.promptFile?.trim();
-  const promptSet = (file !== undefined && file.length > 0) || !isDeferredPrompt(loaded.config.breakdown.prompt ?? "");
+  const promptSet =
+    layerHasBreakdownPrompt(loaded.breakdownLayers.project) || layerHasBreakdownPrompt(loaded.breakdownLayers.global);
   line(io, `breakdown prompt: ${promptSet ? "set" : "default"}`);
   line(io, `breakdown models: ${breakdownPreferModels(loaded.config.breakdown).join(", ")}`);
   const endpoints = resolvePreferEndpoints(loaded.config.breakdown, io.env);

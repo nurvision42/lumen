@@ -102,7 +102,7 @@ test("breakdown dry-run omits scene and sends the built-in 拉片 prompt", async
     assert.equal(called, false);
     const names = await readdir(path.join(dir, ".lumen", "runs"));
     const record = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", names[0] ?? "", "record.json"), "utf8")) as {
-      params: { prompt: string; scene?: string; level?: string; preferModels?: string[]; preferEndpoints?: string[]; needAudio?: boolean };
+      params: { prompt: string; promptSource: string; scene?: string; level?: string; preferModels?: string[]; preferEndpoints?: string[]; needAudio?: boolean };
       calls: unknown;
     };
     assert.equal(record.params.scene, undefined);
@@ -111,6 +111,7 @@ test("breakdown dry-run omits scene and sends the built-in 拉片 prompt", async
     assert.deepEqual(record.params.preferEndpoints, []);
     assert.equal(record.params.needAudio, true);
     assert.equal(record.params.prompt, BREAKDOWN_DEFAULT_PROMPT);
+    assert.equal(record.params.promptSource, "built-in");
     const body = JSON.stringify(record.calls);
     assert.match(body, /video-understand-router/);
     assert.equal(body.includes('"scene"'), false);
@@ -140,9 +141,10 @@ test("a configured breakdown prompt replaces the built-in 拉片表", async () =
     assert.equal(await run(["breakdown", "--video", "refs/in.mp4", "--project", dir], cap.io), 0, cap.err());
     const names = await readdir(path.join(dir, ".lumen", "runs"));
     const record = JSON.parse(await readFile(path.join(dir, ".lumen", "runs", names[0] ?? "", "record.json"), "utf8")) as {
-      params: { prompt: string };
+      params: { prompt: string; promptSource: string };
     };
     assert.equal(record.params.prompt, "only the cuts");
+    assert.equal(record.params.promptSource, "project");
     assert.equal(record.params.prompt.includes("逐镜头拉片"), false);
   });
 });

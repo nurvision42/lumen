@@ -1,17 +1,22 @@
 import { CliError } from "./errors.js";
 
-export function extractProject(argv: string[]): { argv: string[]; project?: string } {
+export function extractProject(argv: string[]): { argv: string[]; project?: string; projectSelected: boolean } {
   const rest: string[] = [];
   let project: string | undefined;
+  let projectSelected = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === undefined) continue;
     if (arg === "--project") {
       const next = argv[i + 1];
+      // `breakdown prompt` treats a bare `--project` as the current directory.
       if (next === undefined || next.startsWith("--")) {
-        throw new CliError("--project needs a directory", 2);
+        if (!isBreakdownPrompt(argv)) throw new CliError("--project needs a directory", 2);
+        projectSelected = true;
+        continue;
       }
       project = next;
+      projectSelected = true;
       i += 1;
       continue;
     }
@@ -19,11 +24,22 @@ export function extractProject(argv: string[]): { argv: string[]; project?: stri
       const value = arg.slice("--project=".length);
       if (value.length === 0) throw new CliError("--project needs a directory", 2);
       project = value;
+      projectSelected = true;
       continue;
     }
     rest.push(arg);
   }
-  return { argv: rest, project };
+  return { argv: rest, project, projectSelected };
+}
+
+function isBreakdownPrompt(argv: string[]): boolean {
+  const words: string[] = [];
+  for (const arg of argv) {
+    if (arg.startsWith("-")) continue;
+    words.push(arg);
+    if (words.length >= 2) break;
+  }
+  return words[0] === "breakdown" && words[1] === "prompt";
 }
 
 export function takeOption(args: string[], name: string): { value?: string; rest: string[] } {

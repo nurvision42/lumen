@@ -1,13 +1,13 @@
 ---
 name: 视频拆解
-description: 用 lumen breakdown 拆一条成片。只传视频，不要写提示词。
+description: 用 lumen breakdown 拆一条成片。省略提示词时用已绑定的提示词，否则用内置拉片表。
 ---
 
 # 视频拆解
 
 用户明确要求拆解、拉片、按镜头分析一条成片时，再运行 `lumen breakdown`。不要因为对话里出现了视频就自动拆解。
 
-只传视频。不要传 prompt。不要传 `--prompt` 或 `--prompt-file`，不要自己写拆解提示词，也不要把内置拉片表再贴进命令。CLI 在省略提示词时会带上拉片表。
+省略 `--prompt` 时，用已绑定的拆解提示词；没有绑定就用内置拉片表。不要把内置拉片表再贴进命令。绑定：`lumen breakdown prompt set --text <中文>` 或 `--file <path>`，正文会复制进配置，源文件之后挪走也不受影响。不加 `--project` 写到用户目录 `~/.config/lumen`（`providers.json` 的 `breakdown.prompt`）；`--project` 或 `--project <dir>` 只写该项目的 `lumen.config.json`。`lumen breakdown prompt show` 打印生效提示词和来源（`flag`、`project`、`global`、`built-in`）。`lumen breakdown prompt clear` 清除全局，`lumen breakdown prompt clear --project` 清除项目。单次覆盖用 `--prompt` 或 `--prompt-file`。优先级是 `--prompt`、`--prompt-file`、项目绑定或项目配置、全局绑定、内置。
 
 ```text
 lumen breakdown --video <file>

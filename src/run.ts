@@ -57,7 +57,7 @@ export async function run(argv: string[], io: IO = defaultIO()): Promise<number>
       case "providers":
         return await providersCommand(args, project, io);
       case "breakdown":
-        return await breakdownCommand(args, project, io, extracted.argv);
+        return await breakdownCommand(args, project, io, extracted.argv, extracted.projectSelected);
       case "gen":
         return await genCommand(args, project, io, extracted.argv);
       case "fish":
