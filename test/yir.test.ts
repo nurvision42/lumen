@@ -8,6 +8,7 @@ import {
   SEEDREAM_PRO_MODEL,
   assertProviderServes,
   canonicalModel,
+  modelInfo,
   validateImage,
 } from "../src/catalog.js";
 import { yirImageWireModel, yirTaskState } from "../src/clients/yir.js";
@@ -150,11 +151,12 @@ test("seedream-5.5 aliases fold to the lumen id", () => {
   assert.equal(canonicalModel("bytedance/seedream-5.5"), SEEDREAM_55_MODEL);
 });
 
-test("yir is the only provider for seedream-5.5", () => {
+test("seedream-5.5 accepts volcark and yir, and volcark is the listed default", () => {
   assert.doesNotThrow(() => assertProviderServes("yir", SEEDREAM_55_MODEL));
+  assert.doesNotThrow(() => assertProviderServes("volcark", SEEDREAM_55_MODEL));
   assert.throws(() => assertProviderServes("beeftv", SEEDREAM_55_MODEL), /cannot serve/);
-  assert.throws(() => assertProviderServes("volcark", SEEDREAM_55_MODEL), /cannot serve/);
   assert.throws(() => assertProviderServes("yir", SEEDREAM_PRO_MODEL), /cannot serve/);
+  assert.deepEqual(modelInfo(SEEDREAM_55_MODEL)?.providers, ["volcark", "yir"]);
 });
 
 test("yir job statuses: succeeded ends ok; failed and cancelled fail; others pending", () => {
@@ -163,8 +165,8 @@ test("yir job statuses: succeeded ends ok; failed and cancelled fail; others pen
   for (const s of ["failed", "cancelled"]) assert.equal(yirTaskState({ status: s }), "fail");
 });
 
-test("seedream-5.5 validation: 1K/2K only, auto becomes 1:1, no background, no 1.5K", () => {
-  const base = { modelId: "seedream-5-5", prompt: "一只杯子", references: [] as string[] };
+test("seedream-5.5 on yir: 1K/2K only, auto becomes 1:1, no background, no 1.5K", () => {
+  const base = { modelId: "seedream-5-5", prompt: "一只杯子", references: [] as string[], provider: "yir" };
   const auto = validateImage({ ...base, aspectRatio: "auto", resolution: "2K", background: undefined, quality: undefined });
   assert.equal(auto.aspectRatio, "1:1");
   assert.equal(auto.resolution, "2K");
