@@ -8,6 +8,7 @@ import {
   SEEDREAM_PRO_MODEL,
   assertProviderServes,
   canonicalModel,
+  modelInfo,
   validateImage,
 } from "../src/catalog.js";
 import { yirImageWireModel, yirTaskState } from "../src/clients/yir.js";
@@ -150,11 +151,12 @@ test("seedream-5.5 aliases fold to the lumen id", () => {
   assert.equal(canonicalModel("bytedance/seedream-5.5"), SEEDREAM_55_MODEL);
 });
 
-test("yir is the only provider for seedream-5.5", () => {
+test("seedream-5.5 accepts yir and volcark, and yir stays the listed default", () => {
   assert.doesNotThrow(() => assertProviderServes("yir", SEEDREAM_55_MODEL));
+  assert.doesNotThrow(() => assertProviderServes("volcark", SEEDREAM_55_MODEL));
   assert.throws(() => assertProviderServes("beeftv", SEEDREAM_55_MODEL), /cannot serve/);
-  assert.throws(() => assertProviderServes("volcark", SEEDREAM_55_MODEL), /cannot serve/);
   assert.throws(() => assertProviderServes("yir", SEEDREAM_PRO_MODEL), /cannot serve/);
+  assert.deepEqual(modelInfo(SEEDREAM_55_MODEL)?.providers, ["yir", "volcark"]);
 });
 
 test("yir job statuses: succeeded ends ok; failed and cancelled fail; others pending", () => {

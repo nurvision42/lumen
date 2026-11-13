@@ -44,17 +44,29 @@ Backends, one binding per model (no family fallback):
            Sizes 1K, 1.5K, 2K. watermark is sent false. response_format url, output_format png.
            One image. No sequential_image_generation (Pro and Flash do not support group images).
            Seedream 5.5 seedream-5.5 (aliases seedream-5-5, bytedance/seedream-5.5).
-           Provider yir only. Official Ark and beeftv IDs are not published yet.
+           Providers yir (listed default) and volcark. beeftv does not serve 5.5.
+           Default resolution 2K.
            yir: POST /v1/images/generations with Idempotency-Key, then poll
            GET /v1/jobs/{id}/status and GET /v1/jobs/{id}. Authorization: Bearer YIR_API_KEY.
            Wire id bytedance/seedream-5.5 unless --model-alias is set.
-           Default resolution 2K. 1K and 2K only (no 1.5K). Omitted or auto aspect becomes 1:1.
+           On yir: 1K and 2K only (no 1.5K). Omitted or auto aspect becomes 1:1.
            Aspects: 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3, 2:1, 1:2, 21:9.
            HTTPS refs pass through. Local files use the Yir Files API (jpeg/png/webp).
-           Data URIs are not accepted. --background is rejected (transparent is not open on Yir).
+           Data URIs are not accepted. --background is rejected on yir (transparent is not open on Yir).
            Estimate (APIMart via Yir, 2026-11-10): 1K $0.0182/image, 2K $0.0280/image.
            Reference images cost extra; the per-ref amount is unpublished and not estimated.
            lumen runs resume continues a yir job id; do not resubmit.
+           volcark wire id doubao-seedream-5-5-261028 unless --model-alias is set.
+           Same POST /images/generations shape as Seedream 5.0. Resolutions 1K, 1.5K, 2K
+           (no 3K or 4K). auto sends the tier; a concrete aspect sends WxH within
+           921600-4624220 pixels and ratio 1/16 to 16.
+           --background transparent, opaque, or auto. transparent requires png;
+           jpeg with transparent is rejected. Text-to-image and image-to-image
+           both accept transparent; reference images need not be transparent. Up to 10 refs.
+           No group images, web search, stream, or fast prompt mode. 500 images/min.
+           output_format defaults to png. watermark is sent false.
+           Estimate: input images 0.05 yuan each from the first; output 0.13 yuan
+           at or under 2.61M pixels, 0.23 yuan when pixels are above 2.61M up to 4.63M.
   video    haomao; beeftv (seedance-2-fast); ycyapi (seedance-2.5) — Seedance. Polls the task, then saves the mp4. Not MediaKit.
            seedance-2.5 on haomao: --task-type auto|reference|edit|extend (omni_reference_task_type).
            ycyapi: HTTPS or local refs (local files require a tos block and VOLC_ACCESSKEY / VOLC_SECRETKEY); no first/last frame, Auto/task-type, adaptive, or 4K.

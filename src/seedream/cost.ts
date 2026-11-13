@@ -1,10 +1,12 @@
-import { SEEDREAM_55_MODEL, SEEDREAM_FLASH_MODEL, SEEDREAM_PRO_MODEL } from "../catalog.js";
+import { SEEDREAM_55_MODEL, SEEDREAM_FLASH_MODEL, SEEDREAM_PRO_MODEL, isSeedream55Model } from "../catalog.js";
 import { seedreamSize } from "../clients/volcark.js";
 import { CliError } from "../errors.js";
 
 /**
- * Two price tables.
+ * Price tables.
  * volcark (火山方舟): Pro ≤1.5K 0.30, Pro 2K 0.60, Flash 0.12. Image only.
+ *   Seedream 5.5 (Ark, 2026-11-12): input images 0.05 yuan each from the first;
+ *   output 0.13 yuan when pixels ≤ 2.61M, 0.23 yuan when 2.61M < pixels ≤ 4.63M.
  * beeftv: Flash 0.04 at 1K/1.5K/2K, refs free.
  *   Pro image ≤2.61M px 0.09, above that (the 2K tier) 0.18.
  *   Pro refs: the first is free, each later one is under 0.01.
@@ -23,6 +25,12 @@ export const BEEFTV_PIXEL_THRESHOLD = 2_610_000;
 /** Yir APIMart public prices for Seedream 5.5, 2026-11-10. https://yir.ai/zh/models/seedream-5-5 */
 export const YIR_SEEDREAM_55_USD_1K = 0.0182;
 export const YIR_SEEDREAM_55_USD_2K = 0.0280;
+/** Ark Seedream 5.5, 2026-11-12. Input images are charged from the first one. */
+export const VOLCARK_55_INPUT_YUAN = 0.05;
+export const VOLCARK_55_OUTPUT_YUAN_LE = 0.13;
+export const VOLCARK_55_OUTPUT_YUAN_GT = 0.23;
+/** 261万像素. At or under this, Seedream 5.5 output on Ark is 0.13 yuan. Above, up to 4.63M, it is 0.23. */
+export const VOLCARK_55_PIXEL_THRESHOLD = 2_610_000;
 
 export interface SeedreamCostInput {
   modelId: string;
@@ -35,7 +43,7 @@ export interface SeedreamCostInput {
 export interface SeedreamCost {
   readonly yuan?: number;
   readonly usd?: number;
-  /** Known image-generation fee. Extra BeefTV Pro refs are an upper bound in `text`, not added here. */
+  /** Image fee. BeefTV Pro extra refs stay an upper bound in `text` and are not added. Seedream 5.5 on volcark adds the exact input-image fee. */
   readonly text: string;
 }
 
@@ -54,7 +62,7 @@ function money(yuan: number): string {
 /** Printed before the request is sent, including dry-run. Provider selects the table. */
 export function seedreamCost(input: SeedreamCostInput): SeedreamCost {
   const refs = input.references ?? 0;
-  if (input.provider === "volcark") return volcarkCost(input.modelId, input.resolution);
+  if (input.provider === "volcark") return volcarkCost(input.modelId, input.resolution, input.aspectRatio ?? "auto", refs);
   if (input.provider === "beeftv") return beeftvCost(input.modelId, input.resolution, input.aspectRatio ?? "auto", refs);
   if (input.provider === "yir") return yirCost(input.modelId, input.resolution, refs);
   throw new CliError(`no seedream price for provider ${input.provider}`);
@@ -70,7 +78,36 @@ function yirCost(modelId: string, resolution: string, refs: number): SeedreamCos
   };
 }
 
-function volcarkCost(modelId: string, resolution: string): SeedreamCost {
+/** 1:1 area of each tier. Used when aspect is auto and the wire size is the tier name. */
+const VOLCARK_TIER_PIXELS: Record<string, number> = {
+  "1K": 1024 * 1024,
+  "1.5K": 1536 * 1536,
+  "2K": 2048 * 2048,
+};
+
+function volcark55Pixels(resolution: string, aspectRatio: string): number {
+  const size = seedreamSize(aspectRatio, resolution);
+  if (!size.includes("x")) return VOLCARK_TIER_PIXELS[resolution] ?? 0;
+  const [width, height] = size.split("x").map(Number);
+  return (width ?? 0) * (height ?? 0);
+}
+
+function volcark55Cost(resolution: string, aspectRatio: string, refs: number): SeedreamCost {
+  const large = volcark55Pixels(resolution, aspectRatio) > VOLCARK_55_PIXEL_THRESHOLD;
+  const output = large ? VOLCARK_55_OUTPUT_YUAN_GT : VOLCARK_55_OUTPUT_YUAN_LE;
+  const yuan = (Math.round(output * 100) + Math.round(VOLCARK_55_INPUT_YUAN * 100) * refs) / 100;
+  const band = large ? ">2.61M px" : "≤2.61M px";
+  const refText = refs > 0
+    ? ` + ${money(VOLCARK_55_INPUT_YUAN)} yuan x ${refs} input image${refs === 1 ? "" : "s"}`
+    : "";
+  return {
+    yuan,
+    text: `estimate: ${money(yuan)} yuan (${SEEDREAM_55_MODEL} volcark ${band}, 1 image${refText})`,
+  };
+}
+
+function volcarkCost(modelId: string, resolution: string, aspectRatio: string, refs: number): SeedreamCost {
+  if (isSeedream55Model(modelId)) return volcark55Cost(resolution, aspectRatio, refs);
   if (modelId === SEEDREAM_FLASH_MODEL) {
     return {
       yuan: SEEDREAM_FLASH_YUAN,

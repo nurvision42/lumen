@@ -4,27 +4,43 @@ import type { ModelBinding } from "../config.js";
 import {
   SEEDREAM_RESOLUTIONS,
   assertImageProviderRules,
+  assertSeedream55VolcarkOutput,
+  isSeedream55Model,
   type ImageRequest,
 } from "../catalog.js";
 import { CliError } from "../errors.js";
 import { joinUrl, type HttpCall } from "../http.js";
 import { isLocalMedia } from "./beeftv.js";
-import { jsonCall, wireModel } from "./wire.js";
+import { jsonCall } from "./wire.js";
 
 /**
  * Volcengine Ark (火山方舟) OpenAI-compatible image generation.
  * POST {base}/images/generations
  * Docs: https://www.volcengine.com/docs/82379/1541523
  *
- * Seedream 5.0 Pro and Flash generate one image. They do not accept
- * sequential_image_generation, stream, or web search. watermark defaults to
- * true on the API; lumen always sends false.
+ * Seedream 5.0 Pro, Flash, and 5.5 generate one image. They do not accept
+ * sequential_image_generation, stream, or web search. 5.5 also has no fast
+ * prompt-optimize mode. watermark defaults to true on the API; lumen always
+ * sends false.
+ *
+ * Seedream 5.5's Ark model id is doubao-seedream-5-5-261028. --model-alias
+ * replaces it. output_format defaults to png. background transparent requires png.
  *
  * size is either a tier (1K, 1.5K, 2K) or 宽x高. Total pixels for 宽x高 must
  * sit in [1280x720 = 921600, 2048x2048x1.1025 = 4624220], aspect in [1/16, 16].
  * The pixel table below is the official mapping for common aspects.
  */
 export const VOLCARK_IMAGE_PATH = "/images/generations";
+/** Ark model id for Seedream 5.5. 5.0 Pro and Flash use the lumen id. */
+export const VOLCARK_SEEDREAM_55_WIRE = "doubao-seedream-5-5-261028";
+
+/** Alias wins. Seedream 5.5 otherwise sends the Ark id; 5.0 sends the lumen id. */
+export function volcarkImageWireModel(modelId: string, alias: string | undefined): string {
+  if (alias !== undefined) return alias;
+  if (isSeedream55Model(modelId)) return VOLCARK_SEEDREAM_55_WIRE;
+  return modelId;
+}
+
 export const SEEDREAM_MIN_PIXELS = 1280 * 720;
 export const SEEDREAM_MAX_PIXELS = Math.floor(2048 * 2048 * 1.1025);
 
@@ -171,14 +187,17 @@ export async function volcarkImageRef(source: string, cwd: string): Promise<stri
 /** JSON body for one image. References must already be https or data URIs. */
 export function planVolcarkImage(request: ImageRequest, binding: ModelBinding): HttpCall[] {
   assertImageProviderRules(request, binding.provider);
-  const model = wireModel(request.modelId, binding.modelAlias);
+  const model = volcarkImageWireModel(request.modelId, binding.modelAlias);
   const size = seedreamSize(request.aspectRatio, request.resolution);
+  const outputFormat = isSeedream55Model(request.modelId)
+    ? assertSeedream55VolcarkOutput(request.background, request.outputFormat)
+    : "png";
   const body: Record<string, unknown> = {
     model,
     prompt: request.prompt,
     size,
     response_format: "url",
-    output_format: "png",
+    output_format: outputFormat,
     watermark: false,
   };
   if (request.background !== undefined) body.background = request.background;
