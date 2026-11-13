@@ -9,7 +9,10 @@ Usage:
   lumen providers list|set|doctor
   lumen gen <image|video|voice> --model <id> [--shot N] [--dry-run|--execute|--mock] [--detach]
   lumen fish <design|clone|synth> [--shot N]
-  lumen breakdown [--video file] [--prefer-endpoint <id>] [--dry-run|--execute|--mock] [--detach]
+  lumen breakdown [--video file] [--prompt text] [--prompt-file path] [--prefer-endpoint <id>] [--dry-run|--execute|--mock] [--detach]
+  lumen breakdown prompt set (--file <path> | --text <text>) [--project [dir]]
+  lumen breakdown prompt show [--prompt text] [--prompt-file path]
+  lumen breakdown prompt clear [--project [dir]]
   lumen download <douyin-url> --to <path> [--region <code>] [--json]
   lumen setup --key tikhub
   lumen setup ffmpeg
@@ -77,7 +80,13 @@ Backends, one binding per model (no family fallback):
               --region <code> is sent only when that flag is passed.
   breakdown / enhance    MediaKit video-understand-router and enhance-video-generative
                          breakdown sends prefer_models doubao-seed-2-1-pro-260915, doubao-seed-2-0-lite-260428, level Quality, need_audio true
-                         omitted --prompt sends the built-in 拉片 prompt; do not pass one
+                         omitted --prompt uses a bound prompt, or the built-in 拉片 prompt when none is bound
+                         bind: lumen breakdown prompt set --file <path> | --text <text>  (copies the text into config)
+                         default binding is global (~/.config/lumen); --project binds that project instead
+                         lumen breakdown prompt show prints the prompt and its source: flag, project, global, or built-in
+                         lumen breakdown prompt clear [--project] removes that binding
+                         precedence: --prompt, --prompt-file, project binding/config, global binding, built-in
+                         record.json params.promptSource is that same source
                          prefer_endpoints: repeatable --prefer-endpoint, else LUMEN_MEDIAKIT_ENDPOINTS, else breakdown.preferEndpoints
                          omit prefer_endpoints when that list is empty. doubao-seed-2-1-lite-260915 cannot do audio
                          status_code 11100 with need_audio asks for an Ark endpoint for doubao-seed-2-0-lite or mini

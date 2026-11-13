@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { assertProviderServes, PROVIDER_DEFAULT_BASE_URLS, BREAKDOWN_LEVEL, BREAKDOWN_NEED_AUDIO, BREAKDOWN_PREFER_MODELS } from "./catalog.js";
+import { assertProviderServes, PROVIDER_DEFAULT_BASE_URLS, BREAKDOWN_LEVEL, BREAKDOWN_NEED_AUDIO, BREAKDOWN_PREFER_MODELS, isDeferredPrompt } from "./catalog.js";
 import { CliError } from "./errors.js";
 import { fileExists } from "./fsutil.js";
 
@@ -189,10 +189,17 @@ export async function writeConfigFile(file: string, config: StoredConfig): Promi
   await writeFile(file, `${JSON.stringify(body, null, 2)}\n`);
 }
 
+export interface BreakdownLayers {
+  project: LumenConfig["breakdown"];
+  global: LumenConfig["breakdown"];
+}
+
 export interface LoadedConfig {
   config: LumenConfig;
   /** Which file supplied each model binding. Project wins over global. */
   sources: Record<string, "project" | "global">;
+  /** Unmerged breakdown sections. Prompt resolution uses these, not the merged view. */
+  breakdownLayers: BreakdownLayers;
 }
 
 export async function loadConfig(project: string, env: NodeJS.ProcessEnv): Promise<LoadedConfig> {
@@ -215,6 +222,10 @@ export async function loadConfig(project: string, env: NodeJS.ProcessEnv): Promi
       ...(tos === undefined ? {} : { tos }),
     },
     sources,
+    breakdownLayers: {
+      project: { ...local.breakdown },
+      global: { ...global.breakdown },
+    },
   };
 }
 
@@ -280,25 +291,55 @@ function mergeTools(global: ToolPaths, local: ToolPaths): ToolPaths {
   };
 }
 
-/** An empty project prompt does not hide a global one. Init writes `"prompt": ""`. */
+/** A prompt file, or a prompt that is not empty and not the deferred placeholder. */
+function promptBinding(layer: LumenConfig["breakdown"]): { prompt?: string; promptFile?: string } | undefined {
+  const promptFile = layer.promptFile?.trim() ? layer.promptFile : undefined;
+  const prompt = layer.prompt !== undefined && !isDeferredPrompt(layer.prompt) ? layer.prompt : undefined;
+  if (promptFile === undefined && prompt === undefined) return undefined;
+  return {
+    ...(prompt === undefined ? {} : { prompt }),
+    ...(promptFile === undefined ? {} : { promptFile }),
+  };
+}
+
+/**
+ * An empty project prompt does not hide a global one. Init writes `"prompt": ""`.
+ * A project prompt or promptFile hides both global prompt fields. They are not merged across scopes.
+ */
 function mergeBreakdown(
   global: LumenConfig["breakdown"],
   local: LumenConfig["breakdown"],
 ): LumenConfig["breakdown"] {
-  const prompt = local.prompt?.trim() ? local.prompt : global.prompt?.trim() ? global.prompt : undefined;
-  const promptFile = local.promptFile?.trim() ? local.promptFile : global.promptFile?.trim() ? global.promptFile : undefined;
+  const chosen = promptBinding(local) ?? promptBinding(global);
   const preferModels = listedModels(local.preferModels) ?? listedModels(global.preferModels);
   const preferEndpoints = listedModels(local.preferEndpoints) ?? listedModels(global.preferEndpoints);
   const level = local.level?.trim() || global.level?.trim() || undefined;
   const needAudio = local.needAudio ?? global.needAudio;
   return {
-    ...(prompt === undefined ? {} : { prompt }),
-    ...(promptFile === undefined ? {} : { promptFile }),
+    ...(chosen?.prompt === undefined ? {} : { prompt: chosen.prompt }),
+    ...(chosen?.promptFile === undefined ? {} : { promptFile: chosen.promptFile }),
     ...(preferModels === undefined ? {} : { preferModels }),
     ...(preferEndpoints === undefined ? {} : { preferEndpoints }),
     ...(level === undefined ? {} : { level }),
     ...(needAudio === undefined ? {} : { needAudio }),
   };
+}
+
+/** Store prompt text and drop a path, so the binding does not follow a moved file. */
+export function assignBreakdownPrompt(config: StoredConfig, prompt: string): void {
+  const next: LumenConfig["breakdown"] = { ...config.breakdown, prompt };
+  delete next.promptFile;
+  config.breakdown = next;
+}
+
+/** Remove the prompt text and any prompt file path at this scope. Returns false when neither was set. */
+export function removeBreakdownPrompt(config: StoredConfig): boolean {
+  if (config.breakdown.prompt === undefined && config.breakdown.promptFile === undefined) return false;
+  const next: LumenConfig["breakdown"] = { ...config.breakdown };
+  delete next.prompt;
+  delete next.promptFile;
+  config.breakdown = next;
+  return true;
 }
 
 export function bindingFor(config: LumenConfig, modelId: string): ModelBinding {

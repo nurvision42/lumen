@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
-import { BREAKDOWN_DEFAULT_PROMPT, isDeferredPrompt } from "../catalog.js";
+import { resolveBreakdownPrompt } from "../breakdown-prompt.js";
+import { isDeferredPrompt } from "../catalog.js";
 import { breakdownLevel, breakdownNeedAudio, breakdownPreferModels, missingKey, resolvePreferEndpoints } from "../config.js";
 import { CliError, errorCode } from "../errors.js";
 import { fileExists } from "../fsutil.js";
@@ -12,8 +13,8 @@ import { parseShotlistData } from "../shotlist.js";
 import { findShots } from "../walk.js";
 import { isRemoteMedia } from "../media.js";
 import { runMediakit } from "../clients/mediakit.js";
+import { breakdownPromptCommand } from "./breakdown-prompt.js";
 import { adoptBinding } from "./session.js";
-import { readFile } from "node:fs/promises";
 
 const MODEL = "video-understand-router";
 const VIDEO_EXT = new Set([".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"]);
@@ -58,13 +59,14 @@ export async function materializeBreakdown(project: string, runId: string, task:
   return files;
 }
 
-async function promptFrom(project: string, file: string): Promise<string> {
-  const full = path.resolve(project, file);
-  if (!(await fileExists(full))) throw new CliError(`prompt file not found: ${full}`);
-  return (await readFile(full, "utf8")).trim();
-}
-
-export async function breakdownCommand(args: string[], project: string, io: IO, command: string[]): Promise<number> {
+export async function breakdownCommand(
+  args: string[],
+  project: string,
+  io: IO,
+  command: string[],
+  projectSelected = false,
+): Promise<number> {
+  if (args[0] === "prompt") return breakdownPromptCommand(args.slice(1), project, io, projectSelected);
   const { values, rest } = parseFlags(args, {
     video: "string",
     prompt: "string",
@@ -81,20 +83,19 @@ export async function breakdownCommand(args: string[], project: string, io: IO, 
   if (values.detach === true && mode !== "execute" && mode !== "mock") throw new CliError("--detach 需要 --execute", 2);
   return settle(io, project, command, MODEL, mode, async (runId, ctx) => {
     const video = await oneVideo(project, flagString(values, "video"));
-    const { binding, config } = await adoptBinding(ctx, project, io.env, MODEL);
-    const flagged = flagString(values, "prompt");
-    const flagFile = flagString(values, "prompt-file");
-    let prompt: string | undefined;
-    if (flagged !== undefined && flagged.trim().length > 0) prompt = flagged;
-    else if (flagFile !== undefined) prompt = await promptFrom(project, flagFile);
-    else if (config.breakdown.promptFile !== undefined) prompt = await promptFrom(project, config.breakdown.promptFile);
-    else if (config.breakdown.prompt !== undefined && !isDeferredPrompt(config.breakdown.prompt)) prompt = config.breakdown.prompt;
-    if (prompt === undefined || isDeferredPrompt(prompt)) prompt = BREAKDOWN_DEFAULT_PROMPT;
+    const { binding, config, loaded } = await adoptBinding(ctx, project, io.env, MODEL);
+    const resolved = await resolveBreakdownPrompt({
+      project,
+      flagPrompt: flagString(values, "prompt"),
+      flagFile: flagString(values, "prompt-file"),
+      layers: loaded.breakdownLayers,
+    });
+    const prompt = resolved.prompt;
     const preferModels = breakdownPreferModels(config.breakdown);
     const preferEndpoints = resolvePreferEndpoints(config.breakdown, io.env, flagList(values, "prefer-endpoint"));
     const level = breakdownLevel(config.breakdown);
     const needAudio = breakdownNeedAudio(config.breakdown);
-    ctx.params = { video, prompt, level, preferModels, preferEndpoints, needAudio };
+    ctx.params = { video, prompt, promptSource: resolved.source, level, preferModels, preferEndpoints, needAudio };
     if (mode === "execute" && isDeferredPrompt(prompt) && values["allow-placeholder"] !== true) {
       throw new CliError("breakdown prompt is deferred");
     }
