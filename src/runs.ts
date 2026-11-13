@@ -142,8 +142,44 @@ export function detachedWorkerArgs(command: string[], project: string): string[]
   return args;
 }
 
-export function resumeHint(id: string): string {
-  return `still running on the server; resume with: lumen runs resume ${id}`;
+export interface RunLocate {
+  project: string;
+  cwd: string;
+}
+
+/**
+ * `--project` suffix for a command pasted from `cwd`.
+ * Empty when the run directory is already the current directory.
+ * A project inside cwd is printed as that relative path (`proj`); anything else is absolute.
+ */
+export function projectFlag(project: string, cwd: string): string {
+  const absProject = path.resolve(project);
+  const absCwd = path.resolve(cwd);
+  if (absProject === absCwd) return "";
+  const rel = path.relative(absCwd, absProject);
+  const shown = rel.length > 0 && !rel.startsWith("..") && !path.isAbsolute(rel) ? rel : absProject;
+  return ` --project ${quoteArg(shown)}`;
+}
+
+function quoteArg(value: string): string {
+  if (/^[A-Za-z0-9_./:@+=,-]+$/.test(value)) return value;
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+/** `lumen runs <action> <id>` plus `--project` when the record is not in `cwd`. */
+export function runsFollow(action: "wait" | "show" | "resume" | "list", id: string, locate?: RunLocate): string {
+  const flag = locate === undefined ? "" : projectFlag(locate.project, locate.cwd);
+  return `lumen runs ${action} ${id}${flag}`;
+}
+
+export function resumeHint(id: string, locate?: RunLocate): string {
+  return `still running on the server; resume with: ${runsFollow("resume", id, locate)}`;
+}
+
+function noRun(project: string, id: string): CliError {
+  return new CliError(
+    `no run ${id}\n查找的项目目录: ${project}\nrun 记录在 <project>/.lumen/runs/<id>/（record.json、worker.log）。--project 必须和创建该 run 的命令相同。省略 --project 就是当前目录。`,
+  );
 }
 
 export function createRunId(date: Date): string {
@@ -164,7 +200,7 @@ export function publicBinding(ctx: RunCtx): RunBinding | null {
   };
 }
 
-function render(record: RunRecord): string {
+function render(record: RunRecord, locate?: RunLocate): string {
   const binding = record.binding;
   const lines = [
     `# run ${record.id}`,
@@ -187,7 +223,7 @@ function render(record: RunRecord): string {
   if (record.pending !== undefined) {
     lines.push(`- task: ${record.pending.provider} ${record.pending.taskId} (${record.pending.lastStatus})`);
     if (record.pending.pollUrl !== undefined) lines.push(`- poll: ${record.pending.pollUrl}`);
-    lines.push(`- resume: lumen runs resume ${record.id}`);
+    lines.push(`- resume: ${runsFollow("resume", record.id, locate)}`);
   }
   if (record.worker !== undefined) {
     lines.push(`- pid: ${record.worker.pid}`);
@@ -285,26 +321,27 @@ function mergeRecord(prev: RunRecord | undefined, record: RunRecord, sealWorker:
   return next;
 }
 
-async function persistRecord(dir: string, record: RunRecord, secrets: readonly string[]): Promise<void> {
+async function persistRecord(dir: string, record: RunRecord, secrets: readonly string[], locate?: RunLocate): Promise<void> {
   const safe = redactValue(record, secrets) as RunRecord;
   const body = `${JSON.stringify(safe, null, 2)}\n`;
   // JSON first: resume and list read it. The markdown sidecar follows for `runs show`.
   await writeAtomic(path.join(dir, "record.json"), body);
-  await writeAtomic(path.join(dir, "record.md"), render(safe));
+  await writeAtomic(path.join(dir, "record.md"), render(safe, locate));
 }
 
 export async function writeRun(
   project: string,
   record: RunRecord,
   secrets: readonly string[],
-  options?: { sealWorker?: boolean },
+  options?: { sealWorker?: boolean; cwd?: string },
 ): Promise<void> {
   const dir = runDir(project, record.id);
   await mkdir(dir, { recursive: true });
   await withRunLock(dir, async () => {
     const prev = await readRecordFile(path.join(dir, "record.json"));
     const merged = mergeRecord(prev, record, options?.sealWorker === true);
-    await persistRecord(dir, merged, secrets);
+    const locate = options?.cwd === undefined ? undefined : { project, cwd: options.cwd };
+    await persistRecord(dir, merged, secrets, locate);
   });
 }
 
@@ -313,24 +350,31 @@ export async function updateRun(
   id: string,
   mutate: (record: RunRecord) => void,
   secrets: readonly string[] = [],
+  cwd?: string,
 ): Promise<void> {
   const dir = runDir(project, id);
   await mkdir(dir, { recursive: true });
   await withRunLock(dir, async () => {
     const record = await readRecordFile(path.join(dir, "record.json"));
-    if (record === undefined) throw new CliError(`no run ${id}`);
+    if (record === undefined) throw noRun(project, id);
     mutate(record);
-    await persistRecord(dir, record, secrets);
+    await persistRecord(dir, record, secrets, cwd === undefined ? undefined : { project, cwd });
   });
 }
 
-export async function claimRun(project: string, id: string, by: "wait" | "show", at: string): Promise<void> {
-  await updateRun(project, id, (record) => {
-    if (record.claimed === true) return;
-    record.claimed = true;
-    record.claimedBy = by;
-    record.claimedAt = at;
-  });
+export async function claimRun(project: string, id: string, by: "wait" | "show", at: string, cwd?: string): Promise<void> {
+  await updateRun(
+    project,
+    id,
+    (record) => {
+      if (record.claimed === true) return;
+      record.claimed = true;
+      record.claimedBy = by;
+      record.claimedAt = at;
+    },
+    [],
+    cwd,
+  );
 }
 
 export function isUnclaimed(record: RunRecord): boolean {
@@ -350,8 +394,9 @@ export async function outputsOnDisk(record: RunRecord): Promise<string[]> {
 }
 
 /** Live Chinese notes for `runs show` and a timed-out `runs wait`. The stored markdown is not rewritten. */
-export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): string[] {
+export function explainRun(record: RunRecord, filesOnDisk: readonly string[], locate?: RunLocate): string[] {
   const lines: string[] = [];
+  const resume = (suffix: string): string => `${runsFollow("resume", record.id, locate)} ${suffix}`;
   const inflight = record.status === "pending" || record.status === "running";
   const imageLike = record.image !== undefined || isImageModel(record.modelId);
   if (!inflight && !imageLike && record.worker === undefined && record.claimed !== true) return lines;
@@ -375,11 +420,11 @@ export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): s
     if (record.status === "error" && record.error !== undefined) lines.push(`失败：${record.error}`);
     if (filesOnDisk.length === 0 && record.image?.url !== undefined && record.status !== "ok") {
       lines.push("服务商返回过结果 URL。");
-      lines.push(`lumen runs resume ${record.id} 只下载该地址。不要重新提交。`);
+      lines.push(resume("只下载该地址。不要重新提交。"));
     } else if (filesOnDisk.length === 0 && record.image?.taskId !== undefined && record.status !== "ok") {
       if (record.image.provider === "yir" || record.pending?.provider === "yir") {
         lines.push(`服务商返回过任务 ${record.image.taskId}。`);
-        lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
+        lines.push(resume("继续同一个任务，不要重新提交。"));
       } else {
         lines.push(
           `服务商返回过任务 ${record.image.taskId}，但 ${record.image.provider} 的出图接口不能续查。不能 resume。不要重新提交。`,
@@ -387,7 +432,7 @@ export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): s
       }
     } else if (filesOnDisk.length === 0 && record.pending?.provider === "yir" && record.status !== "ok") {
       lines.push(`服务商返回过任务 ${record.pending.taskId}。`);
-      lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
+      lines.push(resume("继续同一个任务，不要重新提交。"));
     }
     return lines;
   }
@@ -395,7 +440,7 @@ export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): s
   const pid = record.worker?.pid;
   if (pid !== undefined && pidAlive(pid)) {
     lines.push(`仍在生成（pid ${pid}）。`);
-    lines.push(`下一步: lumen runs wait ${record.id}`);
+    lines.push(`下一步: ${runsFollow("wait", record.id, locate)}`);
     return lines;
   }
   if (pid !== undefined) lines.push(`已中断（pid ${pid} 已不在，状态仍是 ${record.status}）。`);
@@ -404,18 +449,18 @@ export function explainRun(record: RunRecord, filesOnDisk: readonly string[]): s
   if (record.pending !== undefined) {
     if (record.worker?.exited === "clean") lines.push("本机轮询已结束，服务端任务还在。");
     lines.push(`服务端任务还在：${record.pending.provider} ${record.pending.taskId}。`);
-    lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
+    lines.push(resume("继续同一个任务，不要重新提交。"));
     return lines;
   }
   if (record.image?.url !== undefined) {
     lines.push("服务商返回过结果 URL。");
-    lines.push(`lumen runs resume ${record.id} 只下载该地址。不要重新提交。`);
+    lines.push(resume("只下载该地址。不要重新提交。"));
     return lines;
   }
   if (record.image?.taskId !== undefined) {
     if (record.image.provider === "yir") {
       lines.push(`服务商返回过任务 ${record.image.taskId}。`);
-      lines.push(`lumen runs resume ${record.id} 继续同一个任务，不要重新提交。`);
+      lines.push(resume("继续同一个任务，不要重新提交。"));
     } else {
       lines.push(
         `服务商返回过任务 ${record.image.taskId}，但 ${record.image.provider} 的出图接口不能续查。不能 resume。不要重新提交。`,
@@ -446,23 +491,37 @@ export async function startDetached(input: { project: string; id: string; args: 
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await updateRun(input.project, input.id, (record) => {
-      record.status = "error";
-      record.error = message;
-    });
+    await updateRun(
+      input.project,
+      input.id,
+      (record) => {
+        record.status = "error";
+        record.error = message;
+      },
+      [],
+      input.io.cwd,
+    );
     throw err instanceof CliError ? err : new CliError(message);
   }
-  await updateRun(input.project, input.id, (record) => {
-    if (record.worker?.exited === "clean" && (record.status === "ok" || record.status === "error" || record.status === "mock")) {
-      return;
-    }
-    const worker: WorkerInfo = { ...record.worker, pid: spawned.pid, log: logFile };
-    delete worker.exited;
-    record.worker = worker;
-  });
+  await updateRun(
+    input.project,
+    input.id,
+    (record) => {
+      if (record.worker?.exited === "clean" && (record.status === "ok" || record.status === "error" || record.status === "mock")) {
+        return;
+      }
+      const worker: WorkerInfo = { ...record.worker, pid: spawned.pid, log: logFile };
+      delete worker.exited;
+      record.worker = worker;
+    },
+    [],
+    input.io.cwd,
+  );
+  const locate = { project: input.project, cwd: input.io.cwd };
   line(input.io, `run: ${input.id}`);
   line(input.io, `pid: ${spawned.pid}`);
-  line(input.io, `下一步: lumen runs wait ${input.id}`);
+  line(input.io, `log: ${logFile}`);
+  line(input.io, `下一步: ${runsFollow("wait", input.id, locate)}`);
 }
 
 export interface SettleOptions {
@@ -543,7 +602,7 @@ export async function settle(
     accepted = task;
     if (Array.isArray(note.calls)) ctx.calls = note.calls as HttpCall[];
     ctx.response = note.response;
-    await writeRun(project, snapshot("running", { pending: task }), secrets());
+    await writeRun(project, snapshot("running", { pending: task }), secrets(), { cwd: io.cwd });
   };
   io.noteImageResult = async (note: ImageResultNote) => {
     ctx.image = {
@@ -561,16 +620,16 @@ export async function settle(
       await mkdir(runDir(project, id), { recursive: true });
       await writeFile(file, note.url, { mode: 0o600 });
     }
-    if (mode === "execute") await writeRun(project, snapshot("pending"), secrets());
+    if (mode === "execute") await writeRun(project, snapshot("pending"), secrets(), { cwd: io.cwd });
   };
   ctx.afterLocal = async () => {
     if (detach) {
-      await writeRun(project, snapshot("pending"), secrets());
+      await writeRun(project, snapshot("pending"), secrets(), { cwd: io.cwd });
       await startDetached({ project, id, args: detachedWorkerArgs(recordedCommand, project), io });
       throw new DetachedSignal(id);
     }
     if (mode === "execute" && ctx.image !== undefined) {
-      await writeRun(project, snapshot("pending", { workerPid: process.pid }), secrets());
+      await writeRun(project, snapshot("pending", { workerPid: process.pid }), secrets(), { cwd: io.cwd });
     }
   };
   try {
@@ -639,7 +698,7 @@ export async function settle(
       ...(error === undefined ? {} : { error }),
       ...(pending === undefined ? {} : { pending }),
     });
-    await writeRun(project, record, secrets(), { sealWorker: true });
+    await writeRun(project, record, secrets(), { sealWorker: true, cwd: io.cwd });
 
     if (thrown !== undefined) {
       const message = error ?? "failed";
@@ -653,7 +712,7 @@ export async function settle(
     if (pending !== undefined) {
       line(io, `task: ${pending.provider} ${pending.taskId} (${pending.lastStatus})`);
       if (pending.pollUrl !== undefined) line(io, `poll: ${redactUrl(pending.pollUrl)}`);
-      line(io, resumeHint(id));
+      line(io, resumeHint(id, { project, cwd: io.cwd }));
     }
     for (const call of ctx.calls) line(io, `${call.method} ${redactUrl(call.url)}`);
     for (const output of outputs) line(io, `wrote: ${output}`);
@@ -684,12 +743,12 @@ export async function listRunRecords(project: string): Promise<RunRecord[]> {
 
 export async function readRunMarkdown(project: string, id: string): Promise<string> {
   const file = path.join(runDir(project, id), "record.md");
-  if (!(await fileExists(file))) throw new CliError(`no run ${id}`);
+  if (!(await fileExists(file))) throw noRun(project, id);
   return readFile(file, "utf8");
 }
 
 export async function readRunRecord(project: string, id: string): Promise<RunRecord> {
   const file = path.join(runDir(project, id), "record.json");
-  if (!(await fileExists(file))) throw new CliError(`no run ${id}`);
+  if (!(await fileExists(file))) throw noRun(project, id);
   return JSON.parse(await readFile(file, "utf8")) as RunRecord;
 }

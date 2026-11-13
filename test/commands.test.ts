@@ -77,6 +77,13 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(skill, /不要因为出现了视频就自动拆解/);
   assert.match(skill, /`lumen gen image`、`lumen gen video`、`lumen enhance`、`lumen breakdown`/);
   assert.match(skill, /lumen runs wait <id> --timeout 60/);
+  assert.match(skill, /<project>\/\.lumen\/runs\/<id>\//);
+  assert.match(skill, /record\.json/);
+  assert.match(skill, /worker\.log/);
+  assert.match(skill, /同一个 `--project`/);
+  assert.match(skill, /省略 `--project` 表示当前目录/);
+  assert.match(skill, /--project proj --execute --detach/);
+  assert.match(skill, /lumen runs wait <id> --project proj/);
   assert.match(skill, /references\/视频下载\/SKILL\.md/);
   assert.match(skill, /lumen download "<链接>" --to refs\/source\.mp4/);
   assert.match(skill, /lumen setup --key tikhub/);
@@ -168,7 +175,7 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.equal(/请对这个视频做逐镜头拉片分析/.test(breakdownSkill), false);
   const readme = await readFile(path.join(root, "README.md"), "utf8");
   assert.equal(readme.includes(BREAKDOWN_DEFAULT_PROMPT), true);
-  assert.equal(skill.trim().split("\n").length <= 80, true);
+  assert.equal(skill.trim().split("\n").length <= 81, true);
   assert.equal(/给代理用的|for agents/i.test(skill), false);
   assert.equal(/nurvision|\.nurvision|\bnv\b/i.test(skill.replaceAll("@nurvision/lumen", "")), false);
   assert.equal(/cinematic|电影感|seedance-pe\/SKILL\.md/.test(skill), false);
