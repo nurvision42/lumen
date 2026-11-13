@@ -1,11 +1,11 @@
 import { CliError } from "./errors.js";
 
 export const GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const;
-/** Shared Seedream ids. 5.0 Pro/Flash default to beeftv (also volcark). 5.5 defaults to yir. Aliases: seedream-5-pro, seedream-5-flash, seedream-5-5, bytedance/seedream-5.5. */
+/** Shared Seedream ids. 5.0 Pro/Flash default to beeftv (also volcark). 5.5 defaults to volcark (also yir). Aliases: seedream-5-pro, seedream-5-flash, seedream-5-5, bytedance/seedream-5.5. */
 export const SEEDREAM_DEFAULT_RESOLUTION = "2K";
 export const SEEDREAM_PRO_MODEL = "doubao-seedream-5-0-pro-260628";
 export const SEEDREAM_FLASH_MODEL = "doubao-seedream-5-0-flash-260915";
-/** Yir Standard API model. Wire id is bytedance/seedream-5.5. Aliases: seedream-5-5, bytedance/seedream-5.5. */
+/** Seedream 5.5 lumen id. Yir wire is bytedance/seedream-5.5. Volcark wire is doubao-seedream-5-5-261028. Aliases: seedream-5-5, bytedance/seedream-5.5. */
 export const SEEDREAM_55_MODEL = "seedream-5.5";
 export const SEEDREAM_MODELS = [SEEDREAM_PRO_MODEL, SEEDREAM_FLASH_MODEL, SEEDREAM_55_MODEL] as const;
 export const IMAGE_MODELS = [...GPT_IMAGE_MODELS, ...SEEDREAM_MODELS] as const;
@@ -151,8 +151,8 @@ export const MODELS: readonly ModelInfo[] = [
   {
     id: SEEDREAM_55_MODEL,
     kind: "image",
-    summary: "Seedream 5.5. Provider yir (wire bytedance/seedream-5.5). Default resolution 2K. 1K and 2K only. Yir APIMart 1K $0.0182/image, 2K $0.0280/image (2026-11-10). Reference images cost extra (amount unpublished). Transparent background and layer split are not open on Yir",
-    providers: ["yir"],
+    summary: "Seedream 5.5. Default provider volcark (wire doubao-seedream-5-5-261028), also yir (wire bytedance/seedream-5.5). Default resolution 2K on volcark and yir. volcark: 1K, 1.5K, 2K; output 0.13 yuan ≤2.61M px, 0.23 yuan above that up to 4.63M; input images 0.05 yuan each from the first; --background transparent|opaque|auto (transparent requires png). yir: 1K and 2K only, APIMart 1K $0.0182/image, 2K $0.0280/image (2026-11-10); refs extra (amount unpublished); no --background",
+    providers: ["volcark", "yir"],
   },
   ...SEEDANCE_MODELS.map((id) => ({
     id,
@@ -291,6 +291,8 @@ export interface ImageRequest {
   background?: (typeof IMAGE_BACKGROUNDS)[number];
   /** Set for GPT Image. `gpt-image-2` defaults to `high`; both 2.5 models default to `max`. Seedream omits it. */
   quality?: (typeof IMAGE_QUALITIES_2)[number] | (typeof IMAGE_QUALITIES_25)[number];
+  /** Seedream 5.5 on volcark. Omitted means png. jpeg cannot be combined with a transparent background. */
+  outputFormat?: "png" | "jpeg";
   references: string[];
 }
 
@@ -334,6 +336,24 @@ function oneOf<T extends string>(value: string | undefined, allowed: readonly T[
   return value as T;
 }
 
+/**
+ * Seedream 5.5 on volcark. png is the default. jpeg plus a transparent background
+ * is rejected by Ark, so it is rejected here before the request is built.
+ */
+export function assertSeedream55VolcarkOutput(
+  background: string | undefined,
+  outputFormat: string | undefined,
+): "png" | "jpeg" {
+  const format = outputFormat ?? "png";
+  if (format !== "png" && format !== "jpeg") {
+    throw new CliError("seedream-5.5 on volcark output format must be png or jpeg");
+  }
+  if (background === "transparent" && format === "jpeg") {
+    throw new CliError("seedream-5.5 on volcark cannot use --background transparent with jpeg; transparent requires png");
+  }
+  return format;
+}
+
 export function validateImage(input: {
   modelId: string;
   prompt: string;
@@ -342,6 +362,10 @@ export function validateImage(input: {
   background: string | undefined;
   quality: string | undefined;
   references: string[];
+  /** Bound provider. Seedream 5.5 uses volcark rules unless this is yir. Omitted means volcark, the listed default. */
+  provider?: string;
+  /** Seedream 5.5 on volcark. Omitted means png. */
+  outputFormat?: string;
 }): ImageRequest {
   const modelId = canonicalModel(input.modelId);
   if (!(IMAGE_MODELS as readonly string[]).includes(modelId)) {
@@ -352,26 +376,29 @@ export function validateImage(input: {
   if (prompt.length > 20_000) throw new CliError("prompt is longer than 20000 characters");
   const seedream = isSeedreamModel(modelId);
   const seedream55 = isSeedream55Model(modelId);
-  const aspectRatio = seedream55 && (input.aspectRatio === undefined || input.aspectRatio === "auto")
+  const yir55 = seedream55 && input.provider === "yir";
+  const volcark55 = seedream55 && !yir55;
+  const aspectRatio = seedream55 && !volcark55 && (input.aspectRatio === undefined || input.aspectRatio === "auto")
     ? "1:1"
     : oneOf(input.aspectRatio, IMAGE_ASPECTS, "aspect-ratio");
-  if (seedream55 && !(SEEDREAM_55_ASPECTS as readonly string[]).includes(aspectRatio)) {
+  if (seedream55 && !volcark55 && !(SEEDREAM_55_ASPECTS as readonly string[]).includes(aspectRatio)) {
     throw new CliError(`seedream-5.5 aspect-ratio must be one of ${SEEDREAM_55_ASPECTS.join(", ")}`);
   }
   const resolution = oneOf(
     input.resolution,
-    seedream55 ? SEEDREAM_55_RESOLUTIONS : seedream ? SEEDREAM_RESOLUTIONS : GPT_IMAGE_RESOLUTIONS,
+    volcark55 ? SEEDREAM_RESOLUTIONS : seedream55 ? SEEDREAM_55_RESOLUTIONS : seedream ? SEEDREAM_RESOLUTIONS : GPT_IMAGE_RESOLUTIONS,
     "resolution",
   );
   const background = input.background === undefined ? undefined : oneOf(input.background, IMAGE_BACKGROUNDS, "background");
   if (seedream && input.quality !== undefined) throw new CliError("seedream does not take --quality");
-  if (seedream55 && background !== undefined) {
+  if (seedream55 && !volcark55 && background !== undefined) {
     throw new CliError("seedream-5.5 on yir does not take --background (transparent output is not open on Yir yet)");
   }
-  if (seedream && background === "auto") throw new CliError("seedream background must be transparent or opaque");
-  if (seedream && background === "transparent" && input.references.length !== 1) {
+  if (seedream && !volcark55 && background === "auto") throw new CliError("seedream background must be transparent or opaque");
+  if (seedream && !volcark55 && background === "transparent" && input.references.length !== 1) {
     throw new CliError("seedream transparent background needs exactly one reference image");
   }
+  const outputFormat = volcark55 ? assertSeedream55VolcarkOutput(background, input.outputFormat) : undefined;
   const classic = modelId === "gpt-image-2";
   const quality = seedream
     ? undefined
@@ -387,6 +414,7 @@ export function validateImage(input: {
     resolution,
     ...(background === undefined ? {} : { background }),
     ...(quality === undefined ? {} : { quality }),
+    ...(outputFormat === "jpeg" ? { outputFormat } : {}),
     references: input.references,
   };
 }

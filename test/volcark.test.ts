@@ -3,10 +3,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { planVolcarkImage, seedreamSize, volcarkImageRef } from "../src/clients/volcark.js";
+import { VOLCARK_SEEDREAM_55_WIRE, planVolcarkImage, seedreamSize, volcarkImageRef, volcarkImageWireModel } from "../src/clients/volcark.js";
 import {
   IMAGE_ASPECTS,
   PROVIDER_DEFAULT_BASE_URLS,
+  SEEDREAM_55_MODEL,
+  SEEDREAM_DEFAULT_RESOLUTION,
   SEEDREAM_FLASH_MODEL,
   SEEDREAM_PRO_MODEL,
   SEEDREAM_RESOLUTIONS,
@@ -516,4 +518,287 @@ test("volcark cannot serve gpt-image and the skill is Chinese", async () => {
   assert.match(help, /data:image\/\.\.\.;base64/);
   assert.match(help, /Volcark does not upload them/);
   assert.equal(help.includes("volcark local") && help.includes("lumen42"), false);
+});
+
+test("volcark seedream-5.5 wire id is the Ark id unless aliased", () => {
+  assert.equal(volcarkImageWireModel(SEEDREAM_55_MODEL, undefined), VOLCARK_SEEDREAM_55_WIRE);
+  assert.equal(volcarkImageWireModel("seedream-5-5", undefined), VOLCARK_SEEDREAM_55_WIRE);
+  assert.equal(volcarkImageWireModel(SEEDREAM_55_MODEL, "custom-5.5"), "custom-5.5");
+  assert.equal(volcarkImageWireModel(SEEDREAM_PRO_MODEL, undefined), SEEDREAM_PRO_MODEL);
+});
+
+test("volcark seedream-5.5 allows 1K/1.5K/2K, background, and ten refs", () => {
+  const base = {
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "auto" as const,
+    resolution: "2K",
+    background: undefined as string | undefined,
+    quality: undefined,
+    references: [] as string[],
+    provider: "volcark",
+  };
+  const auto = validateImage(base);
+  assert.equal(auto.aspectRatio, "auto");
+  assert.equal(auto.resolution, "2K");
+  assert.equal(auto.background, undefined);
+  const mid = validateImage({ ...base, resolution: "1.5K", background: "auto" });
+  assert.equal(mid.resolution, "1.5K");
+  assert.equal(mid.background, "auto");
+  const clear = validateImage({
+    ...base,
+    aspectRatio: "9:16",
+    background: "transparent",
+    references: Array.from({ length: 10 }, (_, i) => `https://cdn.example/${i}.jpg`),
+  });
+  assert.equal(clear.background, "transparent");
+  assert.equal(clear.references.length, 10);
+  assert.equal(clear.outputFormat, undefined);
+
+  assert.throws(() => validateImage({ ...base, resolution: "4K" }), /1K, 1.5K, 2K/);
+  assert.throws(() => validateImage({ ...base, resolution: "3K" }), /1K, 1.5K, 2K/);
+  assert.throws(() => validateImage({ ...base, quality: "high" }), /does not take --quality/);
+  assert.throws(
+    () => validateImage({ ...base, references: Array.from({ length: 11 }, () => "https://cdn.example/a.png") }),
+    /limited to 10/,
+  );
+  assert.throws(
+    () => validateImage({ ...base, background: "transparent", outputFormat: "jpeg" }),
+    /transparent requires png/,
+  );
+  assert.throws(() => validateImage({ ...base, outputFormat: "webp" }), /png or jpeg/);
+  const jpeg = validateImage({ ...base, background: "opaque", outputFormat: "jpeg" });
+  assert.equal(jpeg.outputFormat, "jpeg");
+  assert.equal(jpeg.background, "opaque");
+});
+
+test("volcark seedream-5.5 body uses the Ark id, size, background, and refs", () => {
+  const one = validateImage({
+    modelId: "seedream-5-5",
+    prompt: "一只杯子",
+    aspectRatio: "16:9",
+    resolution: "2K",
+    background: "transparent",
+    quality: undefined,
+    references: ["https://cdn.example/a.jpg", "data:image/jpeg;base64,aaaa"],
+    provider: "volcark",
+  });
+  const call = planVolcarkImage(one, binding());
+  const body = jsonBody(call[0]);
+  assert.equal(call[0]?.url, `${BASE}/images/generations`);
+  assert.equal(body.model, VOLCARK_SEEDREAM_55_WIRE);
+  assert.equal(body.size, "2816x1584");
+  assert.equal(body.background, "transparent");
+  assert.equal(body.output_format, "png");
+  assert.equal(body.watermark, false);
+  assert.equal(body.response_format, "url");
+  assert.deepEqual(body.image, ["https://cdn.example/a.jpg", "data:image/jpeg;base64,aaaa"]);
+  assert.equal(JSON.stringify(body).includes("sequential_image_generation"), false);
+  assert.equal(JSON.stringify(body).includes("stream"), false);
+
+  const tier = validateImage({
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "auto",
+    resolution: "1.5K",
+    background: "auto",
+    quality: undefined,
+    references: ["https://cdn.example/only.png"],
+    provider: "volcark",
+  });
+  const tierBody = jsonBody(planVolcarkImage(tier, binding("custom-5.5"))[0]);
+  assert.equal(tierBody.model, "custom-5.5");
+  assert.equal(tierBody.size, "1.5K");
+  assert.equal(tierBody.background, "auto");
+  assert.equal(tierBody.image, "https://cdn.example/only.png");
+
+  const jpeg = validateImage({
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "1:1",
+    resolution: "1K",
+    background: "opaque",
+    quality: undefined,
+    references: [],
+    provider: "volcark",
+    outputFormat: "jpeg",
+  });
+  assert.equal(jsonBody(planVolcarkImage(jpeg, binding())[0]).output_format, "jpeg");
+  assert.throws(
+    () => planVolcarkImage({ ...jpeg, background: "transparent", outputFormat: "jpeg" }, binding()),
+    /transparent requires png/,
+  );
+});
+
+test("volcark seedream-5.5 price uses pixels and charges every input image", () => {
+  const cost = (resolution: string, aspectRatio = "auto", references = 0) =>
+    seedreamCost({ modelId: SEEDREAM_55_MODEL, resolution, aspectRatio, provider: "volcark", references });
+  assert.equal(cost("1K").yuan, 0.13);
+  assert.equal(cost("1K").text, "estimate: 0.13 yuan (seedream-5.5 volcark ≤2.61M px, 1 image)");
+  assert.equal(cost("1.5K").yuan, 0.13);
+  assert.equal(cost("1K", "16:9").yuan, 0.13);
+  assert.equal(cost("2K").yuan, 0.23);
+  assert.equal(cost("2K", "16:9").text, "estimate: 0.23 yuan (seedream-5.5 volcark >2.61M px, 1 image)");
+  assert.equal(cost("2K", "16:9", 2).yuan, 0.33);
+  assert.equal(
+    cost("1K", "1:1", 1).text,
+    "estimate: 0.18 yuan (seedream-5.5 volcark ≤2.61M px, 1 image + 0.05 yuan x 1 input image)",
+  );
+  assert.equal(seedreamCost({ modelId: SEEDREAM_PRO_MODEL, resolution: "2K", provider: "volcark" }).yuan, 0.6);
+});
+
+test("dry-run seedream-5.5 on volcark posts the Ark body and the pixel estimate", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, SEEDREAM_55_MODEL, ["--base-url", BASE]);
+    const cap = capture(isolatedEnv(dir));
+    assert.equal(
+      await run(
+        [
+          "gen", "image", "--model", "seedream-5.5", "--prompt", "一只杯子",
+          "--aspect-ratio", "16:9", "--resolution", "2K", "--background", "transparent",
+          "--ref", "https://cdn.example/a.jpg", "--ref", "data:image/png;base64,aaaa",
+          "--project", dir,
+        ],
+        cap.io,
+      ),
+      0,
+      cap.err(),
+    );
+    assert.match(cap.out(), /estimate: 0\.33 yuan \(seedream-5\.5 volcark >2\.61M px, 1 image \+ 0\.05 yuan x 2 input images\)/);
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    const record = JSON.parse(await readFile(path.join(dir, ".lumen/runs", id, "record.json"), "utf8")) as {
+      modelId: string;
+      params: { yuan?: number; background?: string };
+      calls: Array<{ url: string; body: { value?: Record<string, unknown> } }>;
+    };
+    assert.equal(record.modelId, SEEDREAM_55_MODEL);
+    assert.equal(record.params.yuan, 0.33);
+    assert.equal(record.params.background, "transparent");
+    const body = record.calls[0]?.body.value;
+    assert.equal(record.calls[0]?.url, `${BASE}/images/generations`);
+    assert.equal(body?.model, VOLCARK_SEEDREAM_55_WIRE);
+    assert.equal(body?.size, "2816x1584");
+    assert.equal(body?.background, "transparent");
+    assert.equal(body?.output_format, "png");
+    assert.equal(body?.watermark, false);
+    assert.deepEqual(body?.image, ["https://cdn.example/a.jpg", "data:image/png;base64,aaaa"]);
+    assert.equal(JSON.stringify(body).includes("sequential_image_generation"), false);
+
+    const tier = capture(isolatedEnv(dir));
+    assert.equal(
+      await run(
+        ["gen", "image", "--model", SEEDREAM_55_MODEL, "--prompt", "一只杯子", "--resolution", "1.5K", "--project", dir],
+        tier.io,
+      ),
+      0,
+      tier.err(),
+    );
+    assert.match(tier.out(), /estimate: 0\.13 yuan \(seedream-5\.5 volcark ≤2\.61M px, 1 image\)/);
+    const tierId = /run: (\S+)/.exec(tier.out())?.[1];
+    assert.ok(tierId);
+    const tierRecord = JSON.parse(await readFile(path.join(dir, ".lumen/runs", tierId, "record.json"), "utf8")) as {
+      calls: Array<{ body: { value?: { model?: string; size?: string; background?: string } } }>;
+    };
+    assert.equal(tierRecord.calls[0]?.body.value?.model, VOLCARK_SEEDREAM_55_WIRE);
+    assert.equal(tierRecord.calls[0]?.body.value?.size, "1.5K");
+    assert.equal(tierRecord.calls[0]?.body.value?.background, undefined);
+
+    const alias = capture(isolatedEnv(dir));
+    assert.equal(
+      await run(
+        ["providers", "set", SEEDREAM_55_MODEL, "--provider", "volcark", "--base-url", BASE, "--api-key-env", "ARK_API_KEY", "--model-alias", "custom-5.5", "--project", dir],
+        alias.io,
+      ),
+      0,
+      alias.err(),
+    );
+    const aliased = capture(isolatedEnv(dir));
+    assert.equal(
+      await run(["gen", "image", "--model", "bytedance/seedream-5.5", "--prompt", "一只杯子", "--project", dir], aliased.io),
+      0,
+      aliased.err(),
+    );
+    const aliasId = /run: (\S+)/.exec(aliased.out())?.[1];
+    assert.ok(aliasId);
+    const aliasRecord = JSON.parse(await readFile(path.join(dir, ".lumen/runs", aliasId, "record.json"), "utf8")) as {
+      calls: Array<{ body: { value?: { model?: string; size?: string } } }>;
+    };
+    assert.equal(aliasRecord.calls[0]?.body.value?.model, "custom-5.5");
+    assert.equal(aliasRecord.calls[0]?.body.value?.size, "2K");
+
+    const bad = capture(isolatedEnv(dir));
+    assert.equal(
+      await run(
+        ["gen", "image", "--model", SEEDREAM_55_MODEL, "--prompt", "一只杯子", "--resolution", "4K", "--project", dir],
+        bad.io,
+      ),
+      1,
+    );
+    assert.match(bad.err(), /1K, 1\.5K, 2K/);
+    const many = capture(isolatedEnv(dir));
+    assert.equal(
+      await run(
+        [
+          "gen", "image", "--model", SEEDREAM_55_MODEL, "--prompt", "一只杯子",
+          ...Array.from({ length: 11 }, () => ["--ref", "https://cdn.example/a.png"]).flat(),
+          "--project", dir,
+        ],
+        many.io,
+      ),
+      1,
+    );
+    assert.match(many.err(), /limited to 10/);
+  });
+});
+
+test("models list and docs name seedream-5.5 on yir and volcark", async () => {
+  const listed = capture();
+  assert.equal(await run(["models", SEEDREAM_55_MODEL], listed.io), 0, listed.err());
+  assert.match(listed.out(), new RegExp(`^${SEEDREAM_55_MODEL}  image  volcark,yir`, "m"));
+  assert.match(listed.out(), /doubao-seedream-5-5-261028/);
+  assert.match(listed.out(), /0\.13 yuan/);
+  const skill = await readFile(path.join(root, "skills", "lumen", "SKILL.md"), "utf8");
+  const usage = await readFile(path.join(root, "skills", "lumen", "references", "seedream", "SKILL.md"), "utf8");
+  const readme = await readFile(path.join(root, "README.md"), "utf8");
+  const help = await readFile(path.join(root, "src", "help.ts"), "utf8");
+  for (const text of [skill, usage, readme, help]) {
+    assert.match(text, /doubao-seedream-5-5-261028/);
+    assert.match(text, /0\.13/);
+    assert.match(text, /0\.05/);
+    assert.match(text, /transparent/);
+  }
+  assert.match(skill, /默认供应商是 `volcark`/);
+  assert.match(skill, /默认供应商是 `beeftv`/);
+  assert.match(usage, /默认 `volcark`/);
+  assert.match(usage, /默认供应商是 `beeftv`/);
+  assert.match(readme, /volcark（默认）、yir/);
+  assert.match(help, /Default resolution 2K on volcark and on yir/);
+  assert.equal(SEEDREAM_DEFAULT_RESOLUTION, "2K");
+});
+
+test("omitted seedream-5.5 provider uses volcark rules at the default 2K resolution", () => {
+  const request = validateImage({
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "auto",
+    resolution: SEEDREAM_DEFAULT_RESOLUTION,
+    background: "transparent",
+    quality: undefined,
+    references: [],
+  });
+  assert.equal(request.aspectRatio, "auto");
+  assert.equal(request.resolution, "2K");
+  assert.equal(request.background, "transparent");
+  assert.equal(jsonBody(planVolcarkImage(request, binding())[0]).size, "2K");
+  const mid = validateImage({
+    modelId: SEEDREAM_55_MODEL,
+    prompt: "一只杯子",
+    aspectRatio: "1:1",
+    resolution: "1.5K",
+    background: undefined,
+    quality: undefined,
+    references: [],
+  });
+  assert.equal(mid.resolution, "1.5K");
 });

@@ -12,7 +12,7 @@ import {
   type FishModel,
 } from "../catalog.js";
 import { missingVolcarkKey } from "../clients/volcark.js";
-import { missingKey } from "../config.js";
+import { loadConfig, missingKey } from "../config.js";
 import { CliError } from "../errors.js";
 import { fileExists } from "../fsutil.js";
 import { flagList, flagString, parseFlags, requireRestEmpty, runMode, type FlagKind } from "../flags.js";
@@ -100,6 +100,7 @@ export async function genImage(args: string[], project: string, io: IO, command:
       resolution,
       references: flagList(values, "ref"),
     };
+    const loaded = await loadConfig(project, io.env);
     const request = validateImage({
       modelId,
       prompt: prompt ?? "",
@@ -108,6 +109,7 @@ export async function genImage(args: string[], project: string, io: IO, command:
       background: flagString(values, "background"),
       quality: flagString(values, "quality"),
       references: flagList(values, "ref"),
+      provider: loaded.config.models[modelId]?.provider,
     });
     ctx.params = request;
     const { binding } = await adoptBinding(ctx, project, io.env, modelId);
