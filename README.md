@@ -303,7 +303,7 @@ lumen runs wait 20261024T164700Z-ab12 --timeout 60
 lumen runs resume 20261024T164700Z-ab12 --execute --detach   # 继续等仍在跑的 seedance 或 mediakit 任务，完成后下载或写入结果
 ```
 
-助手跑出图、出视频或增强时，用 `--detach --execute`，不要在前台一直等。命令做完本地校验、打印预估、写好 run 后，会派生一个新会话的子进程去提交、轮询、下载和后处理（增强加颗粒）。父进程打印 run id 和 `下一步: lumen runs wait <id>`，退出码 0。子进程不随父进程或终端退出。日志在 `.lumen/runs/<id>/worker.log`，pid 在 run 记录里。
+助手跑出图、出视频、增强或拆解时，用 `--detach --execute`，不要在前台一直等。命令做完本地校验、打印预估、写好 run 后，会派生一个新会话的子进程去提交、轮询、下载和后处理（增强加颗粒）。父进程打印 run id 和 `下一步: lumen runs wait <id>`，退出码 0。子进程不随父进程或终端退出。日志在 `.lumen/runs/<id>/worker.log`，pid 在 run 记录里。
 
 然后在同一轮里循环 `lumen runs wait <id> --timeout 60`（默认 60 秒）。`wait` 只读记录，不提交、不扣费；杀掉 `wait` 不影响生成。
 
@@ -347,7 +347,7 @@ For a checkout: `npm install`, `npm test`, `npm run build`, then `node dist/cli.
 
 The default is `--dry-run` (audit only, no network, no media). `--execute` calls the provider. `--mock` uses a built-in fake transport and writes no media. Exit `0` on success, `1` on a bad request or missing key, `2` on usage, `3` when `lumen runs wait` times out while generation is still running. Usage errors do not create a run.
 
-Assistants should generate with `--detach --execute` (`gen image`, `gen video`, `enhance`, and `runs resume`), then poll `lumen runs wait <id> --timeout 60` in the same turn. Detach validates locally, prints the estimate, writes the run, and leaves submit, poll, download, and post-processing (enhance grain) to a child in a new session. The parent prints the run id and exits 0. Wait is read-only: exit 0 prints `wrote:` paths, exit 3 means still running, exit 1 is a failure. After the user interrupts a turn, run `lumen runs list --pending` and keep waiting; do not submit again. Stop a job with the pid stored on the run, not `pkill`. A dead pid with status `pending` or `running` is interrupted. `runs show` says whether an image exists. Resume reuses a provider task id, or downloads a saved image URL, and never resubmits.
+Assistants should generate with `--detach --execute` (`gen image`, `gen video`, `enhance`, `breakdown`, and `runs resume`), then poll `lumen runs wait <id> --timeout 60` in the same turn. Detach validates locally, prints the estimate, writes the run, and leaves submit, poll, download, and post-processing (enhance grain) to a child in a new session. The parent prints the run id and exits 0. Wait is read-only: exit 0 prints `wrote:` paths, exit 3 means still running, exit 1 is a failure. After the user interrupts a turn, run `lumen runs list --pending` and keep waiting; do not submit again. Stop a job with the pid stored on the run, not `pkill`. A dead pid with status `pending` or `running` is interrupted. `runs show` says whether an image exists. Resume reuses a provider task id, or downloads a saved image URL, and never resubmits.
 
 ## Routing
 

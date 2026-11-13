@@ -66,6 +66,8 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(skill, /references\/视频拆解\/SKILL\.md/);
   assert.match(skill, /不要传 prompt/);
   assert.match(skill, /不要因为出现了视频就自动拆解/);
+  assert.match(skill, /`lumen gen image`、`lumen gen video`、`lumen enhance`、`lumen breakdown`/);
+  assert.match(skill, /lumen runs wait <id> --timeout 60/);
   assert.match(skill, /references\/视频下载\/SKILL\.md/);
   assert.match(skill, /lumen download "<链接>" --to refs\/source\.mp4/);
   assert.match(skill, /lumen setup --key tikhub/);
@@ -139,6 +141,11 @@ test("seedance prompt skill is one file and old paths redirect", async () => {
   assert.match(breakdownSkill, /不要传 prompt/);
   assert.match(breakdownSkill, /不要自己写拆解提示词/);
   assert.match(breakdownSkill, /不要因为对话里出现了视频就自动拆解/);
+  assert.match(breakdownSkill, /--execute --detach/);
+  assert.match(breakdownSkill, /lumen runs wait <id> --timeout 60/);
+  assert.match(breakdownSkill, /lumen runs resume <id> --execute --detach/);
+  assert.match(breakdownSkill, /不要前台一直等/);
+  assert.match(breakdownSkill, /不要重新拆解/);
   assert.match(breakdownSkill, /每个镜头单独一节/);
   assert.match(breakdownSkill, /字幕\/台词放在这一节最上面/);
   assert.match(breakdownSkill, /不要用 14 列宽表/);

@@ -9,7 +9,7 @@ Usage:
   lumen providers list|set|doctor
   lumen gen <image|video|voice> --model <id> [--shot N] [--dry-run|--execute|--mock] [--detach]
   lumen fish <design|clone|synth> [--shot N]
-  lumen breakdown [--video file] [--prefer-endpoint <id>]
+  lumen breakdown [--video file] [--prefer-endpoint <id>] [--dry-run|--execute|--mock] [--detach]
   lumen download <douyin-url> --to <path> [--region <code>] [--json]
   lumen setup --key tikhub
   lumen setup ffmpeg
@@ -141,10 +141,11 @@ Config:
 Exit 0 on success, 1 on a bad project or request, 2 on usage, 3 when \`lumen runs wait\` times out and the run is still going.
 
 后台生成（助手照这个跑，不要前台死等 --execute）:
-  出图、出视频、增强，以及续跑，一律加 --detach --execute。
+  出图、出视频、增强、拆解，以及续跑，一律加 --detach --execute。
   例如 lumen gen image --model <id> --prompt <中文> --execute --detach
        lumen gen video --model <id> ... --execute --detach
        lumen enhance --video <file> --execute --detach
+       lumen breakdown --video <file> --execute --detach
        lumen runs resume <id> --execute --detach
   --detach 先做本地校验、打印预估、写好 run，再派生脱离终端的子进程去提交、轮询、下载、后处理（增强会加颗粒）。
   父进程马上打印 run id 和「下一步: lumen runs wait <id>」，退出码 0。子进程不跟父进程一起退出，终端关掉也不停。

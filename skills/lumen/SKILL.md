@@ -25,9 +25,9 @@ lumen 是本地视频工具集。二进制是 `lumen`。本文中的 `references
 
 ## 助手怎么跑生成
 
-出图、出视频、增强不要在前台一直占着 `--execute`。用户一发新消息，这一轮会被打断，前台进程被杀掉，生成中断；再提交一次会重新扣费。不要依赖子任务，也不要用 `nohup`、`&` 或 `pkill -f` 自己管后台。
+出图、出视频、增强、拆解不要在前台一直占着 `--execute`。用户一发新消息，这一轮会被打断，前台进程被杀掉，生成中断；再提交一次会重新扣费。不要依赖子任务，也不要用 `nohup`、`&` 或 `pkill -f` 自己管后台。
 
-1. 生成一律加上 `--detach --execute`：`lumen gen image`、`lumen gen video`、`lumen enhance`。续跑是 `lumen runs resume <id> --execute --detach`。命令做完本地校验、打出预估、写好 run 后，把提交、轮询、下载和后处理（增强的颗粒）交给脱离终端的子进程，自己打印 run id，退出码 0。
+1. 生成一律加上 `--detach --execute`：`lumen gen image`、`lumen gen video`、`lumen enhance`、`lumen breakdown`。续跑是 `lumen runs resume <id> --execute --detach`。命令做完本地校验、打出预估、写好 run 后，把提交、轮询、下载和后处理（增强的颗粒）交给脱离终端的子进程，自己打印 run id，退出码 0。
 2. 同一轮里接着循环 `lumen runs wait <id> --timeout 60`。退出码 0：把 `wrote:` 路径发给用户。退出码 3：仍在生成，可以先回一句进度再 wait。退出码 1：把失败原因告诉用户。`wait` 只读记录，不提交。杀掉 `wait` 不影响生成。
 3. 用户中途发消息后，先回用户，再 `lumen runs list --pending`。有未取走的就继续 wait，把结果发回去。不要重新提交。
 4. 要停任务只用 run 记录里的 pid。`runs show <id>` 能看状态。生图若已中断：有结果 URL 就 `runs resume`（只下载，不重提）；有服务端任务就 resume 同一个任务；什么都没有就说明不能 resume，不要重提。

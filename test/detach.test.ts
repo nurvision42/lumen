@@ -86,6 +86,7 @@ test("help describes detach, wait exit codes, and the assistant loop in Chinese"
   assert.match(text, /lumen runs list --pending/);
   assert.match(text, /不要重新提交/);
   assert.match(text, /不要用 nohup/);
+  assert.match(text, /lumen breakdown --video <file> --execute --detach/);
   assert.match(text, /npm postinstall installs that directory/);
 });
 
@@ -598,6 +599,294 @@ test("resume --detach validates then spawns and does not poll while the worker i
     const usage = capture(env(dir));
     assert.equal(await run(["runs", "resume", id, "--detach", "--project", dir], usage.io), 2);
     assert.match(usage.err(), /--detach 需要 --execute/);
+  });
+});
+
+const SHOTS = { shots: [{ "#": 1, durationSec: 1.5, frame: "door", vo: "" }] };
+
+function gateChild(
+  cap: ReturnType<typeof capture>,
+  pid = process.pid,
+): { release: () => void; childOut: () => string; specs: string[][] } {
+  let childOut = "";
+  const specs: string[][] = [];
+  let release = (): void => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  cap.io.spawnDetached = (spec) => {
+    specs.push(spec.args);
+    const child: IO = {
+      stdout: (chunk) => {
+        childOut += chunk;
+      },
+      stderr: (chunk) => {
+        childOut += chunk;
+      },
+      cwd: spec.cwd,
+      env: spec.env,
+      fetch: cap.io.fetch,
+    };
+    void gate.then(() =>
+      run(spec.args, child).then(
+        (exitCode) => {
+          childOut += `\nexit ${exitCode}\n`;
+        },
+        (err: unknown) => {
+          childOut += `\n${err instanceof Error ? err.message : String(err)}\n`;
+        },
+      ),
+    );
+    return { pid };
+  };
+  return { release, childOut: () => childOut, specs };
+}
+
+test("breakdown --detach validates locally and does not hand off a bad request", async () => {
+  await withDir(async (dir) => {
+    const bare = capture(env(dir));
+    assert.equal(await run(["breakdown", "--video", "refs/clip.mp4", "--detach", "--project", dir], bare.io), 2);
+    assert.match(bare.err(), /--detach 需要 --execute/);
+
+    await bind(dir, "video-understand-router", "mediakit", "https://mediakit.example", "MEDIAKIT_UNDERSTAND_KEY");
+    let spawned = 0;
+    const blocked = {
+      cwd: dir,
+      fetch: async () => {
+        throw new Error("must not fetch");
+      },
+      spawnDetached: () => {
+        spawned += 1;
+        return { pid: process.pid };
+      },
+    };
+    const missing = capture(env(dir), blocked);
+    assert.equal(
+      await run(["breakdown", "--video", "refs/clip.mp4", "--execute", "--detach", "--project", dir], missing.io),
+      1,
+    );
+    assert.match(missing.err(), /missing API key env MEDIAKIT_UNDERSTAND_KEY/);
+    const absent = capture(env(dir, { MEDIAKIT_UNDERSTAND_KEY: "mediakit-key-value" }), blocked);
+    assert.equal(
+      await run(["breakdown", "--video", "refs/missing.mp4", "--execute", "--detach", "--project", dir], absent.io),
+      1,
+    );
+    assert.match(absent.err(), /video not found/);
+    assert.equal(spawned, 0);
+
+    await mkdir(path.join(dir, "refs"), { recursive: true });
+    await writeFile(path.join(dir, "refs", "clip.mp4"), "fake");
+    const dry = capture(env(dir, { MEDIAKIT_UNDERSTAND_KEY: "mediakit-key-value" }), blocked);
+    assert.equal(await run(["breakdown", "--video", "refs/clip.mp4", "--project", dir], dry.io), 0, dry.err());
+    assert.match(dry.out(), /^dry-run video-understand-router/m);
+    assert.equal(dry.out().includes("下一步"), false);
+    assert.equal(spawned, 0);
+  });
+});
+
+test("breakdown --detach hands off upload and wait prints the written paths", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "video-understand-router", "mediakit", "https://mediakit.example", "MEDIAKIT_UNDERSTAND_KEY");
+    await mkdir(path.join(dir, "refs"), { recursive: true });
+    await writeFile(path.join(dir, "refs", "clip.mp4"), "fake");
+    const calls: string[] = [];
+    let armed = false;
+    const cap = capture(env(dir, { MEDIAKIT_UNDERSTAND_KEY: "mediakit-key-value", MEDIAKIT_POLL_MS: "0" }), { cwd: dir });
+    const child = gateChild(cap);
+    cap.io.fetch = async (input, init) => {
+      if (!armed) throw new Error("parent must not fetch");
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      if (url.includes("request-media-upload-url")) {
+        assert.equal(String(init?.body), "{}");
+        return Response.json({
+          success: true,
+          result: { file_id: "abc123", upload_url: "https://upload.example/put", method: "PUT", upload_headers: [] },
+        });
+      }
+      if (method === "PUT") return new Response("", { status: 200 });
+      if (url.includes("video-understand-router")) {
+        const body = JSON.parse(String(init?.body)) as { video_urls?: string[] };
+        assert.deepEqual(body.video_urls, ["mediakit://abc123"]);
+        return Response.json({ success: true, task_id: "task-b" });
+      }
+      if (url.includes("/api/v1/tasks/task-b")) {
+        return Response.json({ success: true, status: "completed", result: SHOTS });
+      }
+      throw new Error(`unexpected ${method} ${url}`);
+    };
+    assert.equal(
+      await run(["breakdown", "--video", "refs/clip.mp4", "--execute", "--detach", "--project", dir], cap.io),
+      0,
+      cap.err(),
+    );
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id, cap.out());
+    assert.match(cap.out(), new RegExp(`下一步: lumen runs wait ${id}`));
+    assert.equal(cap.out().includes("wrote:"), false);
+    assert.equal(calls.length, 0);
+    assert.deepEqual(child.specs[0]?.includes("--detach"), false);
+    assert.equal(child.specs[0]?.includes("--execute"), true);
+    const pending = await readRunRecord(dir, id);
+    assert.equal(pending.status, "pending");
+    assert.equal(pending.modelId, "video-understand-router");
+    assert.equal(pending.worker?.pid, process.pid);
+    const waiting = capture(env(dir), {
+      fetch: async () => {
+        throw new Error("wait must not fetch");
+      },
+    });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "0", "--project", dir], waiting.io), 3);
+    assert.match(waiting.out(), /仍在生成/);
+
+    armed = true;
+    child.release();
+    await until(async () => {
+      const record = await readRunRecord(dir, id);
+      return record.status === "ok" || record.status === "error";
+    });
+    assert.equal((await readRunRecord(dir, id)).status, "ok", child.childOut());
+    assert.equal(calls.filter((call) => call.includes("video-understand-router")).length, 1, calls.join("\n"));
+    assert.ok(calls.some((call) => call.startsWith("PUT ")));
+    const done = capture(env(dir), {
+      fetch: async () => {
+        throw new Error("wait must not fetch");
+      },
+    });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "5", "--project", dir], done.io), 0, done.err());
+    assert.match(done.out(), /wrote: .*shotlist\.json/);
+    assert.match(done.out(), new RegExp(`wrote: .*${id}\\.video-understand\\.json`));
+    const shotlist = JSON.parse(await readFile(path.join(dir, "shotlist.json"), "utf8")) as Array<{ frame: string }>;
+    assert.equal(shotlist[0]?.frame, "door");
+  });
+});
+
+test("breakdown wait exits 1 when the detached task fails", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "video-understand-router", "mediakit", "https://mediakit.example", "MEDIAKIT_UNDERSTAND_KEY");
+    await mkdir(path.join(dir, "refs"), { recursive: true });
+    await writeFile(path.join(dir, "refs", "clip.mp4"), "fake");
+    let armed = false;
+    const cap = capture(env(dir, { MEDIAKIT_UNDERSTAND_KEY: "mediakit-key-value", MEDIAKIT_POLL_MS: "0" }), { cwd: dir });
+    const child = gateChild(cap);
+    cap.io.fetch = async (input, init) => {
+      if (!armed) throw new Error("parent must not fetch");
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.includes("request-media-upload-url")) {
+        return Response.json({ result: { file_id: "abc123", upload_url: "https://upload.example/put" } });
+      }
+      if (method === "PUT") return new Response("", { status: 200 });
+      if (url.includes("video-understand-router")) {
+        return Response.json({
+          success: false,
+          status: "failed",
+          task_id: "task-fail",
+          error: { message: "upstream broke" },
+        });
+      }
+      throw new Error(`unexpected ${method} ${url}`);
+    };
+    assert.equal(
+      await run(["breakdown", "--video", "refs/clip.mp4", "--execute", "--detach", "--project", dir], cap.io),
+      0,
+      cap.err(),
+    );
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    armed = true;
+    child.release();
+    await until(async () => (await readRunRecord(dir, id)).status === "error");
+    const failed = capture(env(dir), {
+      fetch: async () => {
+        throw new Error("wait must not fetch");
+      },
+    });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "5", "--project", dir], failed.io), 1);
+    assert.match(failed.err(), /upstream broke/);
+    assert.match(failed.err(), new RegExp(`run: ${id}`));
+  });
+});
+
+test("breakdown resume --detach polls the same MediaKit task", async () => {
+  await withDir(async (dir) => {
+    await bind(dir, "video-understand-router", "mediakit", "https://mediakit.example", "MEDIAKIT_UNDERSTAND_KEY");
+    await mkdir(path.join(dir, "refs"), { recursive: true });
+    await writeFile(path.join(dir, "refs", "clip.mp4"), "fake");
+    const posts: string[] = [];
+    let phase: "submit" | "resume" = "submit";
+    const cap = capture(
+      env(dir, { MEDIAKIT_UNDERSTAND_KEY: "mediakit-key-value", MEDIAKIT_POLL_MS: "0", MEDIAKIT_MAX_POLLS: "1" }),
+      { cwd: dir },
+    );
+    const child = gateChild(cap);
+    cap.io.fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (method === "POST") posts.push(url);
+      if (phase === "resume" && method === "POST") throw new Error(`resume resubmitted ${url}`);
+      if (url.includes("request-media-upload-url")) {
+        return Response.json({ result: { file_id: "abc123", upload_url: "https://upload.example/put" } });
+      }
+      if (method === "PUT") return new Response("", { status: 200 });
+      if (url.includes("video-understand-router")) return Response.json({ success: true, task_id: "task-b" });
+      if (url.includes("/api/v1/tasks/task-b")) {
+        if (phase === "submit") return Response.json({ success: true, status: "running", task_id: "task-b" });
+        return Response.json({ success: true, status: "completed", task_id: "task-b", result: SHOTS });
+      }
+      throw new Error(`unexpected ${method} ${url}`);
+    };
+    assert.equal(
+      await run(["breakdown", "--video", "refs/clip.mp4", "--execute", "--detach", "--project", dir], cap.io),
+      0,
+      cap.err(),
+    );
+    const id = /run: (\S+)/.exec(cap.out())?.[1];
+    assert.ok(id);
+    child.release();
+    await until(async () => (await readRunRecord(dir, id)).status === "running");
+    const running = await readRunRecord(dir, id);
+    assert.equal(running.pending?.provider, "mediakit");
+    assert.equal(running.pending?.taskId, "task-b");
+    const submitted = posts.length;
+
+    phase = "resume";
+    let resumeArmed = false;
+    const resume = capture(env(dir, { MEDIAKIT_UNDERSTAND_KEY: "mediakit-key-value", MEDIAKIT_POLL_MS: "0" }), {
+      cwd: dir,
+      fetch: async (input, init) => {
+        if (!resumeArmed) throw new Error("resume parent must not fetch");
+        return cap.io.fetch!(input, init);
+      },
+    });
+    const resumeChild = gateChild(resume, await deadPid());
+    assert.equal(await run(["runs", "resume", id, "--execute", "--detach", "--project", dir], resume.io), 0, resume.err());
+    assert.match(resume.out(), new RegExp(`下一步: lumen runs wait ${id}`));
+    assert.equal(resumeChild.specs[0]?.[0], "runs");
+    assert.equal(resumeChild.specs[0]?.includes("breakdown"), false);
+    const still = capture(env(dir), {
+      fetch: async () => {
+        throw new Error("wait must not fetch");
+      },
+    });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "0", "--project", dir], still.io), 3);
+
+    resumeArmed = true;
+    resumeChild.release();
+    await until(async () => {
+      const record = await readRunRecord(dir, id);
+      return record.status === "ok" || record.status === "error";
+    });
+    assert.equal((await readRunRecord(dir, id)).status, "ok", resumeChild.childOut());
+    assert.equal(posts.length, submitted, posts.join("\n"));
+    const done = capture(env(dir), {
+      fetch: async () => {
+        throw new Error("wait must not fetch");
+      },
+    });
+    assert.equal(await run(["runs", "wait", id, "--timeout", "5", "--project", dir], done.io), 0, done.err());
+    assert.match(done.out(), /wrote: .*shotlist\.json/);
   });
 });
 
